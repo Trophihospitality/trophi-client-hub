@@ -1,112 +1,121 @@
-## Trophi client portal — build plan
+## Scope
 
-Ship the portal end-to-end: TanStack Router port of the existing pages, Tailwind v4 token migration, and Lovable Cloud backend replacing the localStorage store (auth, RLS, storage, server-generated IDs).
+Port the existing Trophi CRM (React Router + localStorage + demo user switcher) onto the TanStack Start + Lovable Cloud template, preserving all business logic, IDs, status colors, gold-rule utility, and CRM behaviors exactly.
 
-### 1. Repo intake
+## 1. Design tokens — `src/styles.css`
 
-Loose source files at project root (`AppShell.tsx`, `CRM.tsx`, `ClientDetail.tsx`, `Onboarding.tsx`, `crmStore.tsx`, `seedData.ts`, `types.ts`, `ids.ts`, `csv.ts`, `statusConfig.ts`, `PipelineBoard.tsx`, `StatusBadge.tsx`, `AddClientDialog.tsx`, `AttachmentsSection.tsx`, `LogContactDialog.tsx`, `userStore.tsx`, `App.tsx`, `index.css`) are the source of truth. The public GitHub repo currently holds only the TanStack template shell, so we treat the loose files as the code to move in.
+Keep the existing shadcn `@theme inline` / oklch tokens, but overwrite the Trophi-specific parts and add:
 
-Move them into the standard layout:
-- Pages → `src/pages/…` referenced from route files
-- Components → `src/components/{layout,crm}/…`
-- Store/lib/data → `src/store/`, `src/lib/`, `src/data/`
+- All `--trophi-*` variables (gold, gold-light, bronze, gold-soft, ink, charcoal, cream) with exact HSL values.
+- All nine `--status-*` variables.
+- Remap `--background`, `--foreground`, `--primary`, `--accent`, `--ring`, `--card`, etc. to the Trophi palette (matches original `index.css`).
+- `.gold-rule` and `.text-gold-gradient` as `@utility` blocks.
+- Register `--font-display` and `--font-sans` in `@theme` (Montserrat / Inter).
 
-### 2. Tailwind v4 tokens & fonts
+Load Montserrat + Inter via `<link>` in `src/routes/__root.tsx` head (never `@import` URLs).
 
-- Delete `@import url(fonts.googleapis.com…)` from CSS. Add Google Fonts preconnect + stylesheet `<link>` entries to `head()` in `src/routes/__root.tsx` (Montserrat + Inter).
-- Rewrite `src/styles.css` around `@import "tailwindcss"` with an `@theme` block. Preserve every variable name and value verbatim: `--trophi-gold`, `--trophi-gold-light`, `--trophi-bronze`, `--trophi-gold-soft`, `--trophi-ink`, `--trophi-charcoal`, `--trophi-cream`, the shadcn semantic tokens, and all nine `--status-*` colors. Register `--font-display: "Montserrat"` and `--font-sans: "Inter"` in `@theme` so `font-display`/`font-sans` utilities work.
-- Port the `.gold-rule` and `.text-gold-gradient` utilities via `@utility`.
+## 2. File reorganization
 
-### 3. Routing port (React Router → TanStack Router)
-
-Create file-based routes; keep component bodies unchanged except for routing imports:
+Move loose root files into the src tree:
 
 ```
-src/routes/
-  __root.tsx                (already exists — extend head + shell)
-  index.tsx                 → redirect to /crm when signed in, /auth otherwise
-  auth.tsx                  → sign in / sign up (email + password)
-  _authenticated/route.tsx  → integration-managed gate (created by supabase enable)
-  _authenticated/crm.tsx
-  _authenticated/crm.$businessId.tsx
-  _authenticated/onboarding.tsx
-  _authenticated/accounts.tsx    (placeholder — matches sidebar)
-  _authenticated/support.tsx     (placeholder)
-  _authenticated/client-portal.tsx (placeholder)
+src/lib/         types.ts, ids.ts, statusConfig.ts, csv.ts
+src/data/        seedData.ts (SALES_TEAM only — no SEED_CLIENTS anymore)
+src/store/       crmStore.tsx, userStore.tsx
+src/components/  AppShell.tsx
+src/components/crm/  StatusBadge, AddClientDialog, LogContactDialog,
+                     AttachmentsSection, PipelineBoard
 ```
 
-Global find/replace inside moved components:
-- `react-router-dom` → `@tanstack/react-router`
-- `NavLink` → `Link` with `activeProps`
-- `useNavigate()` returns a function accepting `{ to, params }`
-- `useParams<{ businessId: string }>()` → `Route.useParams()` in leaf route
-- `<Outlet />` from tanstack
+Delete loose root copies + `index.css` + `App.tsx`.
 
-`AppShell` becomes the `component` of `_authenticated/route.tsx` (renders sidebar + `<Outlet />`). Demo user switcher is removed; footer shows the signed-in user + sign-out button.
+## 3. TanStack Router port
 
-### 4. Lovable Cloud backend
+- `src/routes/__root.tsx` — brand meta, font `<link>`s, `QueryClientProvider`.
+- `src/routes/index.tsx` — redirect `/` → `/crm`.
+- `src/routes/auth.tsx` — email/password + Google (via `lovable.auth.signInWithOAuth`) sign-in / sign-up. Public route.
+- `src/routes/_authenticated/route.tsx` — `ssr:false`, `getUser()` gate → `/auth`. Renders `<AppShell />` around `<Outlet />`.
+- `src/routes/_authenticated/index.tsx` — redirect to `/crm`.
+- `src/routes/_authenticated/crm.tsx` — layout (`<Outlet />`).
+- `src/routes/_authenticated/crm.index.tsx` — CRM page (from `CRM.tsx`, `useParams`/`useNavigate` swapped for TanStack equivalents).
+- `src/routes/_authenticated/crm.$businessId.tsx` — Client detail (from `ClientDetail.tsx`).
+- `src/routes/_authenticated/onboarding.tsx`
+- `src/routes/_authenticated/accounts.tsx`, `support.tsx`, `client-portal.tsx` — "coming soon" placeholders matching the sidebar nav (parity with the current app which already routes these to empty pages).
 
-Enable Cloud, then create one migration with the full schema:
+Every `NavLink` → TanStack `<Link>` with `activeProps`. Every `useNavigate` / `useParams` from `react-router-dom` → `@tanstack/react-router`.
 
-**Enums:** `app_role` (`manager`, `sales_rep`), `client_type`, `journey_status`, `package_type`, `contact_method`, `activity_type`.
+## 4. Backend — schema & RLS (single migration)
 
-**Tables (all `public`):**
-- `profiles` (id uuid PK → auth.users, name text, email text)
-- `user_roles` (user_id uuid, role app_role) — per user_roles knowledge, with `has_role(_user_id, _role)` security-definer fn
-- `clients` — `business_id text PK` generated server-side (`TRP-XXXXXX` via `gen_business_id()` default), sales_person_id uuid → profiles, all Client fields
-- `locations` — `location_id text PK` (`<business_id>-L01…` via trigger), business_id FK, name/address/city/state
-- `client_notes` (id uuid, business_id FK, author_id, author_name, body, created_at)
-- `activity_events` (id uuid, business_id FK, type activity_type, description, actor, created_at)
-- `attachments` (id uuid, business_id FK, file_name, file_type, file_size, storage_path, uploaded_by, uploaded_at)
+- Enum `public.app_role` with `'manager' | 'sales_rep'`.
+- `public.profiles` (`user_id uuid PK → auth.users`, `name`, `email`).
+- `public.user_roles` (`user_id`, `role app_role`, unique).
+- `SECURITY DEFINER` function `public.has_role(_user_id, _role)`.
+- `public.clients` — `business_id text PK` (auto-generated by trigger `TRP-XXXXXX`, safe alphabet), plus every column from `Client` (except IDs and children). `sales_person_id uuid → profiles.user_id`.
+- `public.locations` — `location_id text PK` auto-generated by trigger as `<business_id>-L<NN>` (per-parent sequence), `business_id text → clients.business_id`.
+- `public.client_notes`, `public.client_activity`, `public.client_attachments` (attachments carry `storage_path` in bucket `client-attachments`; `dataUrl` replaced with signed URL fetches).
+- Triggers:
+  - `set_business_id_before_insert` → `TRP-XXXXXX` collision-safe.
+  - `set_location_id_before_insert` → `-L{max+1 padded to 2}` for the parent business.
+  - `set_updated_at` on `clients`.
+  - `handle_approved_auto_onboarding` → when `journey_status` transitions to `'Approved'`, sets `sent_to_onboarding = true`, `onboarding_sent_at = now()`, and inserts a `status_change` activity row with description ending in `· Sent to Onboarding`.
+  - `handle_new_user` on `auth.users` insert → creates `profiles` row + `user_roles` row (`sales_rep` by default).
+- RLS policies (using `has_role`):
+  - `clients`: SELECT allowed if manager OR `sales_person_id = auth.uid()`. INSERT allowed if manager OR `sales_person_id = auth.uid()`. UPDATE/DELETE same as SELECT. Reassigning `sales_person_id` restricted to managers via `WITH CHECK` clause.
+  - `locations`, `client_notes`, `client_activity`, `client_attachments`: allowed if user can read parent client.
+  - `profiles`: readable by all authenticated (needed for owner name lookups); user updates own row; managers see all (already covered).
+  - `user_roles`: read own row + managers read all.
+- GRANTs on every table to `authenticated` + `service_role` (no anon).
+- Realtime not required.
 
-**Storage bucket:** `client-attachments` (private) via `supabase--storage_create_bucket`.
+Storage bucket `client-attachments` (private) with policies: read/write allowed if user can access parent client.
 
-**RLS (managers see all, reps see own; enforced in DB):**
-- `has_role(auth.uid(),'manager')` OR `sales_person_id = auth.uid()` for SELECT on `clients`
-- Child tables (locations, notes, activity, attachments) delegate via `EXISTS (SELECT 1 FROM clients c WHERE c.business_id = <table>.business_id AND (has_role(auth.uid(),'manager') OR c.sales_person_id = auth.uid()))`
-- Insert/update on `clients`: `sales_person_id = auth.uid()` OR manager
-- Storage policies mirror `clients` visibility keyed by first path segment = business_id
-- Full `GRANT SELECT, INSERT, UPDATE, DELETE … TO authenticated` blocks per public-schema-grants rule
+## 5. Server functions — `src/lib/crm.functions.ts`
 
-**Triggers:**
-- `set_business_id` before insert on `clients` if null
-- `set_location_id` before insert on `locations` (auto-increment `L01`, `L02`… per business)
-- `bump_onboarding_flag` on `clients` update: when new `journey_status = 'Approved'` and `sent_to_onboarding = false`, set true + `onboarding_sent_at = now()`, insert activity row
-- `log_status_change` / `log_contact` etc. handled in server functions for cleaner activity descriptions
-- `handle_new_user` → inserts profile + default `sales_rep` role
+One `.functions.ts` file using `requireSupabaseAuth`, exporting the exact action set used by the current store:
 
-### 5. Server functions replacing `crmStore`
+`listClients()`, `getClientById(businessId)`, `createClient(input)`, `updateClient(businessId, updates)`, `changeStatus(businessId, status)`, `addNote(businessId, body)`, `logContact(businessId, method, date, summary, nextFollowUpDate?)`, `addAttachment(businessId, file metadata + storage_path)`, `removeAttachment(businessId, attachmentId)`, `importClients(rows)`, `listSalesTeam()`.
 
-`src/server/crm.functions.ts` (client-safe import path) with `requireSupabaseAuth`:
-- `listClients()` — returns clients + nested locations/notes/attachments/activity (RLS filters)
-- `getClient(businessId)`
-- `createClient(payload)` — server generates business_id, inserts locations, seeds activity
-- `updateClient(businessId, updates)`
-- `changeStatus(businessId, status)` — atomic status + activity + Approved→onboarding side-effect
-- `addNote(businessId, body)`
-- `logContact(businessId, method, date, summary, nextFollowUpDate?)`
-- `uploadAttachment(businessId, file base64 + meta)` — writes to Storage via admin client (after verifying caller can see client), inserts row
-- `removeAttachment(attachmentId)`
-- `importClients(rows)` for CSV
-- `listSalesTeam()` for assignment dropdowns (from profiles + user_roles)
+All ID generation happens server-side inside the handler (server calls the DB trigger; server never trusts a client-supplied `businessId`/`locationId`). All activity events written server-side. `Approved` side-effects handled by DB trigger, not by application code.
 
-Client code uses TanStack Query (`useQuery(['clients'])`, `useMutation`) wrapping `useServerFn`. `crmStore.tsx` becomes a thin hook layer exposing the same API surface the pages already call (`addClient`, `changeStatus`, etc.), so page components stay untouched aside from the import path.
+Separate `src/lib/auth-helpers.functions.ts`:
+`getMyProfile()` → `{ profile, role }`, plus `promoteToManager(userId)` (admin-only, uses admin client after `has_role` check — useful for bootstrapping the first manager but not exposed in UI this turn).
 
-### 6. Auth
+## 6. Store rewrite — same public API
 
-- `/auth` page: email + password sign in / sign up using `@/integrations/supabase/client` (per Lovable Cloud auth defaults). No Google/Apple this round unless requested.
-- `handle_new_user` trigger creates profile with `name = raw_user_meta_data->>'name'` (captured at sign up) and `sales_rep` role. Managers are promoted manually.
-- Sidebar footer shows `profile.name / role` and Sign Out. Demo switcher deleted.
-- `userStore` collapsed to a hook that returns the signed-in profile + role.
+- `src/store/crmStore.tsx`: still exports `CrmProvider` + `useCrm()` with the same method names, but backed by TanStack Query.
+  - `clients` = `useSuspenseQuery(listClients)`.
+  - Each action = `useMutation` wrapping the server fn, with `queryClient.invalidateQueries({ queryKey: ['clients'] })` in `onSuccess`.
+  - `getClient(businessId)` = local lookup on cached list.
+  - Method signatures unchanged so `CRM.tsx`, `ClientDetail.tsx`, `PipelineBoard.tsx`, `AddClientDialog.tsx`, `LogContactDialog.tsx`, `AttachmentsSection.tsx`, and `Onboarding.tsx` compile unchanged (minus the `actor` argument which the server derives from the session).
+- `src/store/userStore.tsx`: rewritten to expose `currentUser`, `isManager`, `visibleClients`, `canEdit` from the authenticated session + role, and drops `setCurrentUserId`. Backwards-compatible surface for consumers.
+- Attachments swap `dataUrl` for a client-side upload to Storage → `storage_path`; download uses a signed URL fetched on demand.
 
-### 7. Verification
+## 7. AppShell
 
-- Typecheck via harness after each batch.
-- Playwright smoke: sign up → land on `/crm` → seed one client → status → Approved → confirm it appears in `/onboarding` → upload attachment → sign out.
+- Remove the demo user switcher block entirely.
+- Replace with signed-in identity: user name + role + "Sign out" button.
+- All `NavLink` → TanStack `<Link>` with `activeProps.className`.
 
-### Technical notes
+## 8. Auth page
 
-- `useServerFn` + TanStack Query used for reads/writes; loaders stay light. Protected loaders live only under `_authenticated/`.
-- Business/Location IDs come only from Postgres defaults/triggers — never from client code (`ids.ts` retained only for local optimistic UI keys, unused for persisted rows).
-- Attachment files live in Storage; DB row stores `storage_path`; UI resolves signed URLs on demand.
-- Existing `SEED_CLIENTS` is not auto-inserted; can be reintroduced later as a one-off seed migration if the user asks.
+Combined sign-in / sign-up card, styled with brand tokens (cream background, gold rule, Montserrat headline). Google sign-in via managed OAuth (`lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin })`). Password reset link → `/reset-password` (built as a public route).
+
+## 9. Wiring & housekeeping
+
+- `functionMiddleware` already registers `attachSupabaseAuth` — leave it.
+- `configure_social_auth` for Google in the same turn.
+- `head()` on `__root.tsx`: title `Trophi Portal — Internal Client Hub`, description accordingly.
+- Delete the placeholder marker on `index.tsx`.
+- Do NOT create `_authenticated/index.tsx` and `index.tsx` both claiming `/` — root `/` stays at `src/routes/index.tsx` and redirects; `_authenticated/index.tsx` is the authenticated home that redirects to `/crm`.
+
+## What stays deferred (not this turn)
+
+- Full onboarding workflow module (kept as receiving queue only, matching current behavior).
+- Accounts / Support / Client Portal beyond placeholder pages.
+- Password reset UI polish (functional but minimal).
+
+## Verification
+
+- Build must pass.
+- Manual: sign up → land on `/crm` empty state → add client → business ID auto-generated → change to Approved → appears in Onboarding queue → sign out → route bounces to `/auth`.
+- RLS spot-check via `supabase--read_query` that `sales_rep` cannot see another rep's row.
