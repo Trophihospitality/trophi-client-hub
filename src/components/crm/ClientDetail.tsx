@@ -258,6 +258,15 @@ export default function ClientDetail() {
                 <Input value={draft.contactName} onChange={(e) => set('contactName', e.target.value)} />
               </div>
               <div className="space-y-1.5">
+                <Label>Contact role</Label>
+                <Select value={draft.contactRole || undefined} onValueChange={(v) => set('contactRole', v as ContactRole)}>
+                  <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
+                  <SelectContent>
+                    {CONTACT_ROLES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
                 <Label>Email</Label>
                 <Input type="email" value={draft.contactEmail} onChange={(e) => set('contactEmail', e.target.value)} />
               </div>
@@ -279,8 +288,17 @@ export default function ClientDetail() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Annual budget (USD)</Label>
+                <Label>Monthly budget / location (USD)</Label>
                 <Input type="number" min="0" value={draft.budget} onChange={(e) => set('budget', e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Lead source</Label>
+                <Select value={draft.leadSource || undefined} onValueChange={(v) => set('leadSource', v as LeadSource)}>
+                  <SelectTrigger><SelectValue placeholder="Select lead source" /></SelectTrigger>
+                  <SelectContent>
+                    {LEAD_SOURCES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1.5">
                 <Label>Assigned sales person {!isManager && <span className="text-xs text-muted-foreground">(managers only)</span>}</Label>
