@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedSupportRouteImport } from './routes/_authenticated/support'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
+import { Route as AuthenticatedClientPortalRouteImport } from './routes/_authenticated/client-portal'
 import { Route as AuthenticatedAccountsRouteImport } from './routes/_authenticated/accounts'
 import { Route as AuthenticatedCrmIndexRouteImport } from './routes/_authenticated/crm.index'
 import { Route as AuthenticatedCrmBusinessIdRouteImport } from './routes/_authenticated/crm.$businessId'
@@ -42,6 +43,12 @@ const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
   path: '/onboarding',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedClientPortalRoute =
+  AuthenticatedClientPortalRouteImport.update({
+    id: '/client-portal',
+    path: '/client-portal',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAccountsRoute = AuthenticatedAccountsRouteImport.update({
   id: '/accounts',
   path: '/accounts',
@@ -63,6 +70,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/accounts': typeof AuthenticatedAccountsRoute
+  '/client-portal': typeof AuthenticatedClientPortalRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/support': typeof AuthenticatedSupportRoute
   '/crm/$businessId': typeof AuthenticatedCrmBusinessIdRoute
@@ -72,6 +80,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/accounts': typeof AuthenticatedAccountsRoute
+  '/client-portal': typeof AuthenticatedClientPortalRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/support': typeof AuthenticatedSupportRoute
   '/crm/$businessId': typeof AuthenticatedCrmBusinessIdRoute
@@ -83,6 +92,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/_authenticated/accounts': typeof AuthenticatedAccountsRoute
+  '/_authenticated/client-portal': typeof AuthenticatedClientPortalRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/support': typeof AuthenticatedSupportRoute
   '/_authenticated/crm/$businessId': typeof AuthenticatedCrmBusinessIdRoute
@@ -94,6 +104,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/accounts'
+    | '/client-portal'
     | '/onboarding'
     | '/support'
     | '/crm/$businessId'
@@ -103,6 +114,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/accounts'
+    | '/client-portal'
     | '/onboarding'
     | '/support'
     | '/crm/$businessId'
@@ -113,6 +125,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/accounts'
+    | '/_authenticated/client-portal'
     | '/_authenticated/onboarding'
     | '/_authenticated/support'
     | '/_authenticated/crm/$businessId'
@@ -162,6 +175,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/client-portal': {
+      id: '/_authenticated/client-portal'
+      path: '/client-portal'
+      fullPath: '/client-portal'
+      preLoaderRoute: typeof AuthenticatedClientPortalRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/accounts': {
       id: '/_authenticated/accounts'
       path: '/accounts'
@@ -188,6 +208,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAccountsRoute: typeof AuthenticatedAccountsRoute
+  AuthenticatedClientPortalRoute: typeof AuthenticatedClientPortalRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedSupportRoute: typeof AuthenticatedSupportRoute
   AuthenticatedCrmBusinessIdRoute: typeof AuthenticatedCrmBusinessIdRoute
@@ -196,6 +217,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAccountsRoute: AuthenticatedAccountsRoute,
+  AuthenticatedClientPortalRoute: AuthenticatedClientPortalRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedSupportRoute: AuthenticatedSupportRoute,
   AuthenticatedCrmBusinessIdRoute: AuthenticatedCrmBusinessIdRoute,
