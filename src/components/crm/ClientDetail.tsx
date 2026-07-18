@@ -306,24 +306,88 @@ export default function ClientDetail() {
 
           {/* Locations */}
           <section className="rounded-xl border bg-card p-5 space-y-3">
-            <h2 className="font-semibold flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-[hsl(var(--trophi-gold))]" />
-              Locations ({client.locations.length})
-            </h2>
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="font-semibold flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-[hsl(var(--trophi-gold))]" />
+                Locations ({client.locations.filter((l) => l.status !== 'closed').length} active
+                {client.locations.some((l) => l.status === 'closed')
+                  ? ` · ${client.locations.filter((l) => l.status === 'closed').length} closed`
+                  : ''})
+              </h2>
+              {editable && (
+                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setAddLocOpen(true)}>
+                  <Plus className="h-4 w-4" /> Add location
+                </Button>
+              )}
+            </div>
             <div className="divide-y">
-              {client.locations.map((l) => (
-                <div key={l.locationId} className="py-3 flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <div className="font-medium text-sm">{l.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {[l.address, l.city, l.state].filter(Boolean).join(', ') || 'Address not set'}
+              {client.locations.map((l) => {
+                const closed = l.status === 'closed';
+                return (
+                  <div
+                    key={l.locationId}
+                    className={`py-3 flex flex-wrap items-center justify-between gap-2 ${closed ? 'opacity-50' : ''}`}
+                  >
+                    <div>
+                      <div className="font-medium text-sm flex items-center gap-2">
+                        <span className={closed ? 'line-through' : ''}>{l.name}</span>
+                        {closed && (
+                          <span className="text-[10px] uppercase tracking-wide rounded bg-muted px-1.5 py-0.5 text-muted-foreground">
+                            Closed
+                          </span>
+                        )}
+                        {l.needsOnboarding && !closed && (
+                          <span className="text-[10px] uppercase tracking-wide rounded bg-[hsl(var(--trophi-gold))]/15 text-[hsl(var(--trophi-gold))] px-1.5 py-0.5">
+                            Needs onboarding
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {[l.address, l.city, l.state].filter(Boolean).join(', ') || 'Address not set'}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs rounded bg-secondary px-2 py-1">{l.locationId}</span>
+                      {isManager && (
+                        closed ? (
+                          <Button
+                            size="sm" variant="ghost" className="gap-1.5 h-7"
+                            onClick={async () => {
+                              try {
+                                await setLocationStatus(l.locationId, 'active');
+                                toast.success('Location reopened');
+                              } catch (e: any) {
+                                toast.error('Could not reopen', { description: e?.message });
+                              }
+                            }}
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" /> Reopen
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm" variant="ghost" className="gap-1.5 h-7 text-muted-foreground hover:text-destructive"
+                            onClick={async () => {
+                              if (!confirm(`Mark "${l.name}" as closed? The location keeps its ID and history.`)) return;
+                              try {
+                                await setLocationStatus(l.locationId, 'closed');
+                                toast.success('Location closed');
+                              } catch (e: any) {
+                                toast.error('Could not close', { description: e?.message });
+                              }
+                            }}
+                          >
+                            <Ban className="h-3.5 w-3.5" /> Close
+                          </Button>
+                        )
+                      )}
                     </div>
                   </div>
-                  <span className="font-mono text-xs rounded bg-secondary px-2 py-1">{l.locationId}</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
+          <AddLocationDialog businessId={client.businessId} open={addLocOpen} onOpenChange={setAddLocOpen} />
+
 
           {/* Notes */}
           <section className="rounded-xl border bg-card p-5 space-y-4">
