@@ -91,7 +91,7 @@ export function PipelineBoard({ clients, onStatusChange, canEdit }: Props) {
                     </div>
                     <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                       <MapPin className="h-3 w-3" />
-                      {c.locations.length} loc · {c.packageType}
+                      {c.locations.filter((l) => l.status !== 'closed').length} loc · {c.packageType}
                     </div>
                     <div className="mt-2 flex items-center justify-between text-xs">
                       <span className="font-medium">{c.budget ? money(c.budget) : '—'}</span>

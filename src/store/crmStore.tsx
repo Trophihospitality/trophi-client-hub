@@ -5,6 +5,7 @@ import { useServerFn } from '@tanstack/react-start';
 import {
   listClients, changeStatusFn, addNoteFn, logContactFn, updateClientFn,
   registerAttachmentFn, removeAttachmentFn, importClientsFn,
+  addLocationFn, setLocationStatusFn,
 } from '@/lib/crm.functions';
 import type { Client, ClientNote, ActivityEvent, JourneyStatus, Attachment, ContactMethod } from '@/lib/types';
 
@@ -30,6 +31,8 @@ export function useCrm() {
   const attachM = useMutation({ mutationFn: useServerFn(registerAttachmentFn), onSuccess: invalidate });
   const removeAttachM = useMutation({ mutationFn: useServerFn(removeAttachmentFn), onSuccess: invalidate });
   const importM = useMutation({ mutationFn: useServerFn(importClientsFn), onSuccess: invalidate });
+  const addLocationM = useMutation({ mutationFn: useServerFn(addLocationFn), onSuccess: invalidate });
+  const setLocStatusM = useMutation({ mutationFn: useServerFn(setLocationStatusFn), onSuccess: invalidate });
 
   return {
     clients,
@@ -69,6 +72,10 @@ export function useCrm() {
     removeAttachment: (businessId: string, attachmentId: string, _actor: string) =>
       removeAttachM.mutateAsync({ data: { businessId, attachmentId } }),
     importClients: (rows: any[]) => importM.mutateAsync({ data: { rows } }),
+    addLocation: (businessId: string, loc: { name: string; address?: string; city?: string; state?: string }) =>
+      addLocationM.mutateAsync({ data: { businessId, name: loc.name, address: loc.address ?? '', city: loc.city ?? '', state: loc.state ?? '' } }),
+    setLocationStatus: (locationId: string, status: 'active' | 'closed') =>
+      setLocStatusM.mutateAsync({ data: { locationId, status } }),
     // legacy no-op
     addClient: (_c: Client) => {},
   };

@@ -138,6 +138,7 @@ export function csvToClients(
       locations: locNames.map((name, li) => ({
         locationId: generateLocationId(businessId, li),
         businessId, name, address: '', city: '', state: '',
+        status: 'active' as const, needsOnboarding: false,
       })),
       journeyStatus,
       lastContactDate: get(idx.lastContact) || now.slice(0, 10),
