@@ -236,9 +236,38 @@ export const updateClientFn = createServerFn({ method: 'POST' })
     if (u.leadSource !== undefined) patch.lead_source = u.leadSource;
     if (u.lastContactDate !== undefined) patch.last_contact_date = u.lastContactDate || null;
     if (u.lastContactMethod !== undefined) patch.last_contact_method = u.lastContactMethod;
-    if (u.nextFollowUpDate !== undefined) patch.next_follow_up_date = u.nextFollowUpDate || null;
+    // nextFollowUpDate is managed via follow_ups table below; the trigger keeps clients.next_follow_up_date in sync.
     const { error } = await supabase.from('clients').update(patch).eq('business_id', data.businessId);
     if (error) throw error;
+
+    if (u.nextFollowUpDate !== undefined) {
+      // Load current client + existing pending follow-up (if any).
+      const [{ data: cli }, { data: existing }] = await Promise.all([
+        supabase.from('clients').select('sales_person_id, next_follow_up_date').eq('business_id', data.businessId).maybeSingle(),
+        supabase.from('follow_ups').select('id, due_date').eq('business_id', data.businessId).eq('status', 'pending').order('due_date').limit(1).maybeSingle(),
+      ]);
+      const newDate = u.nextFollowUpDate || null;
+      const oldDate = existing?.due_date ?? null;
+      if (newDate !== oldDate) {
+        // Mark any pending follow-ups as rescheduled.
+        if (existing) {
+          await supabase.from('follow_ups')
+            .update({ status: 'rescheduled' } as any)
+            .eq('business_id', data.businessId).eq('status', 'pending');
+        }
+        // Create a new pending follow-up when a date is set.
+        if (newDate && cli) {
+          const { data: ins } = await supabase.from('follow_ups').insert({
+            business_id: data.businessId, assigned_to: cli.sales_person_id,
+            due_date: newDate, status: 'pending', created_by: userId,
+          } as any).select('id').single();
+          if (existing && ins) {
+            await supabase.from('follow_ups').update({ rescheduled_to: ins.id } as any).eq('id', existing.id);
+          }
+        }
+      }
+    }
+
     await logActivity(supabase, data.businessId, 'info_updated', 'Client information updated', name, userId);
     return { ok: true };
   });
