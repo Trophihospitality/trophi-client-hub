@@ -96,12 +96,13 @@ export const listClients = createServerFn({ method: 'GET' })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase } = context;
-    const [{ data: clients, error }, locs, notes, activity, attachments] = await Promise.all([
+    const [{ data: clients, error }, locs, notes, activity, attachments, logs] = await Promise.all([
       supabase.from('clients').select('*').order('created_at', { ascending: false }),
       supabase.from('locations').select('*'),
       supabase.from('client_notes').select('*').order('created_at', { ascending: false }),
       supabase.from('client_activity').select('*').order('timestamp', { ascending: false }),
       supabase.from('client_attachments').select('*').order('uploaded_at', { ascending: false }),
+      supabase.from('contact_logs').select('*').order('created_at', { ascending: false }),
     ]);
     if (error) throw error;
     const byBiz = <T extends { business_id: string }>(rows: T[]) =>
@@ -112,7 +113,8 @@ export const listClients = createServerFn({ method: 'GET' })
     const N = byBiz(notes.data ?? []);
     const A = byBiz(activity.data ?? []);
     const F = byBiz(attachments.data ?? []);
-    return (clients ?? []).map(c => rowToClient(c, L[c.business_id] ?? [], N[c.business_id] ?? [], A[c.business_id] ?? [], F[c.business_id] ?? []));
+    const G = byBiz(logs.data ?? []);
+    return (clients ?? []).map(c => rowToClient(c, L[c.business_id] ?? [], N[c.business_id] ?? [], A[c.business_id] ?? [], F[c.business_id] ?? [], G[c.business_id] ?? []));
   });
 
 // ---------- SALES TEAM ----------
