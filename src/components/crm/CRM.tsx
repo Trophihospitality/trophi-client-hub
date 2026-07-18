@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { useCrm } from '@/store/crmStore';
 import { useUser } from '@/store/userStore';
-import { SALES_TEAM } from '@/data/seedData';
+import { useSalesTeam } from '@/hooks/useSalesTeam';
 import { JourneyStatus } from '@/lib/types';
 import { JOURNEY_STATUSES, STAGE_PROBABILITY, ACTIVE_STATUSES, isOverdue } from '@/lib/statusConfig';
 import { clientsToCsv, downloadCsv, csvToClients } from '@/lib/csv';
