@@ -72,6 +72,10 @@ export function useCrm() {
     removeAttachment: (businessId: string, attachmentId: string, _actor: string) =>
       removeAttachM.mutateAsync({ data: { businessId, attachmentId } }),
     importClients: (rows: any[]) => importM.mutateAsync({ data: { rows } }),
+    addLocation: (businessId: string, loc: { name: string; address?: string; city?: string; state?: string }) =>
+      addLocationM.mutateAsync({ data: { businessId, name: loc.name, address: loc.address ?? '', city: loc.city ?? '', state: loc.state ?? '' } }),
+    setLocationStatus: (locationId: string, status: 'active' | 'closed') =>
+      setLocStatusM.mutateAsync({ data: { locationId, status } }),
     // legacy no-op
     addClient: (_c: Client) => {},
   };
