@@ -17,16 +17,17 @@ async function loadClient(supabase: any, businessId: string): Promise<Client | n
     .from('clients').select('*').eq('business_id', businessId).maybeSingle();
   if (error) throw error;
   if (!c) return null;
-  const [locs, notes, activity, attachments] = await Promise.all([
+  const [locs, notes, activity, attachments, logs] = await Promise.all([
     supabase.from('locations').select('*').eq('business_id', businessId).order('location_id'),
     supabase.from('client_notes').select('*').eq('business_id', businessId).order('created_at', { ascending: false }),
     supabase.from('client_activity').select('*').eq('business_id', businessId).order('timestamp', { ascending: false }),
     supabase.from('client_attachments').select('*').eq('business_id', businessId).order('uploaded_at', { ascending: false }),
+    supabase.from('contact_logs').select('*').eq('business_id', businessId).order('created_at', { ascending: false }),
   ]);
-  return rowToClient(c, locs.data ?? [], notes.data ?? [], activity.data ?? [], attachments.data ?? []);
+  return rowToClient(c, locs.data ?? [], notes.data ?? [], activity.data ?? [], attachments.data ?? [], logs.data ?? []);
 }
 
-function rowToClient(c: any, locs: any[], notes: any[], activity: any[], attachments: any[]): Client {
+function rowToClient(c: any, locs: any[], notes: any[], activity: any[], attachments: any[], contactLogs: any[] = []): Client {
   return {
     businessId: c.business_id,
     company: c.company,
