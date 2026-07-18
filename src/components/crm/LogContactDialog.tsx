@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useCrm } from '@/store/crmStore';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCrm, clientsQueryKey } from '@/store/crmStore';
 import { Client, ContactMethod } from '@/lib/types';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
