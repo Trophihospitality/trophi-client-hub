@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 import { Send } from 'lucide-react';
 import { useCrm } from '@/store/crmStore';
 import { SALES_TEAM } from '@/data/seedData';
@@ -43,7 +43,7 @@ export default function Onboarding() {
             return (
               <button
                 key={c.businessId}
-                onClick={() => navigate(`/crm/${c.businessId}`)}
+                onClick={() => navigate({ to: '/crm/$businessId', params: { businessId: c.businessId } })}
                 className="rounded-xl border bg-card p-5 text-left transition-colors hover:border-[hsl(var(--trophi-gold))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <div className="flex items-center justify-between">

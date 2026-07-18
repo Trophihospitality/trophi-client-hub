@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from '@tanstack/react-router';
 import { ArrowLeft, MapPin, StickyNote, Clock, Send, PhoneCall, AlertTriangle } from 'lucide-react';
 import { useCrm } from '@/store/crmStore';
 import { useUser } from '@/store/userStore';
@@ -43,7 +43,7 @@ function timeAgo(iso: string): string {
 }
 
 export default function ClientDetail() {
-  const { businessId } = useParams<{ businessId: string }>();
+  const { businessId } = useParams({ strict: false }) as { businessId: string };
   const navigate = useNavigate();
   const { getClient, updateClient, changeStatus, addNote } = useCrm();
   const client = getClient(businessId ?? '');
@@ -106,7 +106,7 @@ export default function ClientDetail() {
     return (
       <div className="py-24 text-center space-y-3">
         <p className="text-muted-foreground">Client not found.</p>
-        <Button variant="outline" onClick={() => navigate('/crm')}>Back to CRM</Button>
+        <Button variant="outline" onClick={() => navigate({ to: '/crm' })}>Back to CRM</Button>
       </div>
     );
   }
@@ -172,7 +172,7 @@ export default function ClientDetail() {
 
   const handleBack = () => {
     if (isDirty && !window.confirm('You have unsaved changes. Leave without saving?')) return;
-    navigate('/crm');
+    navigate({ to: '/crm' });
   };
 
   return (

@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 import {
   Plus, Search, AlertTriangle, Download, Upload, LayoutGrid, List, TrendingUp,
 } from 'lucide-react';
@@ -257,7 +257,7 @@ export default function CRM() {
                   <TableRow
                     key={c.businessId}
                     className="cursor-pointer"
-                    onClick={() => navigate(`/crm/${c.businessId}`)}
+                    onClick={() => navigate({ to: '/crm/$businessId', params: { businessId: c.businessId } })}
                   >
                     <TableCell className="pr-0">
                       {od.overdue && (

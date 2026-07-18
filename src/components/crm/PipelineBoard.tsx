@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 import { AlertTriangle, MapPin } from 'lucide-react';
 import { Client, JourneyStatus } from '@/lib/types';
 import { JOURNEY_STATUSES, STAGE_PROBABILITY, isOverdue, statusDotStyle } from '@/lib/statusConfig';
@@ -76,7 +76,7 @@ export function PipelineBoard({ clients, onStatusChange, canEdit }: Props) {
                     draggable={editable}
                     onDragStart={() => setDragId(c.businessId)}
                     onDragEnd={() => { setDragId(null); setOverCol(null); }}
-                    onClick={() => navigate(`/crm/${c.businessId}`)}
+                    onClick={() => navigate({ to: '/crm/$businessId', params: { businessId: c.businessId } })}
                     className={`rounded-lg border bg-card p-3 shadow-sm transition-shadow hover:shadow-md ${
                       editable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer opacity-80'
                     } ${dragId === c.businessId ? 'opacity-40' : ''}`}
