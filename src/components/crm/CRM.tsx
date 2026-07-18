@@ -271,7 +271,7 @@ export default function CRM() {
                       <div className="text-xs text-muted-foreground font-mono">{c.businessId}</div>
                     </TableCell>
                     <TableCell className="max-w-[160px] truncate">{c.brands.join(', ')}</TableCell>
-                    <TableCell className="text-center">{c.locations.length}</TableCell>
+                    <TableCell className="text-center">{c.locations.filter((l) => l.status !== 'closed').length}</TableCell>
                     <TableCell>
                       {canEdit(c) ? (
                         <StatusSelect
