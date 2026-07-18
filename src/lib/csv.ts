@@ -98,8 +98,10 @@ export function csvToClients(
   const idx = {
     company: col('Company'), brands: col('Brands'), type: col('Client Type'),
     locations: col('Locations'), status: col('Journey Status'), lastContact: col('Last Contact Date'),
-    contact: col('Contact Name'), email: col('Email'), phone: col('Phone'),
-    dm: col('Decision Maker'), pkg: col('Package'), budget: col('Budget'), source: col('Lead Source'),
+    contact: col('Contact Name'), role: col('Contact Role'), email: col('Email'), phone: col('Phone'),
+    dm: col('Decision Maker'), pkg: col('Package'),
+    budget: col('Monthly Budget Per Location') >= 0 ? col('Monthly Budget Per Location') : col('Budget'),
+    source: col('Lead Source'),
   };
   if (idx.company === -1) return { clients, skipped: [{ row: 0, reason: 'Missing required "Company" column' }] };
 
