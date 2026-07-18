@@ -45,11 +45,12 @@ function rowToClient(c: any, locs: any[], notes: any[], activity: any[], attachm
     contactName: c.contact_name ?? '',
     contactEmail: c.contact_email ?? '',
     contactPhone: c.contact_phone ?? '',
+    contactRole: (c.contact_role ?? '') as any,
     isDecisionMaker: !!c.is_decision_maker,
     packageType: c.package_type as PackageType,
     budget: c.budget !== null ? Number(c.budget) : null,
     salesPersonId: c.sales_person_id,
-    leadSource: c.lead_source ?? undefined,
+    leadSource: (c.lead_source ?? '') as any,
     nextFollowUpDate: c.next_follow_up_date ?? undefined,
     notes: notes.map((n): ClientNote => ({
       id: n.id, authorName: n.author_name, body: n.body, createdAt: n.created_at,
