@@ -114,8 +114,12 @@ export const listSalesTeam = createServerFn({ method: 'GET' })
       supabase.from('profiles').select('user_id, name, email').order('name'),
       supabase.from('user_roles').select('user_id, role'),
     ]);
-    const roleMap = new Map<string, 'manager' | 'sales_rep'>();
-    (roles ?? []).forEach((r: any) => { if (r.role === 'manager') roleMap.set(r.user_id, 'manager'); });
+    const roleMap = new Map<string, 'admin' | 'manager' | 'sales_rep'>();
+    (roles ?? []).forEach((r: any) => {
+      const prev = roleMap.get(r.user_id);
+      const rank = (x: string) => (x === 'admin' ? 2 : x === 'manager' ? 1 : 0);
+      if (!prev || rank(r.role) > rank(prev)) roleMap.set(r.user_id, r.role);
+    });
     return (profiles ?? []).map((p: any) => ({
       id: p.user_id, name: p.name, email: p.email,
       role: roleMap.get(p.user_id) ?? 'sales_rep',
