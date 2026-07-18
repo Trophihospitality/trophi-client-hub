@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedUsersRouteImport } from './routes/_authenticated/users'
 import { Route as AuthenticatedSupportRouteImport } from './routes/_authenticated/support'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedClientPortalRouteImport } from './routes/_authenticated/client-portal'
@@ -32,6 +33,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedUsersRoute = AuthenticatedUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedSupportRoute = AuthenticatedSupportRouteImport.update({
   id: '/support',
@@ -73,6 +79,7 @@ export interface FileRoutesByFullPath {
   '/client-portal': typeof AuthenticatedClientPortalRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/support': typeof AuthenticatedSupportRoute
+  '/users': typeof AuthenticatedUsersRoute
   '/crm/$businessId': typeof AuthenticatedCrmBusinessIdRoute
   '/crm/': typeof AuthenticatedCrmIndexRoute
 }
@@ -83,6 +90,7 @@ export interface FileRoutesByTo {
   '/client-portal': typeof AuthenticatedClientPortalRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/support': typeof AuthenticatedSupportRoute
+  '/users': typeof AuthenticatedUsersRoute
   '/crm/$businessId': typeof AuthenticatedCrmBusinessIdRoute
   '/crm': typeof AuthenticatedCrmIndexRoute
 }
@@ -95,6 +103,7 @@ export interface FileRoutesById {
   '/_authenticated/client-portal': typeof AuthenticatedClientPortalRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/support': typeof AuthenticatedSupportRoute
+  '/_authenticated/users': typeof AuthenticatedUsersRoute
   '/_authenticated/crm/$businessId': typeof AuthenticatedCrmBusinessIdRoute
   '/_authenticated/crm/': typeof AuthenticatedCrmIndexRoute
 }
@@ -107,6 +116,7 @@ export interface FileRouteTypes {
     | '/client-portal'
     | '/onboarding'
     | '/support'
+    | '/users'
     | '/crm/$businessId'
     | '/crm/'
   fileRoutesByTo: FileRoutesByTo
@@ -117,6 +127,7 @@ export interface FileRouteTypes {
     | '/client-portal'
     | '/onboarding'
     | '/support'
+    | '/users'
     | '/crm/$businessId'
     | '/crm'
   id:
@@ -128,6 +139,7 @@ export interface FileRouteTypes {
     | '/_authenticated/client-portal'
     | '/_authenticated/onboarding'
     | '/_authenticated/support'
+    | '/_authenticated/users'
     | '/_authenticated/crm/$businessId'
     | '/_authenticated/crm/'
   fileRoutesById: FileRoutesById
@@ -160,6 +172,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/users': {
+      id: '/_authenticated/users'
+      path: '/users'
+      fullPath: '/users'
+      preLoaderRoute: typeof AuthenticatedUsersRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/support': {
       id: '/_authenticated/support'
@@ -211,6 +230,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedClientPortalRoute: typeof AuthenticatedClientPortalRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedSupportRoute: typeof AuthenticatedSupportRoute
+  AuthenticatedUsersRoute: typeof AuthenticatedUsersRoute
   AuthenticatedCrmBusinessIdRoute: typeof AuthenticatedCrmBusinessIdRoute
   AuthenticatedCrmIndexRoute: typeof AuthenticatedCrmIndexRoute
 }
@@ -220,6 +240,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedClientPortalRoute: AuthenticatedClientPortalRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedSupportRoute: AuthenticatedSupportRoute,
+  AuthenticatedUsersRoute: AuthenticatedUsersRoute,
   AuthenticatedCrmBusinessIdRoute: AuthenticatedCrmBusinessIdRoute,
   AuthenticatedCrmIndexRoute: AuthenticatedCrmIndexRoute,
 }

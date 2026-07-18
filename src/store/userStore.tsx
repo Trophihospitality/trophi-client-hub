@@ -26,11 +26,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           supabase.from('profiles').select('user_id, name, email').eq('user_id', session.user.id).maybeSingle(),
           supabase.from('user_roles').select('role').eq('user_id', session.user.id),
         ]).then(([p, r]) => {
-          const isManager = (r.data ?? []).some((row: any) => row.role === 'manager');
+          const roles = (r.data ?? []).map((row: any) => row.role);
+          const role: 'admin' | 'manager' | 'sales_rep' =
+            roles.includes('admin') ? 'admin' : roles.includes('manager') ? 'manager' : 'sales_rep';
           if (p.data) {
             setProfile({
               id: p.data.user_id, name: p.data.name, email: p.data.email,
-              role: isManager ? 'manager' : 'sales_rep',
+              role,
             });
           }
           setLoading(false);
@@ -56,9 +58,11 @@ export const useAuth = () => useContext(AuthContext);
 export function useUser() {
   const { profile } = useAuth();
   const currentUser = profile ?? { id: '', name: '', email: '', role: 'sales_rep' as const };
-  const isManager = currentUser.role === 'manager';
+  const isAdmin = currentUser.role === 'admin';
+  const isManager = isAdmin || currentUser.role === 'manager';
   return {
     currentUser,
+    isAdmin,
     isManager,
     setCurrentUserId: () => {},
     visibleClients: <T extends { salesPersonId: string }>(clients: T[]) =>

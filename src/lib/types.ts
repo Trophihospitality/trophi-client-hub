@@ -58,7 +58,7 @@ export interface SalesPerson {
   id: string;
   name: string;
   email: string;
-  role: 'manager' | 'sales_rep';   // managers see all accounts; reps see only their own
+  role: 'admin' | 'manager' | 'sales_rep';   // admins bypass every restriction; managers see all accounts; reps see only their own
 }
 
 export interface Attachment {

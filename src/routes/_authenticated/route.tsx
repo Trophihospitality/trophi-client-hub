@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, redirect, Link, useRouterState } from '@tanstack/react-router';
-import { Users, ClipboardCheck, BarChart3, Wrench, Globe, LogOut } from 'lucide-react';
+import { Users, ClipboardCheck, BarChart3, Wrench, Globe, LogOut, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/store/userStore';
 import trophiMarkAsset from '@/assets/trophi-mark.png.asset.json';
@@ -21,6 +21,10 @@ const NAV = [
   { to: '/accounts', label: 'Account Management', icon: BarChart3 },
   { to: '/support', label: 'Tech / Support', icon: Wrench },
   { to: '/client-portal', label: 'Client Portal', icon: Globe },
+] as const;
+
+const ADMIN_NAV = [
+  { to: '/users', label: 'User Management', icon: ShieldCheck },
 ] as const;
 
 function TrophiMark() {
@@ -58,12 +62,35 @@ function AuthedLayout() {
               </Link>
             );
           })}
+          {profile?.role === 'admin' && (
+            <>
+              <div className="pt-4 pb-1 px-3 text-[10px] uppercase tracking-wider text-white/30">Admin</div>
+              {ADMIN_NAV.map(({ to, label, icon: Icon }) => {
+                const active = pathname.startsWith(to);
+                return (
+                  <Link key={to} to={to}
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
+                      active
+                        ? 'bg-white/10 text-white font-medium border-l-2 border-[hsl(var(--trophi-gold))]'
+                        : 'text-white/60 hover:bg-white/5 hover:text-white'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />{label}
+                  </Link>
+                );
+              })}
+            </>
+          )}
         </nav>
         <div className="border-t border-white/10 px-3 py-3 space-y-2">
           <div className="px-2 text-[10px] uppercase tracking-wider text-white/40">Signed in as</div>
           <div className="px-2 text-sm text-white truncate">{profile?.name ?? '…'}</div>
           <div className="px-2 text-[11px] text-white/40">
-            {profile?.role === 'manager' ? 'Manager · sees all' : 'Sales Rep · own accounts'}
+            {profile?.role === 'admin'
+              ? 'Admin · full access'
+              : profile?.role === 'manager'
+              ? 'Manager · sees all'
+              : 'Sales Rep · own accounts'}
           </div>
           <button onClick={signOut}
             className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-white/60 hover:bg-white/5 hover:text-white">
