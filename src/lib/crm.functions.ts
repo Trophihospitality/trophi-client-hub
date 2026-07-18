@@ -35,6 +35,9 @@ function rowToClient(c: any, locs: any[], notes: any[], activity: any[], attachm
     locations: locs.map((l): Location => ({
       locationId: l.location_id, businessId: l.business_id, name: l.name,
       address: l.address ?? '', city: l.city ?? '', state: l.state ?? '',
+      status: (l.status ?? 'active') as 'active' | 'closed',
+      needsOnboarding: !!l.needs_onboarding,
+      closedAt: l.closed_at ?? undefined,
     })),
     journeyStatus: c.journey_status as JourneyStatus,
     lastContactDate: c.last_contact_date ?? '',
