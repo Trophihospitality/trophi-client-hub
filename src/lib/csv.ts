@@ -29,6 +29,7 @@ export function clientsToCsv(clients: Client[]): string {
     c.journeyStatus,
     c.lastContactDate,
     c.contactName,
+    c.contactRole,
     c.contactEmail,
     c.contactPhone,
     c.isDecisionMaker ? 'Yes' : 'No',
