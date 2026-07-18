@@ -195,10 +195,12 @@ const UpdateClientInput = z.object({
     contactName: z.string().optional(),
     contactEmail: z.string().optional(),
     contactPhone: z.string().optional(),
+    contactRole: z.string().optional(),
     isDecisionMaker: z.boolean().optional(),
     packageType: z.string().optional(),
     budget: z.number().nullable().optional(),
     salesPersonId: z.string().uuid().optional(),
+    leadSource: z.string().optional(),
     lastContactDate: z.string().optional(),
     lastContactMethod: z.string().optional(),
     nextFollowUpDate: z.string().optional().nullable(),
@@ -218,10 +220,12 @@ export const updateClientFn = createServerFn({ method: 'POST' })
     if (u.contactName !== undefined) patch.contact_name = u.contactName;
     if (u.contactEmail !== undefined) patch.contact_email = u.contactEmail;
     if (u.contactPhone !== undefined) patch.contact_phone = u.contactPhone;
+    if (u.contactRole !== undefined) patch.contact_role = u.contactRole;
     if (u.isDecisionMaker !== undefined) patch.is_decision_maker = u.isDecisionMaker;
     if (u.packageType !== undefined) patch.package_type = u.packageType;
     if (u.budget !== undefined) patch.budget = u.budget;
     if (u.salesPersonId !== undefined) patch.sales_person_id = u.salesPersonId;
+    if (u.leadSource !== undefined) patch.lead_source = u.leadSource;
     if (u.lastContactDate !== undefined) patch.last_contact_date = u.lastContactDate || null;
     if (u.lastContactMethod !== undefined) patch.last_contact_method = u.lastContactMethod;
     if (u.nextFollowUpDate !== undefined) patch.next_follow_up_date = u.nextFollowUpDate || null;
