@@ -203,6 +203,101 @@ export type Database = {
         }
         Relationships: []
       }
+      contact_logs: {
+        Row: {
+          business_id: string
+          contact_date: string
+          created_at: string
+          discussion: string
+          id: string
+          logged_by: string
+          logged_by_name: string
+          method: string
+        }
+        Insert: {
+          business_id: string
+          contact_date: string
+          created_at?: string
+          discussion: string
+          id?: string
+          logged_by: string
+          logged_by_name: string
+          method: string
+        }
+        Update: {
+          business_id?: string
+          contact_date?: string
+          created_at?: string
+          discussion?: string
+          id?: string
+          logged_by?: string
+          logged_by_name?: string
+          method?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_logs_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["business_id"]
+          },
+        ]
+      }
+      follow_ups: {
+        Row: {
+          assigned_to: string
+          business_id: string
+          completed_at: string | null
+          created_at: string
+          created_by: string
+          due_date: string
+          id: string
+          rescheduled_to: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to: string
+          business_id: string
+          completed_at?: string | null
+          created_at?: string
+          created_by: string
+          due_date: string
+          id?: string
+          rescheduled_to?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string
+          business_id?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string
+          due_date?: string
+          id?: string
+          rescheduled_to?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "follow_ups_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "follow_ups_rescheduled_to_fkey"
+            columns: ["rescheduled_to"]
+            isOneToOne: false
+            referencedRelation: "follow_ups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       locations: {
         Row: {
           address: string
@@ -310,6 +405,10 @@ export type Database = {
         Returns: boolean
       }
       is_privileged: { Args: { _user_id: string }; Returns: boolean }
+      sync_client_next_follow_up: {
+        Args: { _business_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "manager" | "sales_rep" | "admin"
