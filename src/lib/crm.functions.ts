@@ -414,9 +414,9 @@ export const addLocationFn = createServerFn({ method: 'POST' })
   .inputValidator((d: unknown) => z.object({
     businessId: z.string(),
     name: z.string().min(1),
-    address: z.string().default(''),
-    city: z.string().default(''),
-    state: z.string().default(''),
+    address: z.string().min(1),
+    city: z.string().min(1),
+    state: z.string().length(2),
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
