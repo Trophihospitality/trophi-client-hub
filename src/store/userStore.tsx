@@ -58,9 +58,11 @@ export const useAuth = () => useContext(AuthContext);
 export function useUser() {
   const { profile } = useAuth();
   const currentUser = profile ?? { id: '', name: '', email: '', role: 'sales_rep' as const };
-  const isManager = currentUser.role === 'manager';
+  const isAdmin = currentUser.role === 'admin';
+  const isManager = isAdmin || currentUser.role === 'manager';
   return {
     currentUser,
+    isAdmin,
     isManager,
     setCurrentUserId: () => {},
     visibleClients: <T extends { salesPersonId: string }>(clients: T[]) =>
