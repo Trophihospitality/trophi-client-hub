@@ -291,8 +291,8 @@ export const addNoteFn = createServerFn({ method: 'POST' })
 const LogContactInput = z.object({
   businessId: z.string(),
   method: z.string(),
-  date: z.string(),
-  summary: z.string(),
+  date: z.string().min(1),
+  summary: z.string().trim().min(1, 'What was discussed is required'),
   nextFollowUpDate: z.string().optional(),
 });
 export const logContactFn = createServerFn({ method: 'POST' })
@@ -301,14 +301,41 @@ export const logContactFn = createServerFn({ method: 'POST' })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const name = await actorName(supabase, userId);
+
+    // Load client so we know the account owner (for follow_up assignment).
+    const { data: cli, error: cErr } = await supabase.from('clients')
+      .select('sales_person_id').eq('business_id', data.businessId).maybeSingle();
+    if (cErr) throw cErr;
+    if (!cli) throw new Error('Client not found');
+
+    // Update Last Contact fields.
     const patch: any = {
       last_contact_date: data.date,
       last_contact_method: data.method,
     };
-    if (data.nextFollowUpDate) patch.next_follow_up_date = data.nextFollowUpDate;
     const { error } = await supabase.from('clients').update(patch as any).eq('business_id', data.businessId);
     if (error) throw error;
-    const desc = `${data.method} contact logged${data.summary ? `: ${data.summary}` : ''}`;
+
+    // Persist the structured contact log.
+    await supabase.from('contact_logs').insert({
+      business_id: data.businessId, contact_date: data.date, method: data.method,
+      discussion: data.summary.trim(), logged_by: userId, logged_by_name: name,
+    } as any);
+
+    // Any pending follow-ups for this client become completed.
+    await supabase.from('follow_ups')
+      .update({ status: 'completed', completed_at: new Date().toISOString() } as any)
+      .eq('business_id', data.businessId).eq('status', 'pending');
+
+    // Optionally schedule the next follow-up as a task record.
+    if (data.nextFollowUpDate) {
+      await supabase.from('follow_ups').insert({
+        business_id: data.businessId, assigned_to: cli.sales_person_id,
+        due_date: data.nextFollowUpDate, status: 'pending', created_by: userId,
+      } as any);
+    }
+
+    const desc = `${data.method} contact logged: ${data.summary.trim()}`;
     await logActivity(supabase, data.businessId, 'contact_logged', desc, name, userId);
     return { ok: true };
   });
