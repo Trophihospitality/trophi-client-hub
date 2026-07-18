@@ -22,12 +22,26 @@ async function loadClient(supabase: any, businessId: string): Promise<Client | n
     supabase.from('client_notes').select('*').eq('business_id', businessId).order('created_at', { ascending: false }),
     supabase.from('client_activity').select('*').eq('business_id', businessId).order('timestamp', { ascending: false }),
     supabase.from('client_attachments').select('*').eq('business_id', businessId).order('uploaded_at', { ascending: false }),
-    supabase.from('contact_logs').select('*').eq('business_id', businessId).order('created_at', { ascending: false }),
+    supabase.from('contact_logs').select('*').eq('business_id', businessId)
+      .order('contact_date', { ascending: false })
+      .order('created_at', { ascending: false }),
   ]);
   return rowToClient(c, locs.data ?? [], notes.data ?? [], activity.data ?? [], attachments.data ?? [], logs.data ?? []);
 }
 
+function latestContactLog(contactLogs: any[]): any | null {
+  return contactLogs.reduce<any | null>((winner, log) => {
+    if (!winner) return log;
+    const dateCmp = String(log.contact_date ?? '').localeCompare(String(winner.contact_date ?? ''));
+    if (dateCmp > 0) return log;
+    if (dateCmp < 0) return winner;
+    const createdCmp = String(log.created_at ?? '').localeCompare(String(winner.created_at ?? ''));
+    return createdCmp > 0 ? log : winner;
+  }, null);
+}
+
 function rowToClient(c: any, locs: any[], notes: any[], activity: any[], attachments: any[], contactLogs: any[] = []): Client {
+  const lastContact = latestContactLog(contactLogs);
   return {
     businessId: c.business_id,
     company: c.company,
@@ -41,8 +55,8 @@ function rowToClient(c: any, locs: any[], notes: any[], activity: any[], attachm
       closedAt: l.closed_at ?? undefined,
     })),
     journeyStatus: c.journey_status as JourneyStatus,
-    lastContactDate: c.last_contact_date ?? '',
-    lastContactMethod: (c.last_contact_method ?? 'None') as ContactMethod,
+    lastContactDate: lastContact?.contact_date ?? c.last_contact_date ?? '',
+    lastContactMethod: (lastContact?.method ?? c.last_contact_method ?? 'None') as ContactMethod,
     contactName: c.contact_name ?? '',
     contactEmail: c.contact_email ?? '',
     contactPhone: c.contact_phone ?? '',
@@ -102,7 +116,9 @@ export const listClients = createServerFn({ method: 'GET' })
       supabase.from('client_notes').select('*').order('created_at', { ascending: false }),
       supabase.from('client_activity').select('*').order('timestamp', { ascending: false }),
       supabase.from('client_attachments').select('*').order('uploaded_at', { ascending: false }),
-      supabase.from('contact_logs').select('*').order('created_at', { ascending: false }),
+      supabase.from('contact_logs').select('*')
+        .order('contact_date', { ascending: false })
+        .order('created_at', { ascending: false }),
     ]);
     if (error) throw error;
     const byBiz = <T extends { business_id: string }>(rows: T[]) =>
@@ -344,13 +360,14 @@ export const logContactFn = createServerFn({ method: 'POST' })
     } as any);
     if (insErr) throw insErr;
 
-    // Derive Last Contact from the most recent contact_log entry (handles backdated inserts).
-    const { data: latest } = await supabase.from('contact_logs')
-      .select('contact_date, method')
+    // Keep denormalized client fields in sync from the single winning contact_log row.
+    const { data: latest, error: latestErr } = await supabase.from('contact_logs')
+      .select('contact_date, method, created_at')
       .eq('business_id', data.businessId)
       .order('contact_date', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(1).maybeSingle();
+    if (latestErr) throw latestErr;
     if (latest) {
       const { error: updErr } = await supabase.from('clients').update({
         last_contact_date: latest.contact_date,

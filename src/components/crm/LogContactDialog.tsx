@@ -46,7 +46,9 @@ export function LogContactDialog({ client, actorName, open, onOpenChange }: Prop
     if (!summary.trim()) return;
     try {
       await logContact(client.businessId, method, date, summary.trim(), actorName, nextFollowUp || undefined);
+      // The CRM table and Client Detail are both fed by clientsQueryKey.
       await qc.invalidateQueries({ queryKey: clientsQueryKey, refetchType: 'active' });
+      await qc.refetchQueries({ queryKey: clientsQueryKey, type: 'active' });
       toast.success('Contact logged', {
         description: `${method} with ${client.company} · Last Contact updated${nextFollowUp ? ` · Follow-up ${nextFollowUp}` : ''}`,
       });
