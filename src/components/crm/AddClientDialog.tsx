@@ -2,10 +2,12 @@ import { useMemo, useState } from 'react';
 import { Plus, Trash2, Building2, AlertTriangle } from 'lucide-react';
 import { useCrm } from '@/store/crmStore';
 import { useUser } from '@/store/userStore';
-import { SALES_TEAM } from '@/data/seedData';
-import { Client, ClientType, JourneyStatus, PackageType, Location } from '@/lib/types';
+import { ClientType, JourneyStatus, PackageType, SalesPerson } from '@/lib/types';
 import { CLIENT_TYPES, JOURNEY_STATUSES, PACKAGE_TYPES } from '@/lib/statusConfig';
-import { generateBusinessId, generateLocationId, uid } from '@/lib/ids';
+import { uid } from '@/lib/ids';
+import { useQuery } from '@tanstack/react-query';
+import { useServerFn } from '@tanstack/react-start';
+import { createClientFn, listSalesTeam } from '@/lib/crm.functions';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
