@@ -1,5 +1,5 @@
-import { Client, ClientType, JourneyStatus, PackageType } from './types';
-import { CLIENT_TYPES, JOURNEY_STATUSES, PACKAGE_TYPES } from './statusConfig';
+import { Client, ClientType, ContactRole, JourneyStatus, LeadSource, PackageType } from './types';
+import { CLIENT_TYPES, JOURNEY_STATUSES, PACKAGE_TYPES, CONTACT_ROLES, LEAD_SOURCES } from './statusConfig';
 import { generateBusinessId, generateLocationId, uid } from './ids';
 
 // ============================================================
@@ -11,8 +11,8 @@ import { generateBusinessId, generateLocationId, uid } from './ids';
 
 export const CSV_HEADERS = [
   'Company', 'Brands', 'Client Type', 'Locations', 'Journey Status',
-  'Last Contact Date', 'Contact Name', 'Email', 'Phone',
-  'Decision Maker', 'Package', 'Budget', 'Lead Source',
+  'Last Contact Date', 'Contact Name', 'Contact Role', 'Email', 'Phone',
+  'Decision Maker', 'Package', 'Monthly Budget Per Location', 'Lead Source',
 ] as const;
 
 function esc(v: string | number | null | undefined): string {
@@ -29,6 +29,7 @@ export function clientsToCsv(clients: Client[]): string {
     c.journeyStatus,
     c.lastContactDate,
     c.contactName,
+    c.contactRole,
     c.contactEmail,
     c.contactPhone,
     c.isDecisionMaker ? 'Yes' : 'No',
@@ -97,8 +98,10 @@ export function csvToClients(
   const idx = {
     company: col('Company'), brands: col('Brands'), type: col('Client Type'),
     locations: col('Locations'), status: col('Journey Status'), lastContact: col('Last Contact Date'),
-    contact: col('Contact Name'), email: col('Email'), phone: col('Phone'),
-    dm: col('Decision Maker'), pkg: col('Package'), budget: col('Budget'), source: col('Lead Source'),
+    contact: col('Contact Name'), role: col('Contact Role'), email: col('Email'), phone: col('Phone'),
+    dm: col('Decision Maker'), pkg: col('Package'),
+    budget: col('Monthly Budget Per Location') >= 0 ? col('Monthly Budget Per Location') : col('Budget'),
+    source: col('Lead Source'),
   };
   if (idx.company === -1) return { clients, skipped: [{ row: 0, reason: 'Missing required "Company" column' }] };
 
@@ -146,11 +149,12 @@ export function csvToClients(
       contactName: get(idx.contact),
       contactEmail: get(idx.email),
       contactPhone: get(idx.phone),
+      contactRole: (CONTACT_ROLES.find((r) => r.toLowerCase() === get(idx.role).toLowerCase()) ?? '') as ContactRole | '',
       isDecisionMaker: /^(yes|y|true|1)$/i.test(get(idx.dm)),
       packageType,
       budget: budgetRaw && !isNaN(Number(budgetRaw)) ? Number(budgetRaw) : null,
       salesPersonId: defaultSalesPersonId,
-      leadSource: get(idx.source) || 'CSV Import',
+      leadSource: (LEAD_SOURCES.find((s) => s.toLowerCase() === get(idx.source).toLowerCase()) ?? '') as LeadSource | '',
       notes: [],
       attachments: [],
       activity: [{

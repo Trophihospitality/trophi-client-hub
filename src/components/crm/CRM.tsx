@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { useCrm } from '@/store/crmStore';
 import { useUser } from '@/store/userStore';
-import { SALES_TEAM } from '@/data/seedData';
+import { useSalesTeam } from '@/hooks/useSalesTeam';
 import { JourneyStatus } from '@/lib/types';
 import { JOURNEY_STATUSES, STAGE_PROBABILITY, ACTIVE_STATUSES, isOverdue } from '@/lib/statusConfig';
 import { clientsToCsv, downloadCsv, csvToClients } from '@/lib/csv';
@@ -34,6 +34,7 @@ function formatDate(iso: string): string {
 export default function CRM() {
   const { clients, changeStatus, importClients } = useCrm();
   const { currentUser, isManager, visibleClients, canEdit } = useUser();
+  const SALES_TEAM = useSalesTeam();
   const navigate = useNavigate();
   const importRef = useRef<HTMLInputElement>(null);
 
@@ -58,14 +59,17 @@ export default function CRM() {
     });
   }, [mine, search, statusFilter, ownerFilter, attentionOnly]);
 
-  // ---- Forecast metrics (computed on the user's visible book) ----
+  // ---- Forecast metrics: monthly value = budget-per-location × ACTIVE locations ----
+  const clientMonthlyValue = (c: (typeof mine)[number]) =>
+    (c.budget ?? 0) * c.locations.filter((l) => l.status === 'active').length;
+
   const metrics = useMemo(() => {
     const active = mine.filter((c) => ACTIVE_STATUSES.includes(c.journeyStatus));
-    const pipelineValue = active.reduce((s, c) => s + (c.budget ?? 0), 0);
-    const weighted = active.reduce((s, c) => s + (c.budget ?? 0) * STAGE_PROBABILITY[c.journeyStatus], 0);
+    const pipelineValue = active.reduce((s, c) => s + clientMonthlyValue(c), 0);
+    const weighted = active.reduce((s, c) => s + clientMonthlyValue(c) * STAGE_PROBABILITY[c.journeyStatus], 0);
     const approvedValue = mine
       .filter((c) => c.journeyStatus === 'Approved')
-      .reduce((s, c) => s + (c.budget ?? 0), 0);
+      .reduce((s, c) => s + clientMonthlyValue(c), 0);
     const needsAttention = mine.filter((c) => isOverdue(c).overdue).length;
     return { activeCount: active.length, pipelineValue, weighted, approvedValue, needsAttention };
   }, [mine]);
@@ -109,9 +113,9 @@ export default function CRM() {
   };
 
   const stats = [
-    { label: 'Active pipeline', value: money(metrics.pipelineValue), sub: `${metrics.activeCount} open leads` },
-    { label: 'Weighted forecast', value: money(metrics.weighted), sub: 'budget × stage probability', icon: TrendingUp },
-    { label: 'Approved value', value: money(metrics.approvedValue), sub: 'in onboarding' },
+    { label: 'Active pipeline (monthly)', value: money(metrics.pipelineValue), sub: `${metrics.activeCount} open leads` },
+    { label: 'Weighted monthly forecast', value: money(metrics.weighted), sub: 'monthly × active locations × probability', icon: TrendingUp },
+    { label: 'Approved monthly value', value: money(metrics.approvedValue), sub: 'in onboarding' },
     {
       label: 'Needs attention', value: String(metrics.needsAttention),
       sub: 'overdue follow-ups', alert: metrics.needsAttention > 0,
@@ -231,13 +235,16 @@ export default function CRM() {
                 <TableHead className="text-center"># Locations</TableHead>
                 <TableHead>Customer Journey Status</TableHead>
                 <TableHead>Last Contact</TableHead>
-                <TableHead>Point of Contact</TableHead>
+                <TableHead>
+                  Point of Contact
+                  <div className="text-[10px] font-normal text-muted-foreground">Role shown below name</div>
+                </TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead className="text-center">Decision Maker</TableHead>
                 <TableHead>Package</TableHead>
-                <TableHead className="text-right">Budget</TableHead>
-                <TableHead className="text-right">Weighted</TableHead>
+                <TableHead className="text-right">Monthly Budget / Location</TableHead>
+                <TableHead className="text-right">Weighted (monthly)</TableHead>
                 <TableHead>Owner</TableHead>
               </TableRow>
             </TableHeader>
@@ -252,7 +259,7 @@ export default function CRM() {
               {filtered.map((c) => {
                 const owner = SALES_TEAM.find((sp) => sp.id === c.salesPersonId);
                 const od = isOverdue(c);
-                const weighted = (c.budget ?? 0) * STAGE_PROBABILITY[c.journeyStatus];
+                const weighted = clientMonthlyValue(c) * STAGE_PROBABILITY[c.journeyStatus];
                 return (
                   <TableRow
                     key={c.businessId}
@@ -287,7 +294,10 @@ export default function CRM() {
                       <div className="text-sm">{formatDate(c.lastContactDate)}</div>
                       <div className="text-xs text-muted-foreground">{c.lastContactMethod}</div>
                     </TableCell>
-                    <TableCell>{c.contactName}</TableCell>
+                    <TableCell>
+                      <div>{c.contactName}</div>
+                      {c.contactRole && <div className="text-xs text-muted-foreground">{c.contactRole}</div>}
+                    </TableCell>
                     <TableCell className="max-w-[180px] truncate text-sm">{c.contactEmail}</TableCell>
                     <TableCell className="whitespace-nowrap text-sm">{c.contactPhone}</TableCell>
                     <TableCell className="text-center">

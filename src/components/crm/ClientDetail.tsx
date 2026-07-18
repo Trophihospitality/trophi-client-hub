@@ -6,9 +6,9 @@ import { useUser } from '@/store/userStore';
 import { LogContactDialog } from '@/components/crm/LogContactDialog';
 import { AttachmentsSection } from '@/components/crm/AttachmentsSection';
 import { isOverdue } from '@/lib/statusConfig';
-import { SALES_TEAM } from '@/data/seedData';
-import { JourneyStatus, PackageType } from '@/lib/types';
-import { PACKAGE_TYPES } from '@/lib/statusConfig';
+import { useSalesTeam } from '@/hooks/useSalesTeam';
+import { ContactRole, JourneyStatus, LeadSource, PackageType } from '@/lib/types';
+import { PACKAGE_TYPES, CONTACT_ROLES, LEAD_SOURCES } from '@/lib/statusConfig';
 import { StatusBadge, StatusSelect } from '@/components/crm/StatusBadge';
 import { uid } from '@/lib/ids';
 import { Button } from '@/components/ui/button';
@@ -58,10 +58,12 @@ export default function ClientDetail() {
           contactName: client.contactName,
           contactEmail: client.contactEmail,
           contactPhone: client.contactPhone,
+          contactRole: client.contactRole,
           isDecisionMaker: client.isDecisionMaker,
           packageType: client.packageType,
           budget: client.budget?.toString() ?? '',
           salesPersonId: client.salesPersonId,
+          leadSource: client.leadSource,
           lastContactDate: client.lastContactDate,
           lastContactMethod: client.lastContactMethod,
           nextFollowUpDate: client.nextFollowUpDate ?? '',
@@ -73,6 +75,7 @@ export default function ClientDetail() {
   const [addLocOpen, setAddLocOpen] = useState(false);
 
   const { currentUser, isManager, canEdit } = useUser();
+  const SALES_TEAM = useSalesTeam();
   const owner = SALES_TEAM.find((sp) => sp.id === client?.salesPersonId);
   const CURRENT_USER = currentUser.name;
   const editable = client ? canEdit(client) : false;
@@ -85,10 +88,12 @@ export default function ClientDetail() {
       draft.contactName !== client.contactName ||
       draft.contactEmail !== client.contactEmail ||
       draft.contactPhone !== client.contactPhone ||
+      draft.contactRole !== client.contactRole ||
       draft.isDecisionMaker !== client.isDecisionMaker ||
       draft.packageType !== client.packageType ||
       draft.budget !== (client.budget?.toString() ?? '') ||
       draft.salesPersonId !== client.salesPersonId ||
+      draft.leadSource !== client.leadSource ||
       draft.lastContactDate !== client.lastContactDate ||
       draft.lastContactMethod !== client.lastContactMethod ||
       draft.nextFollowUpDate !== (client.nextFollowUpDate ?? '')
@@ -123,10 +128,12 @@ export default function ClientDetail() {
       contactName: draft.contactName.trim(),
       contactEmail: draft.contactEmail.trim(),
       contactPhone: draft.contactPhone.trim(),
+      contactRole: draft.contactRole,
       isDecisionMaker: draft.isDecisionMaker,
       packageType: draft.packageType as PackageType,
       budget: draft.budget ? Number(draft.budget) : null,
       salesPersonId: draft.salesPersonId,
+      leadSource: draft.leadSource,
       lastContactDate: draft.lastContactDate,
       lastContactMethod: draft.lastContactMethod as typeof client.lastContactMethod,
       nextFollowUpDate: draft.nextFollowUpDate || undefined,
@@ -141,10 +148,12 @@ export default function ClientDetail() {
       contactName: client.contactName,
       contactEmail: client.contactEmail,
       contactPhone: client.contactPhone,
+      contactRole: client.contactRole,
       isDecisionMaker: client.isDecisionMaker,
       packageType: client.packageType,
       budget: client.budget?.toString() ?? '',
       salesPersonId: client.salesPersonId,
+      leadSource: client.leadSource,
       lastContactDate: client.lastContactDate,
       lastContactMethod: client.lastContactMethod,
       nextFollowUpDate: client.nextFollowUpDate ?? '',
@@ -249,6 +258,15 @@ export default function ClientDetail() {
                 <Input value={draft.contactName} onChange={(e) => set('contactName', e.target.value)} />
               </div>
               <div className="space-y-1.5">
+                <Label>Contact role</Label>
+                <Select value={draft.contactRole || undefined} onValueChange={(v) => set('contactRole', v as ContactRole)}>
+                  <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
+                  <SelectContent>
+                    {CONTACT_ROLES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
                 <Label>Email</Label>
                 <Input type="email" value={draft.contactEmail} onChange={(e) => set('contactEmail', e.target.value)} />
               </div>
@@ -270,8 +288,17 @@ export default function ClientDetail() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Annual budget (USD)</Label>
+                <Label>Monthly budget / location (USD)</Label>
                 <Input type="number" min="0" value={draft.budget} onChange={(e) => set('budget', e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Lead source</Label>
+                <Select value={draft.leadSource || undefined} onValueChange={(v) => set('leadSource', v as LeadSource)}>
+                  <SelectTrigger><SelectValue placeholder="Select lead source" /></SelectTrigger>
+                  <SelectContent>
+                    {LEAD_SOURCES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1.5">
                 <Label>Assigned sales person {!isManager && <span className="text-xs text-muted-foreground">(managers only)</span>}</Label>

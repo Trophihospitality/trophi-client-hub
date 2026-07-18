@@ -141,6 +141,7 @@ export type Database = {
           contact_email: string
           contact_name: string
           contact_phone: string
+          contact_role: string | null
           created_at: string
           is_decision_maker: boolean
           journey_status: string
@@ -163,6 +164,7 @@ export type Database = {
           contact_email?: string
           contact_name?: string
           contact_phone?: string
+          contact_role?: string | null
           created_at?: string
           is_decision_maker?: boolean
           journey_status?: string
@@ -185,6 +187,7 @@ export type Database = {
           contact_email?: string
           contact_name?: string
           contact_phone?: string
+          contact_role?: string | null
           created_at?: string
           is_decision_maker?: boolean
           journey_status?: string

@@ -3,7 +3,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { AlertTriangle, MapPin } from 'lucide-react';
 import { Client, JourneyStatus } from '@/lib/types';
 import { JOURNEY_STATUSES, STAGE_PROBABILITY, isOverdue, statusDotStyle } from '@/lib/statusConfig';
-import { SALES_TEAM } from '@/data/seedData';
+import { useSalesTeam } from '@/hooks/useSalesTeam';
 
 // ============================================================
 // PIPELINE BOARD — kanban view of the customer journey
@@ -25,8 +25,10 @@ function money(n: number): string {
 
 export function PipelineBoard({ clients, onStatusChange, canEdit }: Props) {
   const navigate = useNavigate();
+  const SALES_TEAM = useSalesTeam();
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<JourneyStatus | null>(null);
+  const monthlyValue = (c: Client) => (c.budget ?? 0) * c.locations.filter((l) => l.status === 'active').length;
 
   const handleDrop = (status: JourneyStatus) => {
     if (!dragId) return;
@@ -41,7 +43,7 @@ export function PipelineBoard({ clients, onStatusChange, canEdit }: Props) {
     <div className="flex gap-3 overflow-x-auto pb-4 -mx-1 px-1">
       {JOURNEY_STATUSES.map((status) => {
         const col = clients.filter((c) => c.journeyStatus === status);
-        const colValue = col.reduce((sum, c) => sum + (c.budget ?? 0), 0);
+        const colValue = col.reduce((sum, c) => sum + monthlyValue(c), 0);
         const weighted = colValue * STAGE_PROBABILITY[status];
         return (
           <div
@@ -94,7 +96,7 @@ export function PipelineBoard({ clients, onStatusChange, canEdit }: Props) {
                       {c.locations.filter((l) => l.status !== 'closed').length} loc · {c.packageType}
                     </div>
                     <div className="mt-2 flex items-center justify-between text-xs">
-                      <span className="font-medium">{c.budget ? money(c.budget) : '—'}</span>
+                      <span className="font-medium">{monthlyValue(c) ? `${money(monthlyValue(c))}/mo` : '—'}</span>
                       <span className="text-muted-foreground">{owner?.name.split(' ')[0] ?? '—'}</span>
                     </div>
                   </div>

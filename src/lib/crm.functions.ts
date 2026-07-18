@@ -45,11 +45,12 @@ function rowToClient(c: any, locs: any[], notes: any[], activity: any[], attachm
     contactName: c.contact_name ?? '',
     contactEmail: c.contact_email ?? '',
     contactPhone: c.contact_phone ?? '',
+    contactRole: (c.contact_role ?? '') as any,
     isDecisionMaker: !!c.is_decision_maker,
     packageType: c.package_type as PackageType,
     budget: c.budget !== null ? Number(c.budget) : null,
     salesPersonId: c.sales_person_id,
-    leadSource: c.lead_source ?? undefined,
+    leadSource: (c.lead_source ?? '') as any,
     nextFollowUpDate: c.next_follow_up_date ?? undefined,
     notes: notes.map((n): ClientNote => ({
       id: n.id, authorName: n.author_name, body: n.body, createdAt: n.created_at,
@@ -131,24 +132,25 @@ export const listSalesTeam = createServerFn({ method: 'GET' })
 
 // ---------- CREATE ----------
 const LocationInputSchema = z.object({
-  name: z.string().min(1),
-  address: z.string().default(''),
-  city: z.string().default(''),
-  state: z.string().default(''),
+  name: z.string().min(1, 'Location name required'),
+  address: z.string().min(1, 'Street address required'),
+  city: z.string().min(1, 'City required'),
+  state: z.string().length(2, 'State required'),
 });
 const CreateClientInput = z.object({
   company: z.string().min(1),
-  brands: z.array(z.string()),
+  brands: z.array(z.string()).min(1),
   clientType: z.string(),
   journeyStatus: z.string(),
-  contactName: z.string().default(''),
-  contactEmail: z.string().default(''),
-  contactPhone: z.string().default(''),
-  isDecisionMaker: z.boolean().default(false),
-  packageType: z.string().default('TBD'),
-  budget: z.number().nullable(),
+  contactName: z.string().min(1),
+  contactEmail: z.string().email(),
+  contactPhone: z.string().min(1),
+  contactRole: z.string().min(1),
+  isDecisionMaker: z.boolean(),
+  packageType: z.string(),
+  budget: z.number(),
   salesPersonId: z.string().uuid(),
-  leadSource: z.string().optional(),
+  leadSource: z.string().min(1),
   locations: z.array(LocationInputSchema).min(1),
 });
 
@@ -164,9 +166,10 @@ export const createClientFn = createServerFn({ method: 'POST' })
       journey_status: data.journeyStatus, last_contact_date: today,
       last_contact_method: 'None', contact_name: data.contactName,
       contact_email: data.contactEmail, contact_phone: data.contactPhone,
+      contact_role: data.contactRole,
       is_decision_maker: data.isDecisionMaker, package_type: data.packageType,
       budget: data.budget, sales_person_id: data.salesPersonId,
-      lead_source: data.leadSource ?? null,
+      lead_source: data.leadSource,
     } as any).select('business_id, journey_status, sent_to_onboarding').single();
     if (error) throw error;
     const businessId = inserted.business_id;
@@ -192,10 +195,12 @@ const UpdateClientInput = z.object({
     contactName: z.string().optional(),
     contactEmail: z.string().optional(),
     contactPhone: z.string().optional(),
+    contactRole: z.string().optional(),
     isDecisionMaker: z.boolean().optional(),
     packageType: z.string().optional(),
     budget: z.number().nullable().optional(),
     salesPersonId: z.string().uuid().optional(),
+    leadSource: z.string().optional(),
     lastContactDate: z.string().optional(),
     lastContactMethod: z.string().optional(),
     nextFollowUpDate: z.string().optional().nullable(),
@@ -215,10 +220,12 @@ export const updateClientFn = createServerFn({ method: 'POST' })
     if (u.contactName !== undefined) patch.contact_name = u.contactName;
     if (u.contactEmail !== undefined) patch.contact_email = u.contactEmail;
     if (u.contactPhone !== undefined) patch.contact_phone = u.contactPhone;
+    if (u.contactRole !== undefined) patch.contact_role = u.contactRole;
     if (u.isDecisionMaker !== undefined) patch.is_decision_maker = u.isDecisionMaker;
     if (u.packageType !== undefined) patch.package_type = u.packageType;
     if (u.budget !== undefined) patch.budget = u.budget;
     if (u.salesPersonId !== undefined) patch.sales_person_id = u.salesPersonId;
+    if (u.leadSource !== undefined) patch.lead_source = u.leadSource;
     if (u.lastContactDate !== undefined) patch.last_contact_date = u.lastContactDate || null;
     if (u.lastContactMethod !== undefined) patch.last_contact_method = u.lastContactMethod;
     if (u.nextFollowUpDate !== undefined) patch.next_follow_up_date = u.nextFollowUpDate || null;
@@ -370,7 +377,12 @@ const ImportInput = z.object({
     budget: z.number().nullable(),
     lastContactDate: z.string(),
     leadSource: z.string().optional(),
-    locations: z.array(LocationInputSchema),
+    locations: z.array(z.object({
+      name: z.string().min(1),
+      address: z.string().default(''),
+      city: z.string().default(''),
+      state: z.string().default(''),
+    })),
   })),
 });
 
@@ -407,9 +419,9 @@ export const addLocationFn = createServerFn({ method: 'POST' })
   .inputValidator((d: unknown) => z.object({
     businessId: z.string(),
     name: z.string().min(1),
-    address: z.string().default(''),
-    city: z.string().default(''),
-    state: z.string().default(''),
+    address: z.string().min(1),
+    city: z.string().min(1),
+    state: z.string().length(2),
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;

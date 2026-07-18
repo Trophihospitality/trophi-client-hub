@@ -30,6 +30,15 @@ export type PackageType =
   | 'Custom'
   | 'TBD';
 
+export type ContactRole =
+  | 'Owner' | 'Partner' | 'C-Suite' | 'Director'
+  | 'Leadership' | 'Manager' | 'Admin' | 'Other';
+
+export type LeadSource =
+  | 'Referral' | 'Website' | 'Social Media' | 'Cold Outreach'
+  | 'Trade Show / Event' | 'Email Campaign' | 'Paid Ads' | 'Partner'
+  | 'Existing Client' | 'Networking' | 'Inbound Call' | 'Other';
+
 export type LocationStatus = 'active' | 'closed';
 
 export interface Location {
@@ -90,11 +99,12 @@ export interface Client {
   contactName: string;             // point of contact
   contactEmail: string;
   contactPhone: string;
+  contactRole: ContactRole | '';   // role of point of contact
   isDecisionMaker: boolean;
   packageType: PackageType;
-  budget: number | null;           // annual budget in USD, null = unknown
+  budget: number | null;           // monthly budget PER ACTIVE LOCATION in USD
   salesPersonId: string;           // account owner
-  leadSource?: string;
+  leadSource: LeadSource | '';
   nextFollowUpDate?: string;
   notes: ClientNote[];
   attachments: Attachment[];       // proposals, contracts, decks
