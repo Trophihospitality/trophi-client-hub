@@ -87,6 +87,16 @@ export interface Attachment {
 
 export type ContactMethod = 'Email' | 'Phone' | 'In-Person' | 'Video Call' | 'Text' | 'None';
 
+export interface ContactLog {
+  id: string;
+  businessId: string;
+  contactDate: string;             // ISO date
+  method: ContactMethod;
+  discussion: string;
+  loggedByName: string;
+  createdAt: string;
+}
+
 export interface Client {
   businessId: string;      // e.g. TRP-4F8K2Q — the universal mapping key
   company: string;
