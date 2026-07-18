@@ -66,6 +66,11 @@ function rowToClient(c: any, locs: any[], notes: any[], activity: any[], attachm
       id: a.id, type: a.type as ActivityEvent['type'],
       description: a.description, actor: a.actor, timestamp: a.timestamp,
     })),
+    contactLogs: contactLogs.map((l): ContactLog => ({
+      id: l.id, businessId: l.business_id, contactDate: l.contact_date,
+      method: l.method as ContactMethod, discussion: l.discussion,
+      loggedByName: l.logged_by_name, createdAt: l.created_at,
+    })),
     createdAt: c.created_at,
     updatedAt: c.updated_at,
     sentToOnboarding: !!c.sent_to_onboarding,
