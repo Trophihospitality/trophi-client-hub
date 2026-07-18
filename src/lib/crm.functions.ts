@@ -400,3 +400,55 @@ export const importClientsFn = createServerFn({ method: 'POST' })
     }
     return { count };
   });
+
+// ---------- ADD LOCATION ----------
+export const addLocationFn = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({
+    businessId: z.string(),
+    name: z.string().min(1),
+    address: z.string().default(''),
+    city: z.string().default(''),
+    state: z.string().default(''),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const name = await actorName(supabase, userId);
+    const { data: ins, error } = await supabase.from('locations').insert({
+      business_id: data.businessId, name: data.name,
+      address: data.address, city: data.city, state: data.state,
+    } as any).select('location_id, needs_onboarding').single();
+    if (error) throw error;
+    await logActivity(supabase, data.businessId, 'info_updated',
+      `Location added: ${data.name} · ${ins.location_id}${ins.needs_onboarding ? ' · Flagged for Onboarding' : ''}`,
+      name, userId);
+    return { locationId: ins.location_id };
+  });
+
+// ---------- CLOSE LOCATION (managers/admins only, enforced by DB trigger) ----------
+export const setLocationStatusFn = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({
+    locationId: z.string(),
+    status: z.enum(['active', 'closed']),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const name = await actorName(supabase, userId);
+    const { data: loc, error: fErr } = await supabase.from('locations')
+      .select('business_id, name, status').eq('location_id', data.locationId).maybeSingle();
+    if (fErr) throw fErr;
+    if (!loc) throw new Error('Location not found');
+    if (loc.status === data.status) return { ok: true };
+    const patch: any = {
+      status: data.status,
+      closed_at: data.status === 'closed' ? new Date().toISOString() : null,
+      closed_by: data.status === 'closed' ? userId : null,
+    };
+    const { error } = await supabase.from('locations').update(patch).eq('location_id', data.locationId);
+    if (error) throw error;
+    const verb = data.status === 'closed' ? 'Location closed' : 'Location reopened';
+    await logActivity(supabase, loc.business_id, 'info_updated',
+      `${verb}: ${loc.name} · ${data.locationId}`, name, userId);
+    return { ok: true };
+  });
