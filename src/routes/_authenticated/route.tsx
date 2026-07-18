@@ -2,7 +2,8 @@ import { createFileRoute, Outlet, redirect, Link, useRouterState } from '@tansta
 import { Users, ClipboardCheck, BarChart3, Wrench, Globe, LogOut } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/store/userStore';
-import trophiMark from '@/assets/trophi-mark.png';
+import trophiMarkAsset from '@/assets/trophi-mark.png.asset.json';
+const trophiMark = trophiMarkAsset.url;
 
 export const Route = createFileRoute('/_authenticated')({
   ssr: false,
