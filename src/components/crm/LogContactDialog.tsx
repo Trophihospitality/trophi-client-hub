@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useCrm } from '@/store/crmStore';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCrm, clientsQueryKey } from '@/store/crmStore';
 import { Client, ContactMethod } from '@/lib/types';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
@@ -31,6 +32,7 @@ interface Props {
 
 export function LogContactDialog({ client, actorName, open, onOpenChange }: Props) {
   const { logContact } = useCrm();
+  const qc = useQueryClient();
   const [method, setMethod] = useState<ContactMethod>('Email');
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [summary, setSummary] = useState('');
@@ -44,6 +46,7 @@ export function LogContactDialog({ client, actorName, open, onOpenChange }: Prop
     if (!summary.trim()) return;
     try {
       await logContact(client.businessId, method, date, summary.trim(), actorName, nextFollowUp || undefined);
+      await qc.invalidateQueries({ queryKey: clientsQueryKey, refetchType: 'active' });
       toast.success('Contact logged', {
         description: `${method} with ${client.company} · Last Contact updated${nextFollowUp ? ` · Follow-up ${nextFollowUp}` : ''}`,
       });

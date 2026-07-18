@@ -337,19 +337,27 @@ export const logContactFn = createServerFn({ method: 'POST' })
     if (cErr) throw cErr;
     if (!cli) throw new Error('Client not found');
 
-    // Update Last Contact fields.
-    const patch: any = {
-      last_contact_date: data.date,
-      last_contact_method: data.method,
-    };
-    const { error } = await supabase.from('clients').update(patch as any).eq('business_id', data.businessId);
-    if (error) throw error;
-
-    // Persist the structured contact log.
-    await supabase.from('contact_logs').insert({
+    // Persist the structured contact log first — it's the source of truth.
+    const { error: insErr } = await supabase.from('contact_logs').insert({
       business_id: data.businessId, contact_date: data.date, method: data.method,
       discussion: data.summary.trim(), logged_by: userId, logged_by_name: name,
     } as any);
+    if (insErr) throw insErr;
+
+    // Derive Last Contact from the most recent contact_log entry (handles backdated inserts).
+    const { data: latest } = await supabase.from('contact_logs')
+      .select('contact_date, method')
+      .eq('business_id', data.businessId)
+      .order('contact_date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(1).maybeSingle();
+    if (latest) {
+      const { error: updErr } = await supabase.from('clients').update({
+        last_contact_date: latest.contact_date,
+        last_contact_method: latest.method,
+      } as any).eq('business_id', data.businessId);
+      if (updErr) throw updErr;
+    }
 
     // Any pending follow-ups for this client become completed.
     await supabase.from('follow_ups')
