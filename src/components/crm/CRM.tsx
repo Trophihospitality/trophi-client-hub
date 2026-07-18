@@ -294,7 +294,10 @@ export default function CRM() {
                       <div className="text-sm">{formatDate(c.lastContactDate)}</div>
                       <div className="text-xs text-muted-foreground">{c.lastContactMethod}</div>
                     </TableCell>
-                    <TableCell>{c.contactName}</TableCell>
+                    <TableCell>
+                      <div>{c.contactName}</div>
+                      {c.contactRole && <div className="text-xs text-muted-foreground">{c.contactRole}</div>}
+                    </TableCell>
                     <TableCell className="max-w-[180px] truncate text-sm">{c.contactEmail}</TableCell>
                     <TableCell className="whitespace-nowrap text-sm">{c.contactPhone}</TableCell>
                     <TableCell className="text-center">
