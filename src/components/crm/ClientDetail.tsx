@@ -88,10 +88,12 @@ export default function ClientDetail() {
       draft.contactName !== client.contactName ||
       draft.contactEmail !== client.contactEmail ||
       draft.contactPhone !== client.contactPhone ||
+      draft.contactRole !== client.contactRole ||
       draft.isDecisionMaker !== client.isDecisionMaker ||
       draft.packageType !== client.packageType ||
       draft.budget !== (client.budget?.toString() ?? '') ||
       draft.salesPersonId !== client.salesPersonId ||
+      draft.leadSource !== client.leadSource ||
       draft.lastContactDate !== client.lastContactDate ||
       draft.lastContactMethod !== client.lastContactMethod ||
       draft.nextFollowUpDate !== (client.nextFollowUpDate ?? '')
