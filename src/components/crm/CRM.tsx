@@ -113,9 +113,9 @@ export default function CRM() {
   };
 
   const stats = [
-    { label: 'Active pipeline', value: money(metrics.pipelineValue), sub: `${metrics.activeCount} open leads` },
-    { label: 'Weighted forecast', value: money(metrics.weighted), sub: 'budget × stage probability', icon: TrendingUp },
-    { label: 'Approved value', value: money(metrics.approvedValue), sub: 'in onboarding' },
+    { label: 'Active pipeline (monthly)', value: money(metrics.pipelineValue), sub: `${metrics.activeCount} open leads` },
+    { label: 'Weighted monthly forecast', value: money(metrics.weighted), sub: 'monthly × active locations × probability', icon: TrendingUp },
+    { label: 'Approved monthly value', value: money(metrics.approvedValue), sub: 'in onboarding' },
     {
       label: 'Needs attention', value: String(metrics.needsAttention),
       sub: 'overdue follow-ups', alert: metrics.needsAttention > 0,
