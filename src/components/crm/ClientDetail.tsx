@@ -70,6 +70,7 @@ export default function ClientDetail() {
   );
   const [newNote, setNewNote] = useState('');
   const [logOpen, setLogOpen] = useState(false);
+  const [addLocOpen, setAddLocOpen] = useState(false);
 
   const { currentUser, isManager, canEdit } = useUser();
   const owner = SALES_TEAM.find((sp) => sp.id === client?.salesPersonId);
