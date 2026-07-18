@@ -259,7 +259,7 @@ export default function CRM() {
               {filtered.map((c) => {
                 const owner = SALES_TEAM.find((sp) => sp.id === c.salesPersonId);
                 const od = isOverdue(c);
-                const weighted = (c.budget ?? 0) * STAGE_PROBABILITY[c.journeyStatus];
+                const weighted = clientMonthlyValue(c) * STAGE_PROBABILITY[c.journeyStatus];
                 return (
                   <TableRow
                     key={c.businessId}
