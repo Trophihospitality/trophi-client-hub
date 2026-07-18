@@ -23,6 +23,10 @@ const NAV = [
   { to: '/client-portal', label: 'Client Portal', icon: Globe },
 ] as const;
 
+const ADMIN_NAV = [
+  { to: '/users', label: 'User Management', icon: ShieldCheck },
+] as const;
+
 function TrophiMark() {
   return (
     <div className="flex items-center gap-2.5 px-2">
