@@ -205,28 +205,40 @@ export type Database = {
           address: string
           business_id: string
           city: string
+          closed_at: string | null
+          closed_by: string | null
           created_at: string
           location_id: string
           name: string
+          needs_onboarding: boolean
           state: string
+          status: string
         }
         Insert: {
           address?: string
           business_id: string
           city?: string
+          closed_at?: string | null
+          closed_by?: string | null
           created_at?: string
           location_id: string
           name: string
+          needs_onboarding?: boolean
           state?: string
+          status?: string
         }
         Update: {
           address?: string
           business_id?: string
           city?: string
+          closed_at?: string | null
+          closed_by?: string | null
           created_at?: string
           location_id?: string
           name?: string
+          needs_onboarding?: boolean
           state?: string
+          status?: string
         }
         Relationships: [
           {
