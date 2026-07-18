@@ -1,4 +1,4 @@
-import { Client, ClientType, JourneyStatus, PackageType } from './types';
+import { Client, ClientType, ContactRole, JourneyStatus, LeadSource, PackageType } from './types';
 import { CLIENT_TYPES, JOURNEY_STATUSES, PACKAGE_TYPES } from './statusConfig';
 import { generateBusinessId, generateLocationId, uid } from './ids';
 
