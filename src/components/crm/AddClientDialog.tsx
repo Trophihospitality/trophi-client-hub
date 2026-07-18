@@ -45,9 +45,15 @@ interface Props {
 }
 
 export function AddClientDialog({ open, onOpenChange }: Props) {
-  const { clients, addClient } = useCrm();
+  const { clients } = useCrm();
   const { currentUser, isManager } = useUser();
   const [step, setStep] = useState<1 | 2>(1);
+  const createFn = useServerFn(createClientFn);
+  const teamFn = useServerFn(listSalesTeam);
+  const { data: SALES_TEAM = [] } = useQuery<SalesPerson[]>({
+    queryKey: ['sales-team'],
+    queryFn: () => teamFn({} as any),
+  });
 
   const [clientType, setClientType] = useState<ClientType | null>(null);
   const [company, setCompany] = useState('');
