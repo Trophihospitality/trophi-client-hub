@@ -46,6 +46,7 @@ export function LogContactDialog({ client, actorName, open, onOpenChange }: Prop
     if (!summary.trim()) return;
     try {
       await logContact(client.businessId, method, date, summary.trim(), actorName, nextFollowUp || undefined);
+      await qc.invalidateQueries({ queryKey: clientsQueryKey, refetchType: 'active' });
       toast.success('Contact logged', {
         description: `${method} with ${client.company} · Last Contact updated${nextFollowUp ? ` · Follow-up ${nextFollowUp}` : ''}`,
       });
