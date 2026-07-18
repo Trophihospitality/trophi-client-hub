@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import type {
   Client, ClientNote, ActivityEvent, JourneyStatus, Attachment,
-  ContactMethod, ClientType, PackageType, Location, SalesPerson,
+  ContactMethod, ClientType, PackageType, Location, SalesPerson, ContactLog,
 } from '@/lib/types';
 
 // ============================================================
