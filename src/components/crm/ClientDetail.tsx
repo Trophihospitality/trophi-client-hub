@@ -46,7 +46,7 @@ function timeAgo(iso: string): string {
 export default function ClientDetail() {
   const { businessId } = useParams({ strict: false }) as { businessId: string };
   const navigate = useNavigate();
-  const { getClient, updateClient, changeStatus, addNote } = useCrm();
+  const { getClient, updateClient, changeStatus, addNote, setLocationStatus } = useCrm();
   const client = getClient(businessId ?? '');
 
   // Editable draft of client info
