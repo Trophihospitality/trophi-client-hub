@@ -149,11 +149,12 @@ export function csvToClients(
       contactName: get(idx.contact),
       contactEmail: get(idx.email),
       contactPhone: get(idx.phone),
+      contactRole: (CONTACT_ROLES.find((r) => r.toLowerCase() === get(idx.role).toLowerCase()) ?? '') as ContactRole | '',
       isDecisionMaker: /^(yes|y|true|1)$/i.test(get(idx.dm)),
       packageType,
       budget: budgetRaw && !isNaN(Number(budgetRaw)) ? Number(budgetRaw) : null,
       salesPersonId: defaultSalesPersonId,
-      leadSource: get(idx.source) || 'CSV Import',
+      leadSource: (LEAD_SOURCES.find((s) => s.toLowerCase() === get(idx.source).toLowerCase()) ?? '') as LeadSource | '',
       notes: [],
       attachments: [],
       activity: [{
