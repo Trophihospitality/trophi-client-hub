@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from '@tanstack/react-router';
-import { ArrowLeft, MapPin, StickyNote, Clock, Send, PhoneCall, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, MapPin, StickyNote, Clock, Send, PhoneCall, AlertTriangle, Plus, Ban, RotateCcw } from 'lucide-react';
 import { useCrm } from '@/store/crmStore';
 import { useUser } from '@/store/userStore';
 import { LogContactDialog } from '@/components/crm/LogContactDialog';
