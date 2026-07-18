@@ -36,14 +36,24 @@ export function LogContactDialog({ client, actorName, open, onOpenChange }: Prop
   const [summary, setSummary] = useState('');
   const [nextFollowUp, setNextFollowUp] = useState('');
 
-  const handleSave = () => {
-    logContact(client.businessId, method, date, summary.trim(), actorName, nextFollowUp || undefined);
-    toast.success('Contact logged', {
-      description: `${method} with ${client.company} · Last Contact updated${nextFollowUp ? ` · Follow-up ${nextFollowUp}` : ''}`,
-    });
-    setSummary('');
-    setNextFollowUp('');
-    onOpenChange(false);
+  const [attempted, setAttempted] = useState(false);
+  const summaryError = attempted && !summary.trim();
+
+  const handleSave = async () => {
+    setAttempted(true);
+    if (!summary.trim()) return;
+    try {
+      await logContact(client.businessId, method, date, summary.trim(), actorName, nextFollowUp || undefined);
+      toast.success('Contact logged', {
+        description: `${method} with ${client.company} · Last Contact updated${nextFollowUp ? ` · Follow-up ${nextFollowUp}` : ''}`,
+      });
+      setSummary('');
+      setNextFollowUp('');
+      setAttempted(false);
+      onOpenChange(false);
+    } catch (e: any) {
+      toast.error('Could not log contact', { description: e?.message });
+    }
   };
 
   return (
@@ -72,8 +82,15 @@ export function LogContactDialog({ client, actorName, open, onOpenChange }: Prop
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label>What was discussed? <span className="text-muted-foreground text-xs">(optional)</span></Label>
-            <Textarea rows={3} value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="Left voicemail about the revised proposal…" />
+            <Label>What was discussed? <span className="text-destructive">*</span></Label>
+            <Textarea
+              rows={3}
+              value={summary}
+              onChange={(e) => setSummary(e.target.value)}
+              placeholder="Left voicemail about the revised proposal…"
+              aria-invalid={summaryError}
+            />
+            {summaryError && <p className="text-xs text-destructive">Required</p>}
           </div>
           <div className="space-y-1.5">
             <Label>Schedule next follow-up <span className="text-muted-foreground text-xs">(optional)</span></Label>
@@ -82,7 +99,7 @@ export function LogContactDialog({ client, actorName, open, onOpenChange }: Prop
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSave}>Log contact</Button>
+          <Button onClick={handleSave} disabled={!summary.trim()}>Log contact</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

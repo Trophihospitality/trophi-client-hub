@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import type {
   Client, ClientNote, ActivityEvent, JourneyStatus, Attachment,
-  ContactMethod, ClientType, PackageType, Location, SalesPerson,
+  ContactMethod, ClientType, PackageType, Location, SalesPerson, ContactLog,
 } from '@/lib/types';
 
 // ============================================================
@@ -17,16 +17,17 @@ async function loadClient(supabase: any, businessId: string): Promise<Client | n
     .from('clients').select('*').eq('business_id', businessId).maybeSingle();
   if (error) throw error;
   if (!c) return null;
-  const [locs, notes, activity, attachments] = await Promise.all([
+  const [locs, notes, activity, attachments, logs] = await Promise.all([
     supabase.from('locations').select('*').eq('business_id', businessId).order('location_id'),
     supabase.from('client_notes').select('*').eq('business_id', businessId).order('created_at', { ascending: false }),
     supabase.from('client_activity').select('*').eq('business_id', businessId).order('timestamp', { ascending: false }),
     supabase.from('client_attachments').select('*').eq('business_id', businessId).order('uploaded_at', { ascending: false }),
+    supabase.from('contact_logs').select('*').eq('business_id', businessId).order('created_at', { ascending: false }),
   ]);
-  return rowToClient(c, locs.data ?? [], notes.data ?? [], activity.data ?? [], attachments.data ?? []);
+  return rowToClient(c, locs.data ?? [], notes.data ?? [], activity.data ?? [], attachments.data ?? [], logs.data ?? []);
 }
 
-function rowToClient(c: any, locs: any[], notes: any[], activity: any[], attachments: any[]): Client {
+function rowToClient(c: any, locs: any[], notes: any[], activity: any[], attachments: any[], contactLogs: any[] = []): Client {
   return {
     businessId: c.business_id,
     company: c.company,
@@ -65,6 +66,11 @@ function rowToClient(c: any, locs: any[], notes: any[], activity: any[], attachm
       id: a.id, type: a.type as ActivityEvent['type'],
       description: a.description, actor: a.actor, timestamp: a.timestamp,
     })),
+    contactLogs: contactLogs.map((l): ContactLog => ({
+      id: l.id, businessId: l.business_id, contactDate: l.contact_date,
+      method: l.method as ContactMethod, discussion: l.discussion,
+      loggedByName: l.logged_by_name, createdAt: l.created_at,
+    })),
     createdAt: c.created_at,
     updatedAt: c.updated_at,
     sentToOnboarding: !!c.sent_to_onboarding,
@@ -90,12 +96,13 @@ export const listClients = createServerFn({ method: 'GET' })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase } = context;
-    const [{ data: clients, error }, locs, notes, activity, attachments] = await Promise.all([
+    const [{ data: clients, error }, locs, notes, activity, attachments, logs] = await Promise.all([
       supabase.from('clients').select('*').order('created_at', { ascending: false }),
       supabase.from('locations').select('*'),
       supabase.from('client_notes').select('*').order('created_at', { ascending: false }),
       supabase.from('client_activity').select('*').order('timestamp', { ascending: false }),
       supabase.from('client_attachments').select('*').order('uploaded_at', { ascending: false }),
+      supabase.from('contact_logs').select('*').order('created_at', { ascending: false }),
     ]);
     if (error) throw error;
     const byBiz = <T extends { business_id: string }>(rows: T[]) =>
@@ -106,7 +113,8 @@ export const listClients = createServerFn({ method: 'GET' })
     const N = byBiz(notes.data ?? []);
     const A = byBiz(activity.data ?? []);
     const F = byBiz(attachments.data ?? []);
-    return (clients ?? []).map(c => rowToClient(c, L[c.business_id] ?? [], N[c.business_id] ?? [], A[c.business_id] ?? [], F[c.business_id] ?? []));
+    const G = byBiz(logs.data ?? []);
+    return (clients ?? []).map(c => rowToClient(c, L[c.business_id] ?? [], N[c.business_id] ?? [], A[c.business_id] ?? [], F[c.business_id] ?? [], G[c.business_id] ?? []));
   });
 
 // ---------- SALES TEAM ----------
@@ -228,9 +236,38 @@ export const updateClientFn = createServerFn({ method: 'POST' })
     if (u.leadSource !== undefined) patch.lead_source = u.leadSource;
     if (u.lastContactDate !== undefined) patch.last_contact_date = u.lastContactDate || null;
     if (u.lastContactMethod !== undefined) patch.last_contact_method = u.lastContactMethod;
-    if (u.nextFollowUpDate !== undefined) patch.next_follow_up_date = u.nextFollowUpDate || null;
+    // nextFollowUpDate is managed via follow_ups table below; the trigger keeps clients.next_follow_up_date in sync.
     const { error } = await supabase.from('clients').update(patch).eq('business_id', data.businessId);
     if (error) throw error;
+
+    if (u.nextFollowUpDate !== undefined) {
+      // Load current client + existing pending follow-up (if any).
+      const [{ data: cli }, { data: existing }] = await Promise.all([
+        supabase.from('clients').select('sales_person_id, next_follow_up_date').eq('business_id', data.businessId).maybeSingle(),
+        supabase.from('follow_ups').select('id, due_date').eq('business_id', data.businessId).eq('status', 'pending').order('due_date').limit(1).maybeSingle(),
+      ]);
+      const newDate = u.nextFollowUpDate || null;
+      const oldDate = existing?.due_date ?? null;
+      if (newDate !== oldDate) {
+        // Mark any pending follow-ups as rescheduled.
+        if (existing) {
+          await supabase.from('follow_ups')
+            .update({ status: 'rescheduled' } as any)
+            .eq('business_id', data.businessId).eq('status', 'pending');
+        }
+        // Create a new pending follow-up when a date is set.
+        if (newDate && cli) {
+          const { data: ins } = await supabase.from('follow_ups').insert({
+            business_id: data.businessId, assigned_to: cli.sales_person_id,
+            due_date: newDate, status: 'pending', created_by: userId,
+          } as any).select('id').single();
+          if (existing && ins) {
+            await supabase.from('follow_ups').update({ rescheduled_to: ins.id } as any).eq('id', existing.id);
+          }
+        }
+      }
+    }
+
     await logActivity(supabase, data.businessId, 'info_updated', 'Client information updated', name, userId);
     return { ok: true };
   });
@@ -283,8 +320,8 @@ export const addNoteFn = createServerFn({ method: 'POST' })
 const LogContactInput = z.object({
   businessId: z.string(),
   method: z.string(),
-  date: z.string(),
-  summary: z.string(),
+  date: z.string().min(1),
+  summary: z.string().trim().min(1, 'What was discussed is required'),
   nextFollowUpDate: z.string().optional(),
 });
 export const logContactFn = createServerFn({ method: 'POST' })
@@ -293,14 +330,41 @@ export const logContactFn = createServerFn({ method: 'POST' })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const name = await actorName(supabase, userId);
+
+    // Load client so we know the account owner (for follow_up assignment).
+    const { data: cli, error: cErr } = await supabase.from('clients')
+      .select('sales_person_id').eq('business_id', data.businessId).maybeSingle();
+    if (cErr) throw cErr;
+    if (!cli) throw new Error('Client not found');
+
+    // Update Last Contact fields.
     const patch: any = {
       last_contact_date: data.date,
       last_contact_method: data.method,
     };
-    if (data.nextFollowUpDate) patch.next_follow_up_date = data.nextFollowUpDate;
     const { error } = await supabase.from('clients').update(patch as any).eq('business_id', data.businessId);
     if (error) throw error;
-    const desc = `${data.method} contact logged${data.summary ? `: ${data.summary}` : ''}`;
+
+    // Persist the structured contact log.
+    await supabase.from('contact_logs').insert({
+      business_id: data.businessId, contact_date: data.date, method: data.method,
+      discussion: data.summary.trim(), logged_by: userId, logged_by_name: name,
+    } as any);
+
+    // Any pending follow-ups for this client become completed.
+    await supabase.from('follow_ups')
+      .update({ status: 'completed', completed_at: new Date().toISOString() } as any)
+      .eq('business_id', data.businessId).eq('status', 'pending');
+
+    // Optionally schedule the next follow-up as a task record.
+    if (data.nextFollowUpDate) {
+      await supabase.from('follow_ups').insert({
+        business_id: data.businessId, assigned_to: cli.sales_person_id,
+        due_date: data.nextFollowUpDate, status: 'pending', created_by: userId,
+      } as any);
+    }
+
+    const desc = `${data.method} contact logged: ${data.summary.trim()}`;
     await logActivity(supabase, data.businessId, 'contact_logged', desc, name, userId);
     return { ok: true };
   });

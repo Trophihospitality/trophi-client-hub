@@ -449,6 +449,31 @@ export default function ClientDetail() {
             </div>
           </section>
 
+          {/* Contact Log */}
+          <section className="rounded-xl border bg-card p-5 space-y-4">
+            <h2 className="font-semibold flex items-center gap-2">
+              <StickyNote className="h-4 w-4 text-[hsl(var(--trophi-gold))]" />
+              Contact log ({client.contactLogs.length})
+            </h2>
+            <div className="space-y-3">
+              {client.contactLogs.length === 0 && (
+                <p className="text-sm text-muted-foreground">No logged contacts yet. Use “Log contact” to record the next touchpoint.</p>
+              )}
+              {client.contactLogs.map((l) => (
+                <div key={l.id} className="rounded-lg bg-secondary/50 p-3">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-foreground">{l.loggedByName}</span>
+                      <span className="rounded bg-background px-1.5 py-0.5 text-[10px] uppercase tracking-wide border">{l.method}</span>
+                    </div>
+                    <span>{new Date(l.contactDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                  </div>
+                  <p className="text-sm whitespace-pre-wrap">{l.discussion}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
           <AttachmentsSection client={client} actorName={CURRENT_USER} canEdit={editable} />
         </div>
 
