@@ -377,7 +377,12 @@ const ImportInput = z.object({
     budget: z.number().nullable(),
     lastContactDate: z.string(),
     leadSource: z.string().optional(),
-    locations: z.array(LocationInputSchema),
+    locations: z.array(z.object({
+      name: z.string().min(1),
+      address: z.string().default(''),
+      city: z.string().default(''),
+      state: z.string().default(''),
+    })),
   })),
 });
 
