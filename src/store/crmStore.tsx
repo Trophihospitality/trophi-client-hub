@@ -5,6 +5,7 @@ import { useServerFn } from '@tanstack/react-start';
 import {
   listClients, changeStatusFn, addNoteFn, logContactFn, updateClientFn,
   registerAttachmentFn, removeAttachmentFn, importClientsFn,
+  addLocationFn, setLocationStatusFn,
 } from '@/lib/crm.functions';
 import type { Client, ClientNote, ActivityEvent, JourneyStatus, Attachment, ContactMethod } from '@/lib/types';
 
