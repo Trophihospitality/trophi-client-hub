@@ -162,6 +162,7 @@ export function csvToClients(
         description: `Imported from CSV · ${locNames.length} location${locNames.length > 1 ? 's' : ''} registered`,
         actor: actorName, timestamp: now,
       }],
+      contactLogs: [],
       createdAt: now,
       updatedAt: now,
       sentToOnboarding: journeyStatus === 'Approved',
