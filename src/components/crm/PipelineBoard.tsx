@@ -3,7 +3,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { AlertTriangle, MapPin } from 'lucide-react';
 import { Client, JourneyStatus } from '@/lib/types';
 import { JOURNEY_STATUSES, STAGE_PROBABILITY, isOverdue, statusDotStyle } from '@/lib/statusConfig';
-import { SALES_TEAM } from '@/data/seedData';
+import { useSalesTeam } from '@/hooks/useSalesTeam';
 
 // ============================================================
 // PIPELINE BOARD — kanban view of the customer journey
