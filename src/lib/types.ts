@@ -30,6 +30,15 @@ export type PackageType =
   | 'Custom'
   | 'TBD';
 
+export type ContactRole =
+  | 'Owner' | 'Partner' | 'C-Suite' | 'Director'
+  | 'Leadership' | 'Manager' | 'Admin' | 'Other';
+
+export type LeadSource =
+  | 'Referral' | 'Website' | 'Social Media' | 'Cold Outreach'
+  | 'Trade Show / Event' | 'Email Campaign' | 'Paid Ads' | 'Partner'
+  | 'Existing Client' | 'Networking' | 'Inbound Call' | 'Other';
+
 export type LocationStatus = 'active' | 'closed';
 
 export interface Location {
