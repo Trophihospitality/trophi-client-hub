@@ -31,6 +31,8 @@ export function useCrm() {
   const attachM = useMutation({ mutationFn: useServerFn(registerAttachmentFn), onSuccess: invalidate });
   const removeAttachM = useMutation({ mutationFn: useServerFn(removeAttachmentFn), onSuccess: invalidate });
   const importM = useMutation({ mutationFn: useServerFn(importClientsFn), onSuccess: invalidate });
+  const addLocationM = useMutation({ mutationFn: useServerFn(addLocationFn), onSuccess: invalidate });
+  const setLocStatusM = useMutation({ mutationFn: useServerFn(setLocationStatusFn), onSuccess: invalidate });
 
   return {
     clients,
