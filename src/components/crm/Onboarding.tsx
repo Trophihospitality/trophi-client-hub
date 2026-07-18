@@ -54,7 +54,7 @@ export default function Onboarding() {
                 </div>
                 <h3 className="mt-2 font-semibold">{c.company}</h3>
                 <p className="text-sm text-muted-foreground">
-                  {c.clientType} · {c.locations.length} location{c.locations.length > 1 ? 's' : ''} · {c.packageType}
+                  {c.clientType} · {c.locations.filter((l) => l.status !== 'closed').length} location{c.locations.filter((l) => l.status !== 'closed').length !== 1 ? 's' : ''} · {c.packageType}
                 </p>
                 <p className="mt-3 text-xs text-muted-foreground">
                   Sales owner: {owner?.name ?? '—'}
