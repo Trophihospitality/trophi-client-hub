@@ -30,6 +30,8 @@ export type PackageType =
   | 'Custom'
   | 'TBD';
 
+export type LocationStatus = 'active' | 'closed';
+
 export interface Location {
   locationId: string;      // e.g. TRP-4F8K2Q-L01 — maps to businessId
   businessId: string;
@@ -37,6 +39,9 @@ export interface Location {
   address: string;
   city: string;
   state: string;
+  status: LocationStatus;  // 'closed' locations keep their ID but are grayed out
+  needsOnboarding: boolean;
+  closedAt?: string;
 }
 
 export interface ClientNote {
