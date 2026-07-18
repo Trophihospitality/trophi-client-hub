@@ -43,7 +43,7 @@ export function PipelineBoard({ clients, onStatusChange, canEdit }: Props) {
     <div className="flex gap-3 overflow-x-auto pb-4 -mx-1 px-1">
       {JOURNEY_STATUSES.map((status) => {
         const col = clients.filter((c) => c.journeyStatus === status);
-        const colValue = col.reduce((sum, c) => sum + (c.budget ?? 0), 0);
+        const colValue = col.reduce((sum, c) => sum + monthlyValue(c), 0);
         const weighted = colValue * STAGE_PROBABILITY[status];
         return (
           <div
