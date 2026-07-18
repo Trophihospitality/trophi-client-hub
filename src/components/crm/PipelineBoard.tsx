@@ -25,8 +25,10 @@ function money(n: number): string {
 
 export function PipelineBoard({ clients, onStatusChange, canEdit }: Props) {
   const navigate = useNavigate();
+  const SALES_TEAM = useSalesTeam();
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<JourneyStatus | null>(null);
+  const monthlyValue = (c: Client) => (c.budget ?? 0) * c.locations.filter((l) => l.status === 'active').length;
 
   const handleDrop = (status: JourneyStatus) => {
     if (!dragId) return;
