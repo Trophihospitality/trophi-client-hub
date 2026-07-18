@@ -59,14 +59,17 @@ export default function CRM() {
     });
   }, [mine, search, statusFilter, ownerFilter, attentionOnly]);
 
-  // ---- Forecast metrics (computed on the user's visible book) ----
+  // ---- Forecast metrics: monthly value = budget-per-location × ACTIVE locations ----
+  const clientMonthlyValue = (c: (typeof mine)[number]) =>
+    (c.budget ?? 0) * c.locations.filter((l) => l.status === 'active').length;
+
   const metrics = useMemo(() => {
     const active = mine.filter((c) => ACTIVE_STATUSES.includes(c.journeyStatus));
-    const pipelineValue = active.reduce((s, c) => s + (c.budget ?? 0), 0);
-    const weighted = active.reduce((s, c) => s + (c.budget ?? 0) * STAGE_PROBABILITY[c.journeyStatus], 0);
+    const pipelineValue = active.reduce((s, c) => s + clientMonthlyValue(c), 0);
+    const weighted = active.reduce((s, c) => s + clientMonthlyValue(c) * STAGE_PROBABILITY[c.journeyStatus], 0);
     const approvedValue = mine
       .filter((c) => c.journeyStatus === 'Approved')
-      .reduce((s, c) => s + (c.budget ?? 0), 0);
+      .reduce((s, c) => s + clientMonthlyValue(c), 0);
     const needsAttention = mine.filter((c) => isOverdue(c).overdue).length;
     return { activeCount: active.length, pipelineValue, weighted, approvedValue, needsAttention };
   }, [mine]);
