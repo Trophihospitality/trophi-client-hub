@@ -96,7 +96,7 @@ export function PipelineBoard({ clients, onStatusChange, canEdit }: Props) {
                       {c.locations.filter((l) => l.status !== 'closed').length} loc · {c.packageType}
                     </div>
                     <div className="mt-2 flex items-center justify-between text-xs">
-                      <span className="font-medium">{c.budget ? money(c.budget) : '—'}</span>
+                      <span className="font-medium">{monthlyValue(c) ? `${money(monthlyValue(c))}/mo` : '—'}</span>
                       <span className="text-muted-foreground">{owner?.name.split(' ')[0] ?? '—'}</span>
                     </div>
                   </div>
