@@ -73,6 +73,7 @@ export default function ClientDetail() {
   const [addLocOpen, setAddLocOpen] = useState(false);
 
   const { currentUser, isManager, canEdit } = useUser();
+  const SALES_TEAM = useSalesTeam();
   const owner = SALES_TEAM.find((sp) => sp.id === client?.salesPersonId);
   const CURRENT_USER = currentUser.name;
   const editable = client ? canEdit(client) : false;
