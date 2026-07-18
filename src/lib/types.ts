@@ -119,6 +119,7 @@ export interface Client {
   notes: ClientNote[];
   attachments: Attachment[];       // proposals, contracts, decks
   activity: ActivityEvent[];
+  contactLogs: ContactLog[];       // structured touchpoint records (new-format; historical entries stay in activity)
   createdAt: string;
   updatedAt: string;
   sentToOnboarding: boolean;       // set true automatically when status → Approved
