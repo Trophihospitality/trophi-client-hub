@@ -2,10 +2,12 @@ import { useMemo, useState } from 'react';
 import { Plus, Trash2, Building2, AlertTriangle } from 'lucide-react';
 import { useCrm } from '@/store/crmStore';
 import { useUser } from '@/store/userStore';
-import { SALES_TEAM } from '@/data/seedData';
-import { Client, ClientType, JourneyStatus, PackageType, Location } from '@/lib/types';
+import { ClientType, JourneyStatus, PackageType, SalesPerson } from '@/lib/types';
 import { CLIENT_TYPES, JOURNEY_STATUSES, PACKAGE_TYPES } from '@/lib/statusConfig';
-import { generateBusinessId, generateLocationId, uid } from '@/lib/ids';
+import { uid } from '@/lib/ids';
+import { useQuery } from '@tanstack/react-query';
+import { useServerFn } from '@tanstack/react-start';
+import { createClientFn, listSalesTeam } from '@/lib/crm.functions';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
@@ -43,9 +45,15 @@ interface Props {
 }
 
 export function AddClientDialog({ open, onOpenChange }: Props) {
-  const { clients, addClient } = useCrm();
+  const { clients } = useCrm();
   const { currentUser, isManager } = useUser();
   const [step, setStep] = useState<1 | 2>(1);
+  const createFn = useServerFn(createClientFn);
+  const teamFn = useServerFn(listSalesTeam);
+  const { data: SALES_TEAM = [] } = useQuery<SalesPerson[]>({
+    queryKey: ['sales-team'],
+    queryFn: () => teamFn({} as any),
+  });
 
   const [clientType, setClientType] = useState<ClientType | null>(null);
   const [company, setCompany] = useState('');
@@ -90,60 +98,34 @@ export function AddClientDialog({ open, onOpenChange }: Props) {
     clientType && company.trim() && contactName.trim() && salesPersonId &&
     locations.every((l) => l.name.trim());
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!canSave || !clientType) return;
-
-    // Auto-generate the universal mapping IDs
-    const businessId = generateBusinessId(clients.map((c) => c.businessId));
-    const builtLocations: Location[] = locations.map((l, i) => ({
-      locationId: generateLocationId(businessId, i),
-      businessId,
-      name: l.name.trim(),
-      address: l.address.trim(),
-      city: l.city.trim(),
-      state: l.state.trim(),
-    }));
-
-    const owner = SALES_TEAM.find((sp) => sp.id === salesPersonId);
-    const now = new Date().toISOString();
-
-    const client: Client = {
-      businessId,
-      company: company.trim(),
-      brands: brands.split(',').map((b) => b.trim()).filter(Boolean),
-      clientType,
-      locations: builtLocations,
-      journeyStatus,
-      lastContactDate: now.slice(0, 10),
-      lastContactMethod: 'None',
-      contactName: contactName.trim(),
-      contactEmail: contactEmail.trim(),
-      contactPhone: contactPhone.trim(),
-      isDecisionMaker,
-      packageType,
-      budget: budget ? Number(budget) : null,
-      salesPersonId,
-      leadSource: leadSource.trim() || undefined,
-      notes: [],
-      attachments: [],
-      activity: [{
-        id: uid(),
-        type: 'created',
-        description: `Client created · ${builtLocations.length} location${builtLocations.length > 1 ? 's' : ''} registered`,
-        actor: currentUser.name,
-        timestamp: now,
-      }],
-      createdAt: now,
-      updatedAt: now,
-      sentToOnboarding: journeyStatus === 'Approved',
-      onboardingSentAt: journeyStatus === 'Approved' ? now : undefined,
-    };
-
-    addClient(client);
-    toast.success('Client created', {
-      description: `${client.company} · ${businessId} · ${builtLocations.length} location ID${builtLocations.length > 1 ? 's' : ''} generated`,
-    });
-    close(false);
+    try {
+      const res = await createFn({ data: {
+        company: company.trim(),
+        brands: brands.split(',').map((b) => b.trim()).filter(Boolean),
+        clientType,
+        journeyStatus,
+        contactName: contactName.trim(),
+        contactEmail: contactEmail.trim(),
+        contactPhone: contactPhone.trim(),
+        isDecisionMaker,
+        packageType,
+        budget: budget ? Number(budget) : null,
+        salesPersonId,
+        leadSource: leadSource.trim() || undefined,
+        locations: locations.map(l => ({
+          name: l.name.trim(), address: l.address.trim(),
+          city: l.city.trim(), state: l.state.trim(),
+        })),
+      } });
+      toast.success('Client created', {
+        description: `${company.trim()} · ${res.businessId} · ${locations.length} location ID${locations.length > 1 ? 's' : ''} generated`,
+      });
+      close(false);
+    } catch (e: any) {
+      toast.error(e.message ?? 'Could not create client');
+    }
   };
 
   return (

@@ -1,19 +1,16 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { Paperclip, Download, Trash2 } from 'lucide-react';
 import { useCrm } from '@/store/crmStore';
 import { Client } from '@/lib/types';
-import { uid } from '@/lib/ids';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useServerFn } from '@tanstack/react-start';
+import { signAttachmentUrlFn } from '@/lib/crm.functions';
 
-// ============================================================
-// ATTACHMENTS — proposals, contracts, decks per client
-// Files are stored as base64 in localStorage for now (2 MB cap
-// per file to stay within browser limits). When Supabase is
-// connected, upload to Storage and keep only the URL.
-// ============================================================
-
-const MAX_FILE_BYTES = 2 * 1024 * 1024;
+// Attachments now upload to Supabase Storage bucket 'client-attachments'.
+// Path convention: <business_id>/<uuid>-<filename>
+const MAX_FILE_BYTES = 25 * 1024 * 1024;
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -27,40 +24,52 @@ interface Props {
   canEdit: boolean;
 }
 
-export function AttachmentsSection({ client, actorName, canEdit }: Props) {
+export function AttachmentsSection({ client, canEdit }: Props) {
   const { addAttachment, removeAttachment } = useCrm();
   const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const signUrl = useServerFn(signAttachmentUrlFn);
 
-  const handleFiles = (files: FileList | null) => {
+  const handleFiles = async (files: FileList | null) => {
     if (!files) return;
-    Array.from(files).forEach((file) => {
-      if (file.size > MAX_FILE_BYTES) {
-        toast.error(`${file.name} is too large`, { description: 'Files up to 2 MB are supported in this preview build.' });
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = () => {
-        addAttachment(client.businessId, {
-          id: uid(),
+    setBusy(true);
+    try {
+      for (const file of Array.from(files)) {
+        if (file.size > MAX_FILE_BYTES) {
+          toast.error(`${file.name} is too large`, { description: 'Files up to 25 MB are supported.' });
+          continue;
+        }
+        const path = `${client.businessId}/${crypto.randomUUID()}-${file.name}`;
+        const { error: upErr } = await supabase.storage
+          .from('client-attachments').upload(path, file, { contentType: file.type, upsert: false });
+        if (upErr) { toast.error(upErr.message); continue; }
+        await addAttachment(client.businessId, {
+          id: '', // set server-side
           fileName: file.name,
           fileType: file.type || 'application/octet-stream',
           fileSize: file.size,
-          dataUrl: reader.result as string,
-          uploadedBy: actorName,
+          dataUrl: path,
+          storagePath: path,
+          uploadedBy: '',
           uploadedAt: new Date().toISOString(),
-        });
+        } as any);
         toast.success('Attachment saved', { description: file.name });
-      };
-      reader.readAsDataURL(file);
-    });
-    if (inputRef.current) inputRef.current.value = '';
+      }
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
   };
 
-  const download = (att: Client['attachments'][number]) => {
-    const a = document.createElement('a');
-    a.href = att.dataUrl;
-    a.download = att.fileName;
-    a.click();
+  const download = async (att: Client['attachments'][number]) => {
+    try {
+      const res = await signUrl({ data: { attachmentId: att.id } });
+      const a = document.createElement('a');
+      a.href = res.url; a.download = res.fileName; a.target = '_blank';
+      document.body.appendChild(a); a.click(); a.remove();
+    } catch (e: any) {
+      toast.error(e.message ?? 'Could not download');
+    }
   };
 
   return (
@@ -72,15 +81,10 @@ export function AttachmentsSection({ client, actorName, canEdit }: Props) {
         </h2>
         {canEdit && (
           <>
-            <input
-              ref={inputRef}
-              type="file"
-              multiple
-              className="hidden"
-              onChange={(e) => handleFiles(e.target.files)}
-            />
-            <Button size="sm" variant="outline" onClick={() => inputRef.current?.click()}>
-              Upload file
+            <input ref={inputRef} type="file" multiple className="hidden"
+              onChange={(e) => handleFiles(e.target.files)} />
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => inputRef.current?.click()}>
+              {busy ? 'Uploading…' : 'Upload file'}
             </Button>
           </>
         )}
@@ -104,11 +108,10 @@ export function AttachmentsSection({ client, actorName, canEdit }: Props) {
                   <Download className="h-4 w-4" />
                 </Button>
                 {canEdit && (
-                  <Button
-                    size="icon" variant="ghost" className="h-8 w-8"
+                  <Button size="icon" variant="ghost" className="h-8 w-8"
                     onClick={() => {
                       if (window.confirm(`Remove ${att.fileName}?`)) {
-                        removeAttachment(client.businessId, att.id, actorName);
+                        removeAttachment(client.businessId, att.id, '');
                         toast.success('Attachment removed');
                       }
                     }}
