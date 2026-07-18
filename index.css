@@ -1,0 +1,89 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;500;600;700&family=Inter:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   TROPHI HOSPITALITY — DESIGN TOKENS
+   Colors sampled directly from the official Trophi logo files:
+   - Wordmark gradient: bronze #6D4E31 → champagne #D9B164
+   - Secondary mark gold: #825B1F → #BF9837 (core #B48C34)
+   - "HOSPITALITY" charcoal gray: #3A3A3A
+   Fonts: Montserrat (matches logo wordmark), Inter (body/UI)
+   ============================================================ */
+
+@layer base {
+  :root {
+    /* Brand core — sampled from logo assets */
+    --trophi-gold: 41 55% 45%;        /* #B48C34 — secondary mark gold, primary accent */
+    --trophi-gold-light: 40 61% 62%;  /* #D9B164 — champagne end of wordmark gradient */
+    --trophi-bronze: 29 38% 31%;      /* #6D4E31 — dark end of wordmark gradient */
+    --trophi-gold-soft: 41 60% 93%;   /* gold tint for hovers/highlights */
+    --trophi-ink: 32 12% 11%;         /* warm near-black — sidebar, headings */
+    --trophi-charcoal: 0 0% 24%;      /* #3D3D3D — "HOSPITALITY" gray, secondary text */
+    --trophi-cream: 40 25% 97%;       /* warm off-white app background */
+
+    /* shadcn semantic tokens (mapped to brand) */
+    --background: var(--trophi-cream);
+    --foreground: var(--trophi-ink);
+    --card: 0 0% 100%;
+    --card-foreground: var(--trophi-ink);
+    --popover: 0 0% 100%;
+    --popover-foreground: var(--trophi-ink);
+    --primary: var(--trophi-ink);
+    --primary-foreground: 40 25% 97%;
+    --secondary: 40 20% 94%;
+    --secondary-foreground: var(--trophi-ink);
+    --muted: 40 15% 93%;
+    --muted-foreground: 30 5% 40%;
+    --accent: var(--trophi-gold-soft);
+    --accent-foreground: var(--trophi-ink);
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 40 12% 88%;
+    --input: 40 12% 86%;
+    --ring: var(--trophi-gold);
+    --radius: 0.625rem;
+
+    /* Customer Journey status colors */
+    --status-cold: 215 15% 50%;
+    --status-mql: 210 85% 45%;
+    --status-sql: 245 65% 55%;
+    --status-proposal: 275 55% 50%;
+    --status-restrictions: 38 92% 45%;
+    --status-approved: 152 60% 36%;
+    --status-unresponsive: 24 90% 50%;
+    --status-lasteffort: 350 75% 48%;
+    --status-lostcontact: 220 10% 40%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, .font-display {
+    font-family: 'Montserrat', 'Inter', sans-serif;
+    letter-spacing: -0.01em;
+  }
+}
+
+@layer utilities {
+  /* Signature brand gradient — matches the TROPHI wordmark sweep */
+  .gold-rule {
+    background: linear-gradient(90deg, hsl(var(--trophi-bronze)) 0%, hsl(var(--trophi-gold)) 45%, hsl(var(--trophi-gold-light)) 100%);
+    height: 2px;
+  }
+  .text-gold-gradient {
+    background: linear-gradient(90deg, hsl(var(--trophi-bronze)) 0%, hsl(var(--trophi-gold)) 45%, hsl(var(--trophi-gold-light)) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
