@@ -294,6 +294,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_privileged: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "manager" | "sales_rep" | "admin"
