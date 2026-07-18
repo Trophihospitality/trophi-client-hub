@@ -99,11 +99,12 @@ export interface Client {
   contactName: string;             // point of contact
   contactEmail: string;
   contactPhone: string;
+  contactRole: ContactRole | '';   // role of point of contact
   isDecisionMaker: boolean;
   packageType: PackageType;
-  budget: number | null;           // annual budget in USD, null = unknown
+  budget: number | null;           // monthly budget PER ACTIVE LOCATION in USD
   salesPersonId: string;           // account owner
-  leadSource?: string;
+  leadSource: LeadSource | '';
   nextFollowUpDate?: string;
   notes: ClientNote[];
   attachments: Attachment[];       // proposals, contracts, decks
