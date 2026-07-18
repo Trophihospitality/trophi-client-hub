@@ -11,8 +11,8 @@ import { generateBusinessId, generateLocationId, uid } from './ids';
 
 export const CSV_HEADERS = [
   'Company', 'Brands', 'Client Type', 'Locations', 'Journey Status',
-  'Last Contact Date', 'Contact Name', 'Email', 'Phone',
-  'Decision Maker', 'Package', 'Budget', 'Lead Source',
+  'Last Contact Date', 'Contact Name', 'Contact Role', 'Email', 'Phone',
+  'Decision Maker', 'Package', 'Monthly Budget Per Location', 'Lead Source',
 ] as const;
 
 function esc(v: string | number | null | undefined): string {
