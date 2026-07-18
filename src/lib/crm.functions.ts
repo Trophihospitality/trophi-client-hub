@@ -132,24 +132,25 @@ export const listSalesTeam = createServerFn({ method: 'GET' })
 
 // ---------- CREATE ----------
 const LocationInputSchema = z.object({
-  name: z.string().min(1),
-  address: z.string().default(''),
-  city: z.string().default(''),
-  state: z.string().default(''),
+  name: z.string().min(1, 'Location name required'),
+  address: z.string().min(1, 'Street address required'),
+  city: z.string().min(1, 'City required'),
+  state: z.string().length(2, 'State required'),
 });
 const CreateClientInput = z.object({
   company: z.string().min(1),
-  brands: z.array(z.string()),
+  brands: z.array(z.string()).min(1),
   clientType: z.string(),
   journeyStatus: z.string(),
-  contactName: z.string().default(''),
-  contactEmail: z.string().default(''),
-  contactPhone: z.string().default(''),
-  isDecisionMaker: z.boolean().default(false),
-  packageType: z.string().default('TBD'),
-  budget: z.number().nullable(),
+  contactName: z.string().min(1),
+  contactEmail: z.string().email(),
+  contactPhone: z.string().min(1),
+  contactRole: z.string().min(1),
+  isDecisionMaker: z.boolean(),
+  packageType: z.string(),
+  budget: z.number(),
   salesPersonId: z.string().uuid(),
-  leadSource: z.string().optional(),
+  leadSource: z.string().min(1),
   locations: z.array(LocationInputSchema).min(1),
 });
 
@@ -165,9 +166,10 @@ export const createClientFn = createServerFn({ method: 'POST' })
       journey_status: data.journeyStatus, last_contact_date: today,
       last_contact_method: 'None', contact_name: data.contactName,
       contact_email: data.contactEmail, contact_phone: data.contactPhone,
+      contact_role: data.contactRole,
       is_decision_maker: data.isDecisionMaker, package_type: data.packageType,
       budget: data.budget, sales_person_id: data.salesPersonId,
-      lead_source: data.leadSource ?? null,
+      lead_source: data.leadSource,
     } as any).select('business_id, journey_status, sent_to_onboarding').single();
     if (error) throw error;
     const businessId = inserted.business_id;
