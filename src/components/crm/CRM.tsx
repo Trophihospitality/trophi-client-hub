@@ -235,13 +235,16 @@ export default function CRM() {
                 <TableHead className="text-center"># Locations</TableHead>
                 <TableHead>Customer Journey Status</TableHead>
                 <TableHead>Last Contact</TableHead>
-                <TableHead>Point of Contact</TableHead>
+                <TableHead>
+                  Point of Contact
+                  <div className="text-[10px] font-normal text-muted-foreground">Role shown below name</div>
+                </TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead className="text-center">Decision Maker</TableHead>
                 <TableHead>Package</TableHead>
-                <TableHead className="text-right">Budget</TableHead>
-                <TableHead className="text-right">Weighted</TableHead>
+                <TableHead className="text-right">Monthly Budget / Location</TableHead>
+                <TableHead className="text-right">Weighted (monthly)</TableHead>
                 <TableHead>Owner</TableHead>
               </TableRow>
             </TableHeader>
