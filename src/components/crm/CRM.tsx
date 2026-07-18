@@ -34,6 +34,7 @@ function formatDate(iso: string): string {
 export default function CRM() {
   const { clients, changeStatus, importClients } = useCrm();
   const { currentUser, isManager, visibleClients, canEdit } = useUser();
+  const SALES_TEAM = useSalesTeam();
   const navigate = useNavigate();
   const importRef = useRef<HTMLInputElement>(null);
 
