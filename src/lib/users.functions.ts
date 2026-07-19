@@ -2,7 +2,11 @@ import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 
-export type AppRole = 'admin' | 'manager' | 'sales_rep';
+export type AppRole = 'admin' | 'manager' | 'sales_rep' | 'onboarding_specialist' | 'account_manager' | 'client_admin';
+
+const ROLE_RANK: Record<AppRole, number> = {
+  admin: 5, manager: 4, onboarding_specialist: 3, account_manager: 3, sales_rep: 2, client_admin: 1,
+};
 
 export interface AppUser {
   id: string;
@@ -12,10 +16,12 @@ export interface AppUser {
 }
 
 function highestRole(rows: { role: string }[]): AppRole {
-  const roles = rows.map((r) => r.role);
-  if (roles.includes('admin')) return 'admin';
-  if (roles.includes('manager')) return 'manager';
-  return 'sales_rep';
+  let best: AppRole = 'sales_rep';
+  for (const r of rows) {
+    const role = r.role as AppRole;
+    if ((ROLE_RANK[role] ?? 0) > ROLE_RANK[best]) best = role;
+  }
+  return best;
 }
 
 async function assertAdmin(supabase: any, userId: string) {
@@ -49,31 +55,33 @@ export const listUsersFn = createServerFn({ method: 'GET' })
     }));
   });
 
+const AssignableRole = z.enum(['admin', 'manager', 'sales_rep', 'onboarding_specialist', 'account_manager']);
+
 export const setUserRoleFn = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
     z.object({
       targetUserId: z.string().uuid(),
-      role: z.enum(['admin', 'manager', 'sales_rep']),
+      role: AssignableRole,
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     await assertAdmin(supabase, userId);
 
-    // Replace all roles for the target user with the single chosen role.
-    // The database trigger prevents demoting the last remaining admin.
+    // Replace all Trophi-staff roles with the single chosen one.
+    // (client_admin is client-scoped and managed elsewhere; not touched here.)
     const { error: delErr } = await supabase
       .from('user_roles')
       .delete()
       .eq('user_id', data.targetUserId)
+      .in('role', ['admin', 'manager', 'sales_rep', 'onboarding_specialist', 'account_manager'])
       .neq('role', data.role);
     if (delErr) throw delErr;
 
     const { error: insErr } = await supabase
       .from('user_roles')
       .insert({ user_id: data.targetUserId, role: data.role } as any);
-    // Ignore unique conflict — role already present.
     if (insErr && !/duplicate key/i.test(insErr.message)) throw insErr;
 
     return { ok: true };
