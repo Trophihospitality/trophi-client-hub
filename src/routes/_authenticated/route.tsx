@@ -25,6 +25,7 @@ const NAV = [
 
 const ADMIN_NAV = [
   { to: '/users', label: 'User Management', icon: ShieldCheck },
+  { to: '/settings/pandadoc-templates', label: 'PandaDoc Templates', icon: FileText },
 ] as const;
 
 function TrophiMark() {
