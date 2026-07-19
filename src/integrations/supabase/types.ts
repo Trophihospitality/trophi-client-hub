@@ -348,6 +348,33 @@ export type Database = {
           },
         ]
       }
+      onboarding_notifications: {
+        Row: {
+          business_id: string
+          id: string
+          kind: string
+          recipient: string
+          sent_at: string
+          step_number: number | null
+        }
+        Insert: {
+          business_id: string
+          id?: string
+          kind: string
+          recipient: string
+          sent_at?: string
+          step_number?: number | null
+        }
+        Update: {
+          business_id?: string
+          id?: string
+          kind?: string
+          recipient?: string
+          sent_at?: string
+          step_number?: number | null
+        }
+        Relationships: []
+      }
       onboarding_records: {
         Row: {
           account_manager_id: string | null
