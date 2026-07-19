@@ -96,6 +96,53 @@ export type Database = {
           },
         ]
       }
+      client_contracts: {
+        Row: {
+          business_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          kind: string
+          metadata: Json
+          pandadoc_document_id: string | null
+          signed_pdf_path: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind: string
+          metadata?: Json
+          pandadoc_document_id?: string | null
+          signed_pdf_path?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          metadata?: Json
+          pandadoc_document_id?: string | null
+          signed_pdf_path?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_contracts_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["business_id"]
+          },
+        ]
+      }
       client_notes: {
         Row: {
           author_id: string
@@ -124,6 +171,32 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "client_notes_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["business_id"]
+          },
+        ]
+      }
+      client_portal_users: {
+        Row: {
+          business_id: string
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_portal_users_business_id_fkey"
             columns: ["business_id"]
             isOneToOne: false
             referencedRelation: "clients"
@@ -501,6 +574,149 @@ export type Database = {
           },
         ]
       }
+      pandadoc_templates: {
+        Row: {
+          key: string
+          label: string
+          notes: string | null
+          template_id: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          key: string
+          label: string
+          notes?: string | null
+          template_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          key?: string
+          label?: string
+          notes?: string | null
+          template_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      payment_authorizations: {
+        Row: {
+          business_id: string
+          choice: string
+          created_at: string
+          id: string
+          metadata: Json
+          pandadoc_document_id: string | null
+          signed_at: string | null
+          signed_pdf_path: string | null
+          signer_email: string | null
+          signer_name: string | null
+          signer_role: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          choice: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          pandadoc_document_id?: string | null
+          signed_at?: string | null
+          signed_pdf_path?: string | null
+          signer_email?: string | null
+          signer_name?: string | null
+          signer_role?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          choice?: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          pandadoc_document_id?: string | null
+          signed_at?: string | null
+          signed_pdf_path?: string | null
+          signer_email?: string | null
+          signer_name?: string | null
+          signer_role?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_authorizations_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["business_id"]
+          },
+        ]
+      }
+      payment_methods: {
+        Row: {
+          brand: string | null
+          business_id: string
+          created_at: string
+          id: string
+          is_default: boolean
+          last4: string
+          location_id: string | null
+          method_type: string
+          scope: string
+          stripe_customer_id: string
+          stripe_payment_method_id: string
+          updated_at: string
+        }
+        Insert: {
+          brand?: string | null
+          business_id: string
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          last4: string
+          location_id?: string | null
+          method_type: string
+          scope: string
+          stripe_customer_id: string
+          stripe_payment_method_id: string
+          updated_at?: string
+        }
+        Update: {
+          brand?: string | null
+          business_id?: string
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          last4?: string
+          location_id?: string | null
+          method_type?: string
+          scope?: string
+          stripe_customer_id?: string
+          stripe_payment_method_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_methods_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "payment_methods_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["location_id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -563,7 +779,9 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_client_admin_for: { Args: { _business_id: string }; Returns: boolean }
       is_privileged: { Args: { _user_id: string }; Returns: boolean }
+      is_trophi_staff_for: { Args: { _business_id: string }; Returns: boolean }
       sync_client_next_follow_up: {
         Args: { _business_id: string }
         Returns: undefined

@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, redirect, Link, useRouterState } from '@tanstack/react-router';
-import { Users, ClipboardCheck, BarChart3, Wrench, Globe, LogOut, ShieldCheck } from 'lucide-react';
+import { Users, ClipboardCheck, BarChart3, Wrench, Globe, LogOut, ShieldCheck, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/store/userStore';
 import trophiMarkAsset from '@/assets/trophi-mark.png.asset.json';
@@ -25,6 +25,7 @@ const NAV = [
 
 const ADMIN_NAV = [
   { to: '/users', label: 'User Management', icon: ShieldCheck },
+  { to: '/settings/pandadoc-templates', label: 'PandaDoc Templates', icon: FileText },
 ] as const;
 
 function TrophiMark() {
