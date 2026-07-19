@@ -21,6 +21,7 @@ import { Route as AuthenticatedCrmIndexRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedOnboardingBusinessIdRouteImport } from './routes/_authenticated/onboarding.$businessId'
 import { Route as AuthenticatedCrmBusinessIdRouteImport } from './routes/_authenticated/crm.$businessId'
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
+import { Route as ApiPublicHooksTestOnboardingEmailRouteImport } from './routes/api/public/hooks/test-onboarding-email'
 import { Route as ApiPublicHooksOnboardingRemindersRouteImport } from './routes/api/public/hooks/onboarding-reminders'
 
 const AuthRoute = AuthRouteImport.update({
@@ -86,6 +87,12 @@ const LovableEmailTransactionalPreviewRoute =
     path: '/lovable/email/transactional/preview',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksTestOnboardingEmailRoute =
+  ApiPublicHooksTestOnboardingEmailRouteImport.update({
+    id: '/api/public/hooks/test-onboarding-email',
+    path: '/api/public/hooks/test-onboarding-email',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksOnboardingRemindersRoute =
   ApiPublicHooksOnboardingRemindersRouteImport.update({
     id: '/api/public/hooks/onboarding-reminders',
@@ -105,6 +112,7 @@ export interface FileRoutesByFullPath {
   '/onboarding/$businessId': typeof AuthenticatedOnboardingBusinessIdRoute
   '/crm/': typeof AuthenticatedCrmIndexRoute
   '/api/public/hooks/onboarding-reminders': typeof ApiPublicHooksOnboardingRemindersRoute
+  '/api/public/hooks/test-onboarding-email': typeof ApiPublicHooksTestOnboardingEmailRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
 }
 export interface FileRoutesByTo {
@@ -119,6 +127,7 @@ export interface FileRoutesByTo {
   '/onboarding/$businessId': typeof AuthenticatedOnboardingBusinessIdRoute
   '/crm': typeof AuthenticatedCrmIndexRoute
   '/api/public/hooks/onboarding-reminders': typeof ApiPublicHooksOnboardingRemindersRoute
+  '/api/public/hooks/test-onboarding-email': typeof ApiPublicHooksTestOnboardingEmailRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
 }
 export interface FileRoutesById {
@@ -135,6 +144,7 @@ export interface FileRoutesById {
   '/_authenticated/onboarding/$businessId': typeof AuthenticatedOnboardingBusinessIdRoute
   '/_authenticated/crm/': typeof AuthenticatedCrmIndexRoute
   '/api/public/hooks/onboarding-reminders': typeof ApiPublicHooksOnboardingRemindersRoute
+  '/api/public/hooks/test-onboarding-email': typeof ApiPublicHooksTestOnboardingEmailRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
 }
 export interface FileRouteTypes {
@@ -151,6 +161,7 @@ export interface FileRouteTypes {
     | '/onboarding/$businessId'
     | '/crm/'
     | '/api/public/hooks/onboarding-reminders'
+    | '/api/public/hooks/test-onboarding-email'
     | '/lovable/email/transactional/preview'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -165,6 +176,7 @@ export interface FileRouteTypes {
     | '/onboarding/$businessId'
     | '/crm'
     | '/api/public/hooks/onboarding-reminders'
+    | '/api/public/hooks/test-onboarding-email'
     | '/lovable/email/transactional/preview'
   id:
     | '__root__'
@@ -180,6 +192,7 @@ export interface FileRouteTypes {
     | '/_authenticated/onboarding/$businessId'
     | '/_authenticated/crm/'
     | '/api/public/hooks/onboarding-reminders'
+    | '/api/public/hooks/test-onboarding-email'
     | '/lovable/email/transactional/preview'
   fileRoutesById: FileRoutesById
 }
@@ -188,6 +201,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ApiPublicHooksOnboardingRemindersRoute: typeof ApiPublicHooksOnboardingRemindersRoute
+  ApiPublicHooksTestOnboardingEmailRoute: typeof ApiPublicHooksTestOnboardingEmailRoute
   LovableEmailTransactionalPreviewRoute: typeof LovableEmailTransactionalPreviewRoute
 }
 
@@ -277,6 +291,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LovableEmailTransactionalPreviewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/test-onboarding-email': {
+      id: '/api/public/hooks/test-onboarding-email'
+      path: '/api/public/hooks/test-onboarding-email'
+      fullPath: '/api/public/hooks/test-onboarding-email'
+      preLoaderRoute: typeof ApiPublicHooksTestOnboardingEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/onboarding-reminders': {
       id: '/api/public/hooks/onboarding-reminders'
       path: '/api/public/hooks/onboarding-reminders'
@@ -331,8 +352,20 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   ApiPublicHooksOnboardingRemindersRoute:
     ApiPublicHooksOnboardingRemindersRoute,
+  ApiPublicHooksTestOnboardingEmailRoute:
+    ApiPublicHooksTestOnboardingEmailRoute,
   LovableEmailTransactionalPreviewRoute: LovableEmailTransactionalPreviewRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
