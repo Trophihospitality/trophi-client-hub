@@ -348,6 +348,132 @@ export type Database = {
           },
         ]
       }
+      onboarding_records: {
+        Row: {
+          account_manager_id: string | null
+          business_id: string
+          created_at: string
+          current_step: number
+          specialist_id: string | null
+          started_at: string
+          status: string
+          updated_at: string
+          went_live_at: string | null
+        }
+        Insert: {
+          account_manager_id?: string | null
+          business_id: string
+          created_at?: string
+          current_step?: number
+          specialist_id?: string | null
+          started_at?: string
+          status?: string
+          updated_at?: string
+          went_live_at?: string | null
+        }
+        Update: {
+          account_manager_id?: string | null
+          business_id?: string
+          created_at?: string
+          current_step?: number
+          specialist_id?: string | null
+          started_at?: string
+          status?: string
+          updated_at?: string
+          went_live_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_records_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "onboarding_records_current_step_fkey"
+            columns: ["current_step"]
+            isOneToOne: false
+            referencedRelation: "onboarding_step_definitions"
+            referencedColumns: ["step_number"]
+          },
+        ]
+      }
+      onboarding_step_definitions: {
+        Row: {
+          actor: string
+          client_visible: boolean
+          description: string | null
+          name: string
+          step_number: number
+        }
+        Insert: {
+          actor: string
+          client_visible?: boolean
+          description?: string | null
+          name: string
+          step_number: number
+        }
+        Update: {
+          actor?: string
+          client_visible?: boolean
+          description?: string | null
+          name?: string
+          step_number?: number
+        }
+        Relationships: []
+      }
+      onboarding_step_progress: {
+        Row: {
+          business_id: string
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          id: string
+          started_at: string | null
+          status: string
+          step_number: number
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          started_at?: string | null
+          status?: string
+          step_number: number
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          started_at?: string | null
+          status?: string
+          step_number?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_step_progress_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_records"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "onboarding_step_progress_step_number_fkey"
+            columns: ["step_number"]
+            isOneToOne: false
+            referencedRelation: "onboarding_step_definitions"
+            referencedColumns: ["step_number"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -395,7 +521,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      business_hours_since: { Args: { _ts: string }; Returns: number }
       can_access_client: { Args: { _business_id: string }; Returns: boolean }
+      can_view_onboarding: { Args: { _business_id: string }; Returns: boolean }
+      ensure_onboarding_for_client: {
+        Args: { _business_id: string }
+        Returns: undefined
+      }
       gen_business_id: { Args: never; Returns: string }
       has_role: {
         Args: {
@@ -411,7 +543,13 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "manager" | "sales_rep" | "admin"
+      app_role:
+        | "manager"
+        | "sales_rep"
+        | "admin"
+        | "onboarding_specialist"
+        | "account_manager"
+        | "client_admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -539,7 +677,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["manager", "sales_rep", "admin"],
+      app_role: [
+        "manager",
+        "sales_rep",
+        "admin",
+        "onboarding_specialist",
+        "account_manager",
+        "client_admin",
+      ],
     },
   },
 } as const

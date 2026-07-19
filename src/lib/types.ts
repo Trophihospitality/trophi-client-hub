@@ -68,11 +68,13 @@ export interface ActivityEvent {
   timestamp: string;
 }
 
+export type AppRole = 'admin' | 'manager' | 'sales_rep' | 'onboarding_specialist' | 'account_manager' | 'client_admin';
+
 export interface SalesPerson {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'manager' | 'sales_rep';   // admins bypass every restriction; managers see all accounts; reps see only their own
+  role: AppRole;
 }
 
 export interface Attachment {

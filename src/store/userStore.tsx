@@ -27,8 +27,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           supabase.from('user_roles').select('role').eq('user_id', session.user.id),
         ]).then(([p, r]) => {
           const roles = (r.data ?? []).map((row: any) => row.role);
-          const role: 'admin' | 'manager' | 'sales_rep' =
-            roles.includes('admin') ? 'admin' : roles.includes('manager') ? 'manager' : 'sales_rep';
+          const rank = (x: string) =>
+            x === 'admin' ? 5 : x === 'manager' ? 4
+              : x === 'onboarding_specialist' ? 3 : x === 'account_manager' ? 3
+              : x === 'sales_rep' ? 2 : 1;
+          const role = (roles.length ? roles.reduce((a: string, b: string) => rank(b) > rank(a) ? b : a) : 'sales_rep') as SalesPerson['role'];
           if (p.data) {
             setProfile({
               id: p.data.user_id, name: p.data.name, email: p.data.email,

@@ -13,6 +13,8 @@ const ROLE_OPTIONS: { value: AppRole; label: string }[] = [
   { value: 'admin', label: 'Admin' },
   { value: 'manager', label: 'Manager' },
   { value: 'sales_rep', label: 'Sales Rep' },
+  { value: 'onboarding_specialist', label: 'Onboarding Specialist' },
+  { value: 'account_manager', label: 'Account Manager' },
 ];
 
 function UsersPage() {
