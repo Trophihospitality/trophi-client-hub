@@ -186,7 +186,7 @@ export const getOnboardingDetailFn = createServerFn({ method: 'GET' })
 
     const profs = await loadProfileMap(supabase, [
       client?.sales_person_id, rec.specialist_id, rec.account_manager_id,
-    ].filter(Boolean));
+    ].filter((x): x is string => !!x));
 
     const progMap = new Map<number, any>();
     (progs ?? []).forEach((p: any) => progMap.set(p.step_number, p));
@@ -220,7 +220,7 @@ export const getOnboardingDetailFn = createServerFn({ method: 'GET' })
       packageType: client?.package_type ?? '',
       budget: client?.budget ?? null,
       salesPersonId: client?.sales_person_id ?? '',
-      salesPersonName: profs.get(client?.sales_person_id)?.name ?? '—',
+      salesPersonName: (client?.sales_person_id && profs.get(client.sales_person_id)?.name) || '—',
       specialistId: rec.specialist_id,
       specialistName: rec.specialist_id ? profs.get(rec.specialist_id)?.name ?? '—' : null,
       accountManagerId: rec.account_manager_id,
