@@ -86,10 +86,10 @@ function AuthedLayout() {
           <div className="px-2 text-[10px] uppercase tracking-wider text-white/40">Signed in as</div>
           <div className="px-2 text-sm text-white truncate">{profile?.name ?? '…'}</div>
           <div className="px-2 text-[11px] text-white/40">
-            {profile?.role === 'admin'
-              ? 'Admin · full access'
-              : profile?.role === 'manager'
-              ? 'Manager · sees all'
+            {profile?.role === 'admin' ? 'Admin · full access'
+              : profile?.role === 'manager' ? 'Manager · sees all'
+              : profile?.role === 'onboarding_specialist' ? 'Onboarding Specialist'
+              : profile?.role === 'account_manager' ? 'Account Manager'
               : 'Sales Rep · own accounts'}
           </div>
           <button onClick={signOut}
