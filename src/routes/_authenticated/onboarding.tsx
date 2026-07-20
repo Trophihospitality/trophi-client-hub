@@ -1,6 +1,9 @@
-import { createFileRoute } from '@tanstack/react-router';
-import Onboarding from '@/components/crm/Onboarding';
+import { createFileRoute, Outlet } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/_authenticated/onboarding')({
-  component: Onboarding,
+  component: OnboardingLayout,
 });
+
+function OnboardingLayout() {
+  return <Outlet />;
+}

@@ -17,6 +17,7 @@ import { Route as AuthenticatedSupportRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedClientPortalRouteImport } from './routes/_authenticated/client-portal'
 import { Route as AuthenticatedAccountsRouteImport } from './routes/_authenticated/accounts'
+import { Route as AuthenticatedOnboardingIndexRouteImport } from './routes/_authenticated/onboarding.index'
 import { Route as AuthenticatedCrmIndexRouteImport } from './routes/_authenticated/crm.index'
 import { Route as AuthenticatedSettingsPandadocTemplatesRouteImport } from './routes/_authenticated/settings.pandadoc-templates'
 import { Route as AuthenticatedOnboardingBusinessIdRouteImport } from './routes/_authenticated/onboarding.$businessId'
@@ -65,6 +66,12 @@ const AuthenticatedAccountsRoute = AuthenticatedAccountsRouteImport.update({
   path: '/accounts',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedOnboardingIndexRoute =
+  AuthenticatedOnboardingIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedOnboardingRoute,
+  } as any)
 const AuthenticatedCrmIndexRoute = AuthenticatedCrmIndexRouteImport.update({
   id: '/crm/',
   path: '/crm/',
@@ -119,6 +126,7 @@ export interface FileRoutesByFullPath {
   '/onboarding/$businessId': typeof AuthenticatedOnboardingBusinessIdRoute
   '/settings/pandadoc-templates': typeof AuthenticatedSettingsPandadocTemplatesRoute
   '/crm/': typeof AuthenticatedCrmIndexRoute
+  '/onboarding/': typeof AuthenticatedOnboardingIndexRoute
   '/api/public/hooks/onboarding-reminders': typeof ApiPublicHooksOnboardingRemindersRoute
   '/api/public/hooks/test-onboarding-email': typeof ApiPublicHooksTestOnboardingEmailRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
@@ -128,13 +136,13 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/accounts': typeof AuthenticatedAccountsRoute
   '/client-portal': typeof AuthenticatedClientPortalRoute
-  '/onboarding': typeof AuthenticatedOnboardingRouteWithChildren
   '/support': typeof AuthenticatedSupportRoute
   '/users': typeof AuthenticatedUsersRoute
   '/crm/$businessId': typeof AuthenticatedCrmBusinessIdRoute
   '/onboarding/$businessId': typeof AuthenticatedOnboardingBusinessIdRoute
   '/settings/pandadoc-templates': typeof AuthenticatedSettingsPandadocTemplatesRoute
   '/crm': typeof AuthenticatedCrmIndexRoute
+  '/onboarding': typeof AuthenticatedOnboardingIndexRoute
   '/api/public/hooks/onboarding-reminders': typeof ApiPublicHooksOnboardingRemindersRoute
   '/api/public/hooks/test-onboarding-email': typeof ApiPublicHooksTestOnboardingEmailRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
@@ -153,6 +161,7 @@ export interface FileRoutesById {
   '/_authenticated/onboarding/$businessId': typeof AuthenticatedOnboardingBusinessIdRoute
   '/_authenticated/settings/pandadoc-templates': typeof AuthenticatedSettingsPandadocTemplatesRoute
   '/_authenticated/crm/': typeof AuthenticatedCrmIndexRoute
+  '/_authenticated/onboarding/': typeof AuthenticatedOnboardingIndexRoute
   '/api/public/hooks/onboarding-reminders': typeof ApiPublicHooksOnboardingRemindersRoute
   '/api/public/hooks/test-onboarding-email': typeof ApiPublicHooksTestOnboardingEmailRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
@@ -171,6 +180,7 @@ export interface FileRouteTypes {
     | '/onboarding/$businessId'
     | '/settings/pandadoc-templates'
     | '/crm/'
+    | '/onboarding/'
     | '/api/public/hooks/onboarding-reminders'
     | '/api/public/hooks/test-onboarding-email'
     | '/lovable/email/transactional/preview'
@@ -180,13 +190,13 @@ export interface FileRouteTypes {
     | '/auth'
     | '/accounts'
     | '/client-portal'
-    | '/onboarding'
     | '/support'
     | '/users'
     | '/crm/$businessId'
     | '/onboarding/$businessId'
     | '/settings/pandadoc-templates'
     | '/crm'
+    | '/onboarding'
     | '/api/public/hooks/onboarding-reminders'
     | '/api/public/hooks/test-onboarding-email'
     | '/lovable/email/transactional/preview'
@@ -204,6 +214,7 @@ export interface FileRouteTypes {
     | '/_authenticated/onboarding/$businessId'
     | '/_authenticated/settings/pandadoc-templates'
     | '/_authenticated/crm/'
+    | '/_authenticated/onboarding/'
     | '/api/public/hooks/onboarding-reminders'
     | '/api/public/hooks/test-onboarding-email'
     | '/lovable/email/transactional/preview'
@@ -276,6 +287,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAccountsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/onboarding/': {
+      id: '/_authenticated/onboarding/'
+      path: '/'
+      fullPath: '/onboarding/'
+      preLoaderRoute: typeof AuthenticatedOnboardingIndexRouteImport
+      parentRoute: typeof AuthenticatedOnboardingRoute
+    }
     '/_authenticated/crm/': {
       id: '/_authenticated/crm/'
       path: '/crm'
@@ -330,12 +348,14 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedOnboardingRouteChildren {
   AuthenticatedOnboardingBusinessIdRoute: typeof AuthenticatedOnboardingBusinessIdRoute
+  AuthenticatedOnboardingIndexRoute: typeof AuthenticatedOnboardingIndexRoute
 }
 
 const AuthenticatedOnboardingRouteChildren: AuthenticatedOnboardingRouteChildren =
   {
     AuthenticatedOnboardingBusinessIdRoute:
       AuthenticatedOnboardingBusinessIdRoute,
+    AuthenticatedOnboardingIndexRoute: AuthenticatedOnboardingIndexRoute,
   }
 
 const AuthenticatedOnboardingRouteWithChildren =
