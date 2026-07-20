@@ -75,6 +75,14 @@ export const pandadoc = {
     return request(`/documents/${id}/details`);
   },
 
+  async listByMetadata(metadata: Record<string, string>): Promise<PandaDocDocument[]> {
+    const parts = Object.entries(metadata).map(([k, v]) => `${k}=${v}`).join(';');
+    const qs = new URLSearchParams({ metadata: parts, count: '50' }).toString();
+    const r = await request<{ results: PandaDocDocument[] }>(`/documents?${qs}`);
+    return r.results ?? [];
+  },
+
+
   async sendDocument(id: string, opts: { subject?: string; message?: string; silent?: boolean } = {}) {
     return request(`/documents/${id}/send`, {
       method: 'POST',
