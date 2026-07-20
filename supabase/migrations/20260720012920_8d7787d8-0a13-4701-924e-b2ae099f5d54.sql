@@ -1,0 +1,1 @@
+ALTER TABLE public.client_contracts DROP CONSTRAINT IF EXISTS client_contracts_status_check;
