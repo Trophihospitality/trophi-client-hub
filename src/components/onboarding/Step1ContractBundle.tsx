@@ -94,10 +94,28 @@ export function Step1ContractBundle({ businessId, canEdit, onGenerated }: Props)
         <MergeField label="Monthly budget / location" value={data.merge.MonthlyBudgetPerLocation} />
         <MergeField label="Active locations" value={String(data.merge.ActiveLocationCount)} />
         <div className="md:col-span-2">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Location list</div>
-          <pre className="mt-1 whitespace-pre-wrap rounded-md bg-muted/40 p-2 font-mono text-xs">
-            {data.merge.ActiveLocationsList || '—'}
-          </pre>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            Location list ({data.locations.length})
+          </div>
+          {data.locations.length === 0 ? (
+            <div className="mt-1 text-sm text-muted-foreground">—</div>
+          ) : (
+            <ul className="mt-2 divide-y rounded-md border">
+              {data.locations.map((l) => (
+                <li key={l.locationId} className="flex items-center justify-between gap-3 px-3 py-2">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">{l.name}</div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {l.address || 'Address not set'}
+                    </div>
+                  </div>
+                  <span className="font-mono text-xs rounded bg-secondary px-2 py-1 shrink-0">
+                    {l.locationId}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
         <MergeField
           label="Client signer"
@@ -109,15 +127,20 @@ export function Step1ContractBundle({ businessId, canEdit, onGenerated }: Props)
         />
       </div>
 
-      {data.missingTemplateIds.length > 0 && (
+      {!data.ready && data.readyReasons.length > 0 && (
         <div className="mx-4 mb-3 flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200">
-          <AlertCircle className="mt-0.5 h-4 w-4" />
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <div>
-            Missing PandaDoc template ID(s): <b>{data.missingTemplateIds.join(', ')}</b>. Set them in{' '}
-            Admin → PandaDoc Templates.
+            <div className="mb-1 font-semibold">Can't generate yet — fix the following:</div>
+            <ul className="list-disc space-y-0.5 pl-4">
+              {data.readyReasons.map((r) => (
+                <li key={r}>{r}</li>
+              ))}
+            </ul>
           </div>
         </div>
       )}
+
 
       <div className="border-t border-border">
         <ul className="divide-y divide-border">

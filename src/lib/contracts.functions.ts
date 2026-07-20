@@ -29,7 +29,9 @@ export interface ContractRow {
 
 export interface ContractBundlePreview {
   ready: boolean;
+  readyReasons: string[]; // human-readable list of what's blocking generation
   missingTemplateIds: BundleKind[];
+  invalidTemplateIds: BundleKind[]; // template value present but not a valid PandaDoc UUID
   merge: {
     Company: string;
     Brands: string;
@@ -42,10 +44,12 @@ export interface ContractBundlePreview {
     ActiveLocationsList: string;
     ActiveLocationCount: number;
   };
+  locations: Array<{ locationId: string; name: string; address: string }>;
   clientSigner: { email: string; firstName: string; lastName: string } | null;
   trophiSigner: { email: string; firstName: string; lastName: string } | null;
   contracts: ContractRow[];
 }
+
 
 function splitName(name: string | null | undefined): { firstName: string; lastName: string } {
   const s = (name ?? '').trim();
@@ -66,7 +70,10 @@ async function loadBundleContext(supabase: any, businessId: string) {
   if (!client) throw new Error('Client not found');
 
   const templateMap = new Map<string, string | null>();
-  (templates ?? []).forEach((t: any) => templateMap.set(t.key, t.template_id));
+  (templates ?? []).forEach((t: any) => {
+    const raw = typeof t.template_id === 'string' ? t.template_id.trim() : t.template_id;
+    templateMap.set(t.key, raw || null);
+  });
 
   let sales: any = null;
   if (client.sales_person_id) {
@@ -77,11 +84,26 @@ async function loadBundleContext(supabase: any, businessId: string) {
   return { client, locations: locations ?? [], templateMap, contracts: contracts ?? [], sales };
 }
 
+// A valid PandaDoc template UUID is an opaque 22-char base62 id; reject
+// obvious form/share URLs and anything with whitespace or slashes.
+function isValidTemplateId(v: string | null | undefined): boolean {
+  if (!v) return false;
+  const s = String(v).trim();
+  if (!s) return false;
+  if (/\s/.test(s)) return false;
+  if (s.includes('/') || s.startsWith('http')) return false;
+  return s.length >= 16 && s.length <= 64;
+}
+
+function formatLocationLine(l: any): string {
+  const addr = [l.address, l.city, l.state].filter(Boolean).join(', ');
+  return `${l.name} — ${addr || 'Address not set'} (${l.location_id})`;
+}
+
 function buildMerge(client: any, locations: any[]) {
   const brands = Array.isArray(client.brands) ? client.brands.join(', ') : '';
-  const locList = locations
-    .map((l: any) => `${l.location_id} — ${l.name} (${[l.address, l.city, l.state].filter(Boolean).join(', ')})`)
-    .join('\n');
+  // Blank line between entries so PandaDoc renders them as separate paragraphs.
+  const locList = locations.map(formatLocationLine).join('\n\n');
   return {
     Company: client.company ?? '',
     Brands: brands,
@@ -96,6 +118,7 @@ function buildMerge(client: any, locations: any[]) {
   };
 }
 
+
 export const getContractBundleFn = createServerFn({ method: 'GET' })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ businessId: z.string() }).parse(d))
@@ -105,6 +128,9 @@ export const getContractBundleFn = createServerFn({ method: 'GET' })
       data.businessId,
     );
     const missing = BUNDLE_KINDS.filter((k) => !templateMap.get(k));
+    const invalid = BUNDLE_KINDS.filter(
+      (k) => !!templateMap.get(k) && !isValidTemplateId(templateMap.get(k)),
+    );
     const merge = buildMerge(client, locations);
 
     const clientNames = splitName(client.contact_name);
@@ -128,23 +154,38 @@ export const getContractBundleFn = createServerFn({ method: 'GET' })
       };
     });
 
+    const reasons: string[] = [];
+    if (!client.contact_name) reasons.push('Client contact name is missing');
+    if (!client.contact_role) reasons.push('Client contact role is missing');
+    if (!client.contact_email) reasons.push('Client contact email is missing');
+    if (!client.package_type) reasons.push('Package type is not set');
+    if (client.budget == null) reasons.push('Monthly budget / location is not set');
+    if (locations.length === 0) reasons.push('At least one active location is required');
+    if (!sales?.email) reasons.push('Account owner (Trophi signer) has no email on file');
+    missing.forEach((k) => reasons.push(`PandaDoc template ID not set for ${KIND_LABELS[k]}`));
+    invalid.forEach((k) =>
+      reasons.push(
+        `PandaDoc template ID for ${KIND_LABELS[k]} looks invalid (expected a template UUID, not a form/share URL)`,
+      ),
+    );
+
     return {
-      ready:
-        missing.length === 0 &&
-        !!clientSigner &&
-        !!trophiSigner &&
-        locations.length > 0 &&
-        !!client.contact_name &&
-        !!client.contact_role &&
-        !!client.package_type &&
-        client.budget != null,
+      ready: reasons.length === 0,
+      readyReasons: reasons,
       missingTemplateIds: missing,
+      invalidTemplateIds: invalid,
       merge,
+      locations: locations.map((l: any) => ({
+        locationId: l.location_id,
+        name: l.name,
+        address: [l.address, l.city, l.state].filter(Boolean).join(', '),
+      })),
       clientSigner,
       trophiSigner,
       contracts: rows,
     };
   });
+
 
 async function assertOwnerOrPrivileged(supabase: any, userId: string, businessId: string) {
   const [{ data: client }, { data: roles }] = await Promise.all([
@@ -173,6 +214,14 @@ export const generateContractBundleFn = createServerFn({ method: 'POST' })
     if (missing.length > 0) {
       throw new Error(`Missing PandaDoc template IDs for: ${missing.join(', ')}`);
     }
+    const invalid = BUNDLE_KINDS.filter((k) => !isValidTemplateId(templateMap.get(k)));
+    if (invalid.length > 0) {
+      throw new Error(
+        `PandaDoc template IDs for ${invalid.map((k) => KIND_LABELS[k]).join(', ')} look invalid. ` +
+          `Paste the template UUID (from Templates → your template → three-dot menu → Copy template ID), not a form/share URL.`,
+      );
+    }
+
     if (!client.contact_email || !client.contact_name || !client.contact_role) {
       throw new Error('Client point-of-contact name, role, and email are required');
     }
