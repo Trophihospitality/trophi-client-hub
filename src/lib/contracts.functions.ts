@@ -128,6 +128,9 @@ export const getContractBundleFn = createServerFn({ method: 'GET' })
       data.businessId,
     );
     const missing = BUNDLE_KINDS.filter((k) => !templateMap.get(k));
+    const invalid = BUNDLE_KINDS.filter(
+      (k) => !!templateMap.get(k) && !isValidTemplateId(templateMap.get(k)),
+    );
     const merge = buildMerge(client, locations);
 
     const clientNames = splitName(client.contact_name);
@@ -151,23 +154,38 @@ export const getContractBundleFn = createServerFn({ method: 'GET' })
       };
     });
 
+    const reasons: string[] = [];
+    if (!client.contact_name) reasons.push('Client contact name is missing');
+    if (!client.contact_role) reasons.push('Client contact role is missing');
+    if (!client.contact_email) reasons.push('Client contact email is missing');
+    if (!client.package_type) reasons.push('Package type is not set');
+    if (client.budget == null) reasons.push('Monthly budget / location is not set');
+    if (locations.length === 0) reasons.push('At least one active location is required');
+    if (!sales?.email) reasons.push('Account owner (Trophi signer) has no email on file');
+    missing.forEach((k) => reasons.push(`PandaDoc template ID not set for ${KIND_LABELS[k]}`));
+    invalid.forEach((k) =>
+      reasons.push(
+        `PandaDoc template ID for ${KIND_LABELS[k]} looks invalid (expected a template UUID, not a form/share URL)`,
+      ),
+    );
+
     return {
-      ready:
-        missing.length === 0 &&
-        !!clientSigner &&
-        !!trophiSigner &&
-        locations.length > 0 &&
-        !!client.contact_name &&
-        !!client.contact_role &&
-        !!client.package_type &&
-        client.budget != null,
+      ready: reasons.length === 0,
+      readyReasons: reasons,
       missingTemplateIds: missing,
+      invalidTemplateIds: invalid,
       merge,
+      locations: locations.map((l: any) => ({
+        locationId: l.location_id,
+        name: l.name,
+        address: [l.address, l.city, l.state].filter(Boolean).join(', '),
+      })),
       clientSigner,
       trophiSigner,
       contracts: rows,
     };
   });
+
 
 async function assertOwnerOrPrivileged(supabase: any, userId: string, businessId: string) {
   const [{ data: client }, { data: roles }] = await Promise.all([
