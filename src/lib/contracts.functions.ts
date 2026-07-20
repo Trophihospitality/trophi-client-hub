@@ -214,6 +214,14 @@ export const generateContractBundleFn = createServerFn({ method: 'POST' })
     if (missing.length > 0) {
       throw new Error(`Missing PandaDoc template IDs for: ${missing.join(', ')}`);
     }
+    const invalid = BUNDLE_KINDS.filter((k) => !isValidTemplateId(templateMap.get(k)));
+    if (invalid.length > 0) {
+      throw new Error(
+        `PandaDoc template IDs for ${invalid.map((k) => KIND_LABELS[k]).join(', ')} look invalid. ` +
+          `Paste the template UUID (from Templates → your template → three-dot menu → Copy template ID), not a form/share URL.`,
+      );
+    }
+
     if (!client.contact_email || !client.contact_name || !client.contact_role) {
       throw new Error('Client point-of-contact name, role, and email are required');
     }
