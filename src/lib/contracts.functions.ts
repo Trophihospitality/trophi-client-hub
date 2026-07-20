@@ -29,7 +29,9 @@ export interface ContractRow {
 
 export interface ContractBundlePreview {
   ready: boolean;
+  readyReasons: string[]; // human-readable list of what's blocking generation
   missingTemplateIds: BundleKind[];
+  invalidTemplateIds: BundleKind[]; // template value present but not a valid PandaDoc UUID
   merge: {
     Company: string;
     Brands: string;
@@ -42,10 +44,12 @@ export interface ContractBundlePreview {
     ActiveLocationsList: string;
     ActiveLocationCount: number;
   };
+  locations: Array<{ locationId: string; name: string; address: string }>;
   clientSigner: { email: string; firstName: string; lastName: string } | null;
   trophiSigner: { email: string; firstName: string; lastName: string } | null;
   contracts: ContractRow[];
 }
+
 
 function splitName(name: string | null | undefined): { firstName: string; lastName: string } {
   const s = (name ?? '').trim();
