@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { Step1ContractBundle } from '@/components/onboarding/Step1ContractBundle';
 
 export const Route = createFileRoute('/_authenticated/onboarding/$businessId')({
   component: OnboardingDetailPage,
