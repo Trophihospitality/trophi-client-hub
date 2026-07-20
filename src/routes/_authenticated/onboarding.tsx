@@ -1,11 +1,5 @@
-import { createFileRoute, Outlet, useRouterState } from '@tanstack/react-router';
-import Onboarding from '@/components/crm/Onboarding';
+import { createFileRoute, Outlet } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/_authenticated/onboarding')({
-  component: OnboardingRoute,
+  component: Outlet,
 });
-
-function OnboardingRoute() {
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  return pathname === '/onboarding' ? <Onboarding /> : <Outlet />;
-}
