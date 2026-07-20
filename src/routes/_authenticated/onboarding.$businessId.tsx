@@ -113,6 +113,17 @@ function OnboardingDetailPage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-4">
+          {data.currentStep === 1 && data.status !== 'live' && (
+            <Step1ContractBundle
+              businessId={data.businessId}
+              canEdit={
+                !!profile &&
+                (profile.role === 'admin' ||
+                  profile.role === 'manager' ||
+                  profile.id === data.salesPersonId)
+              }
+            />
+          )}
           <div className="rounded-xl border bg-card">
             <div className="border-b border-border px-4 py-3 text-sm font-semibold">Step checklist</div>
             <ul className="divide-y divide-border">
