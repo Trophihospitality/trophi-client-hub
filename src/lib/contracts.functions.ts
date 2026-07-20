@@ -249,6 +249,22 @@ export const generateContractBundleFn = createServerFn({ method: 'POST' })
     const created: BundleKind[] = [];
     const skipped: BundleKind[] = [];
 
+    // Reconcile: find any PandaDoc documents already tagged with this business_id
+    // (e.g. from a previous run where the DB insert failed silently) so we link
+    // instead of creating duplicates.
+    let existingDocs: Array<{ id: string; name: string; status: string; metadata?: any }> = [];
+    try {
+      existingDocs = await pandadoc.listByMetadata({ business_id: client.business_id }) as any;
+    } catch {
+      existingDocs = [];
+    }
+    const findExistingRemote = (kind: BundleKind) => {
+      const byMeta = existingDocs.find((d: any) => d.metadata?.kind === kind);
+      if (byMeta) return byMeta;
+      // Fallback: match by document name prefix if metadata wasn't preserved.
+      return existingDocs.find((d) => d.name?.startsWith(KIND_LABELS[kind]));
+    };
+
     for (const kind of BUNDLE_KINDS) {
       const existing = contracts.find((r: any) => r.kind === kind);
       if (existing && existing.pandadoc_document_id && existing.status !== 'error') {
@@ -256,34 +272,38 @@ export const generateContractBundleFn = createServerFn({ method: 'POST' })
         continue;
       }
 
-      const templateUuid = templateMap.get(kind)!;
-      const perKindRecipients =
-        kind === 'client_authorization' ? [recipients[0], recipients[1]] : recipients;
-
       try {
-        const doc = await pandadoc.createFromTemplate({
-          name: `${KIND_LABELS[kind]} — ${client.company} (${client.business_id})`,
-          templateUuid,
-          recipients: perKindRecipients,
-          tokens: mergeStrings,
-          fields: mergeStrings,
-          metadata: { business_id: client.business_id, kind },
-        });
+        let doc: { id: string; name: string; status: string };
+        const remote = findExistingRemote(kind);
+        if (remote) {
+          doc = remote;
+        } else {
+          const templateUuid = templateMap.get(kind)!;
+          const perKindRecipients =
+            kind === 'client_authorization' ? [recipients[0], recipients[1]] : recipients;
+          doc = await pandadoc.createFromTemplate({
+            name: `${KIND_LABELS[kind]} — ${client.company} (${client.business_id})`,
+            templateUuid,
+            recipients: perKindRecipients,
+            tokens: mergeStrings,
+            fields: mergeStrings,
+            metadata: { business_id: client.business_id, kind },
+          });
+        }
 
         const row = {
           business_id: client.business_id,
           kind,
           pandadoc_document_id: doc.id,
           status: doc.status || 'document.draft',
-          metadata: { name: doc.name, template_id: templateUuid },
+          metadata: { name: doc.name, template_id: templateMap.get(kind), reconciled: !!remote },
           created_by: userId,
           updated_at: new Date().toISOString(),
         };
-        if (existing) {
-          await supabaseAdmin.from('client_contracts').update(row).eq('id', existing.id);
-        } else {
-          await supabaseAdmin.from('client_contracts').insert(row);
-        }
+        const res = existing
+          ? await supabaseAdmin.from('client_contracts').update(row).eq('id', existing.id)
+          : await supabaseAdmin.from('client_contracts').insert(row);
+        if (res.error) throw new Error(`DB persist failed: ${res.error.message}`);
         created.push(kind);
       } catch (err: any) {
         const errRow = {
@@ -303,6 +323,7 @@ export const generateContractBundleFn = createServerFn({ method: 'POST' })
         throw new Error(`Failed to create ${KIND_LABELS[kind]}: ${err?.message ?? err}`);
       }
     }
+
 
     await supabaseAdmin.from('client_activity').insert({
       business_id: client.business_id,
