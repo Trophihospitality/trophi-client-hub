@@ -70,7 +70,10 @@ async function loadBundleContext(supabase: any, businessId: string) {
   if (!client) throw new Error('Client not found');
 
   const templateMap = new Map<string, string | null>();
-  (templates ?? []).forEach((t: any) => templateMap.set(t.key, t.template_id));
+  (templates ?? []).forEach((t: any) => {
+    const raw = typeof t.template_id === 'string' ? t.template_id.trim() : t.template_id;
+    templateMap.set(t.key, raw || null);
+  });
 
   let sales: any = null;
   if (client.sales_person_id) {
@@ -81,11 +84,26 @@ async function loadBundleContext(supabase: any, businessId: string) {
   return { client, locations: locations ?? [], templateMap, contracts: contracts ?? [], sales };
 }
 
+// A valid PandaDoc template UUID is an opaque 22-char base62 id; reject
+// obvious form/share URLs and anything with whitespace or slashes.
+function isValidTemplateId(v: string | null | undefined): boolean {
+  if (!v) return false;
+  const s = String(v).trim();
+  if (!s) return false;
+  if (/\s/.test(s)) return false;
+  if (s.includes('/') || s.startsWith('http')) return false;
+  return s.length >= 16 && s.length <= 64;
+}
+
+function formatLocationLine(l: any): string {
+  const addr = [l.address, l.city, l.state].filter(Boolean).join(', ');
+  return `${l.name} — ${addr || 'Address not set'} (${l.location_id})`;
+}
+
 function buildMerge(client: any, locations: any[]) {
   const brands = Array.isArray(client.brands) ? client.brands.join(', ') : '';
-  const locList = locations
-    .map((l: any) => `${l.location_id} — ${l.name} (${[l.address, l.city, l.state].filter(Boolean).join(', ')})`)
-    .join('\n');
+  // Blank line between entries so PandaDoc renders them as separate paragraphs.
+  const locList = locations.map(formatLocationLine).join('\n\n');
   return {
     Company: client.company ?? '',
     Brands: brands,
@@ -99,6 +117,7 @@ function buildMerge(client: any, locations: any[]) {
     ActiveLocationCount: locations.length,
   };
 }
+
 
 export const getContractBundleFn = createServerFn({ method: 'GET' })
   .middleware([requireSupabaseAuth])
