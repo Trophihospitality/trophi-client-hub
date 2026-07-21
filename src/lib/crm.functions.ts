@@ -97,6 +97,11 @@ async function actorName(supabase: any, userId: string): Promise<string> {
   return data?.name ?? 'Unknown';
 }
 
+async function isAdminUser(supabase: any, userId: string): Promise<boolean> {
+  const { data } = await supabase.rpc('has_role', { _user_id: userId, _role: 'admin' });
+  return !!data;
+}
+
 async function logActivity(
   supabase: any, businessId: string, type: string, description: string, actor: string, actorId: string,
 ) {
