@@ -537,7 +537,7 @@ export default function ClientDetail() {
       <LogContactDialog client={client} actorName={CURRENT_USER} open={logOpen} onOpenChange={setLogOpen} />
 
       {/* Sticky unsaved-changes save bar */}
-      {isDirty && editable && (
+      {isDirty && editableInfo && (
         <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2">
           <div className="flex items-center gap-3 rounded-full border bg-[hsl(var(--trophi-ink))] px-5 py-2.5 text-white shadow-lg">
             <span className="text-sm">Unsaved changes</span>
