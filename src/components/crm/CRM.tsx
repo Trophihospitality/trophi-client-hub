@@ -169,7 +169,11 @@ export default function CRM() {
         {stats.map((s) => (
           <div key={s.label} className="rounded-xl border bg-card p-4">
             <div className="text-xs text-muted-foreground">{s.label}</div>
-            <div className={`mt-1 font-display text-xl font-semibold ${s.alert ? 'text-[hsl(var(--status-restrictions))]' : ''}`}>
+            <div
+              className={`mt-1 font-display text-xl font-semibold ${
+                s.alert ? 'text-[hsl(var(--status-restrictions))]' : ''
+              } ${(s as any).accent === 'signed' ? 'text-[hsl(var(--status-signed))]' : ''}`}
+            >
               {s.value}
             </div>
             <div className="text-[11px] text-muted-foreground">{s.sub}</div>
