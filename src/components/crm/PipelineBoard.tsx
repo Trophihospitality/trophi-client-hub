@@ -46,14 +46,15 @@ export function PipelineBoard({ clients, onStatusChange, canEdit, isAdmin = fals
       {JOURNEY_STATUSES.map((status) => {
         const col = clients.filter((c) => c.journeyStatus === status);
         const colValue = col.reduce((sum, c) => sum + monthlyValue(c), 0);
-        const weighted = colValue * STAGE_PROBABILITY[status];
+        const isSignedCol = status === 'Signed';
+        const dropBlocked = isSignedCol && !isAdmin;
         return (
           <div
             key={status}
             className={`flex w-64 shrink-0 flex-col rounded-xl border bg-secondary/40 transition-colors ${
-              overCol === status ? 'border-[hsl(var(--trophi-gold))] bg-[hsl(var(--trophi-gold-soft))]' : ''
-            }`}
-            onDragOver={(e) => { e.preventDefault(); setOverCol(status); }}
+              overCol === status && !dropBlocked ? 'border-[hsl(var(--trophi-gold))] bg-[hsl(var(--trophi-gold-soft))]' : ''
+            } ${dropBlocked ? 'opacity-70' : ''}`}
+            onDragOver={(e) => { if (dropBlocked) return; e.preventDefault(); setOverCol(status); }}
             onDragLeave={() => setOverCol((o) => (o === status ? null : o))}
             onDrop={() => handleDrop(status)}
           >
@@ -66,7 +67,7 @@ export function PipelineBoard({ clients, onStatusChange, canEdit, isAdmin = fals
             </div>
             {colValue > 0 && (
               <div className="px-3 pb-2 text-[11px] text-muted-foreground">
-                {money(colValue)} · weighted {money(weighted)}
+                {money(colValue)}
               </div>
             )}
             <div className="flex-1 space-y-2 px-2 pb-2 min-h-[80px]">
