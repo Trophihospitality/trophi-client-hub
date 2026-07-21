@@ -74,15 +74,17 @@
   --radius: 0.625rem;
 
   /* Customer Journey status colors */
-  --status-cold: 215 15% 50%;
-  --status-mql: 210 85% 45%;
-  --status-sql: 245 65% 55%;
-  --status-proposal: 275 55% 50%;
-  --status-restrictions: 38 92% 45%;
-  --status-approved: 152 60% 36%;
-  --status-unresponsive: 24 90% 50%;
-  --status-lasteffort: 350 75% 48%;
-  --status-lostcontact: 220 10% 40%;
+ --status-cold: 215 15% 50%;
+ --status-prospecting: 178 70% 38%;
+ --status-mql: 210 85% 45%;
+ --status-sql: 245 65% 55%;
+ --status-proposal: 275 55% 50%;
+ --status-restrictions: 38 92% 45%;
+ --status-approved: 152 60% 36%;
+ --status-signed: 158 78% 22%;
+ --status-unresponsive: 24 90% 50%;
+ --status-lasteffort: 350 75% 48%;
+ --status-lostcontact: 220 10% 40%;
 }
 
 @layer base {
