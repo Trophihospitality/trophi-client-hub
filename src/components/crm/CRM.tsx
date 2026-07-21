@@ -299,7 +299,7 @@ export default function CRM() {
                       {c.contactRole && <div className="text-xs text-muted-foreground">{c.contactRole}</div>}
                     </TableCell>
                     <TableCell className="max-w-[180px] truncate text-sm">{c.contactEmail}</TableCell>
-                    <TableCell className="whitespace-nowrap text-sm">{c.contactPhone}</TableCell>
+                    <TableCell className="whitespace-nowrap text-sm">{formatPhone(c.contactPhone)}</TableCell>
                     <TableCell className="text-center">
                       <span className={c.isDecisionMaker ? 'text-[hsl(var(--status-approved))] font-medium' : 'text-muted-foreground'}>
                         {c.isDecisionMaker ? 'Yes' : 'No'}
