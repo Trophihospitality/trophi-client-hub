@@ -114,17 +114,17 @@ export const US_STATES: readonly { code: string; name: string }[] = [
 export const US_STATE_CODES = US_STATES.map((s) => s.code);
 
 // ============================================================
-// DEAL FORECASTING — stage win probabilities
-// Weighted forecast = budget × probability of the current stage.
-// Tune these as real close rates become known.
+// DEAL FORECASTING — stage win probabilities (retained for future reporting; not shown in UI)
 // ============================================================
 export const STAGE_PROBABILITY: Record<JourneyStatus, number> = {
   'Cold Lead': 0.05,
+  'Prospecting': 0.10,
   'MQL': 0.15,
   'SQL': 0.30,
   'Proposal': 0.60,
   'Restrictions': 0.40,
-  'Approved': 1.0,
+  'Approved': 0.90,
+  'Signed': 1.0,
   'Unresponsive': 0.10,
   'Last Effort': 0.05,
   'Lost Contact': 0,
@@ -132,7 +132,7 @@ export const STAGE_PROBABILITY: Record<JourneyStatus, number> = {
 
 /** Statuses that count as an active, workable pipeline. */
 export const ACTIVE_STATUSES: JourneyStatus[] = [
-  'Cold Lead', 'MQL', 'SQL', 'Proposal', 'Restrictions', 'Unresponsive', 'Last Effort',
+  'Cold Lead', 'Prospecting', 'MQL', 'SQL', 'Proposal', 'Restrictions', 'Unresponsive', 'Last Effort',
 ];
 
 // ============================================================
