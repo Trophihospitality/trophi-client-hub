@@ -221,7 +221,12 @@ export default function ClientDetail() {
           )}
           <span className="text-sm text-muted-foreground">Journey status:</span>
           {editable ? (
-            <StatusSelect value={client.journeyStatus} onChange={handleStatusChange} />
+            <StatusSelect
+              value={client.journeyStatus}
+              onChange={handleStatusChange}
+              allowSigned={isAdmin}
+              disabled={signedLocked}
+            />
           ) : (
             <StatusBadge status={client.journeyStatus} />
           )}
@@ -237,18 +242,24 @@ export default function ClientDetail() {
         </div>
       )}
 
+      {signedLocked && (
+        <div className="ml-12 rounded-lg border border-[hsl(var(--status-signed))]/40 bg-[hsl(var(--status-signed))]/10 px-4 py-2.5 text-sm text-[hsl(var(--status-signed))]">
+          🔒 This client is <strong>Signed</strong> — client info, status, and ownership are read-only. You can still log contacts and add notes as the relationship continues. Admins can make edits.
+        </div>
+      )}
+
       {!editable && (
         <div className="ml-12 rounded-lg border bg-secondary/60 px-4 py-2.5 text-sm text-muted-foreground">
           Read-only: this account is owned by {owner?.name ?? 'another rep'}. Ask a manager to reassign it if you need edit access.
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className={`grid grid-cols-1 lg:grid-cols-3 gap-6 ${signedLocked ? 'opacity-95' : ''}`}>
         {/* Left: editable info + locations */}
         <div className="lg:col-span-2 space-y-6">
           <section className="rounded-xl border bg-card p-5 space-y-4">
             <h2 className="font-semibold">Client information</h2>
-            <fieldset disabled={!editable} className="grid grid-cols-1 sm:grid-cols-2 gap-4 disabled:opacity-70">
+            <fieldset disabled={!editableInfo} className="grid grid-cols-1 sm:grid-cols-2 gap-4 disabled:opacity-70">
               <div className="space-y-1.5">
                 <Label>Company</Label>
                 <Input value={draft.company} onChange={(e) => set('company', e.target.value)} />
