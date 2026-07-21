@@ -304,11 +304,18 @@ export const changeStatusFn = createServerFn({ method: 'POST' })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const name = await actorName(supabase, userId);
+    const admin = await isAdminUser(supabase, userId);
     const { data: prev, error: prevErr } = await supabase.from('clients')
       .select('journey_status').eq('business_id', data.businessId).maybeSingle();
     if (prevErr) throw prevErr;
     if (!prev) throw new Error('Client not found');
     if (prev.journey_status === data.status) return { ok: true };
+    if (!admin && data.status === 'Signed') {
+      throw new Error('Only admins can set the Signed status.');
+    }
+    if (!admin && prev.journey_status === 'Signed') {
+      throw new Error('This client is Signed and locked. Ask an admin to change status.');
+    }
     const { data: updated, error } = await supabase.from('clients')
       .update({ journey_status: data.status })
       .eq('business_id', data.businessId)
