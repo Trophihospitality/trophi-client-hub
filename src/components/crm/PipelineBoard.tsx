@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { AlertTriangle, MapPin } from 'lucide-react';
 import { Client, JourneyStatus } from '@/lib/types';
-import { JOURNEY_STATUSES, STAGE_PROBABILITY, isOverdue, statusDotStyle } from '@/lib/statusConfig';
+import { JOURNEY_STATUSES, isOverdue, statusDotStyle } from '@/lib/statusConfig';
 import { useSalesTeam } from '@/hooks/useSalesTeam';
 
 // ============================================================
