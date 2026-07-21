@@ -235,7 +235,7 @@ export default function CRM() {
 
       {/* Pipeline (kanban) view */}
       {view === 'pipeline' && (
-        <PipelineBoard clients={filtered} onStatusChange={handleStatusChange} canEdit={canEdit} />
+        <PipelineBoard clients={filtered} onStatusChange={handleStatusChange} canEdit={canEditRecord} isAdmin={isAdmin} />
       )}
 
       {/* Table view */}
@@ -259,14 +259,13 @@ export default function CRM() {
                 <TableHead className="text-center">Decision Maker</TableHead>
                 <TableHead>Package</TableHead>
                 <TableHead className="text-right">Monthly Budget / Location</TableHead>
-                <TableHead className="text-right">Weighted (monthly)</TableHead>
                 <TableHead>Owner</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={14} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={13} className="h-32 text-center text-muted-foreground">
                     No clients match. Adjust filters or add a new client to get started.
                   </TableCell>
                 </TableRow>
@@ -274,11 +273,11 @@ export default function CRM() {
               {filtered.map((c) => {
                 const owner = SALES_TEAM.find((sp) => sp.id === c.salesPersonId);
                 const od = isOverdue(c);
-                const weighted = clientMonthlyValue(c) * STAGE_PROBABILITY[c.journeyStatus];
+                const locked = isLocked(c);
                 return (
                   <TableRow
                     key={c.businessId}
-                    className="cursor-pointer"
+                    className={`cursor-pointer ${locked ? 'bg-muted/40 text-muted-foreground' : ''}`}
                     onClick={() => navigate({ to: '/crm/$businessId', params: { businessId: c.businessId } })}
                   >
                     <TableCell className="pr-0">
@@ -289,20 +288,28 @@ export default function CRM() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <div className="font-medium">{c.company}</div>
+                      <div className="font-medium flex items-center gap-1.5">
+                        {c.company}
+                        {locked && (
+                          <span className="text-[10px] uppercase tracking-wide rounded bg-[hsl(var(--status-signed))]/15 text-[hsl(var(--status-signed))] px-1.5 py-0.5">
+                            Locked
+                          </span>
+                        )}
+                      </div>
                       <div className="text-xs text-muted-foreground font-mono">{c.businessId}</div>
                     </TableCell>
                     <TableCell className="max-w-[160px] truncate">{c.brands.join(', ')}</TableCell>
                     <TableCell className="text-center">{c.locations.filter((l) => l.status !== 'closed').length}</TableCell>
                     <TableCell>
-                      {canEdit(c) ? (
+                      {canEdit(c) && !locked ? (
                         <StatusSelect
                           value={c.journeyStatus}
                           stopPropagation
+                          allowSigned={isAdmin}
                           onChange={(s) => handleStatusChange(c.businessId, c.company, s)}
                         />
                       ) : (
-                        <span className="text-sm">{c.journeyStatus}</span>
+                        <StatusBadge status={c.journeyStatus} />
                       )}
                     </TableCell>
                     <TableCell>
@@ -322,9 +329,6 @@ export default function CRM() {
                     </TableCell>
                     <TableCell>{c.packageType}</TableCell>
                     <TableCell className="text-right font-medium">{c.budget !== null ? money(c.budget) : '—'}</TableCell>
-                    <TableCell className="text-right text-sm text-muted-foreground">
-                      {c.budget !== null ? money(weighted) : '—'}
-                    </TableCell>
                     <TableCell className="text-sm">{owner?.name ?? '—'}</TableCell>
                   </TableRow>
                 );
