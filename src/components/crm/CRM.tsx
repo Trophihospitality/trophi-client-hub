@@ -1,16 +1,16 @@
 import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import {
-  Plus, Search, AlertTriangle, Download, Upload, LayoutGrid, List, TrendingUp,
+  Plus, Search, AlertTriangle, Download, Upload, LayoutGrid, List,
 } from 'lucide-react';
 import { useCrm } from '@/store/crmStore';
 import { useUser } from '@/store/userStore';
 import { useSalesTeam } from '@/hooks/useSalesTeam';
 import { JourneyStatus } from '@/lib/types';
-import { JOURNEY_STATUSES, STAGE_PROBABILITY, ACTIVE_STATUSES, isOverdue } from '@/lib/statusConfig';
+import { JOURNEY_STATUSES, ACTIVE_STATUSES, isOverdue } from '@/lib/statusConfig';
 import { clientsToCsv, downloadCsv, csvToClients } from '@/lib/csv';
 import { formatPhone } from '@/lib/phone';
-import { StatusSelect } from '@/components/crm/StatusBadge';
+import { StatusSelect, StatusBadge } from '@/components/crm/StatusBadge';
 import { AddClientDialog } from '@/components/crm/AddClientDialog';
 import { PipelineBoard } from '@/components/crm/PipelineBoard';
 import { Button } from '@/components/ui/button';
