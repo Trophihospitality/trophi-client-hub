@@ -9,6 +9,7 @@ import { useSalesTeam } from '@/hooks/useSalesTeam';
 import { JourneyStatus } from '@/lib/types';
 import { JOURNEY_STATUSES, STAGE_PROBABILITY, ACTIVE_STATUSES, isOverdue } from '@/lib/statusConfig';
 import { clientsToCsv, downloadCsv, csvToClients } from '@/lib/csv';
+import { formatPhone } from '@/lib/phone';
 import { StatusSelect } from '@/components/crm/StatusBadge';
 import { AddClientDialog } from '@/components/crm/AddClientDialog';
 import { PipelineBoard } from '@/components/crm/PipelineBoard';
@@ -299,7 +300,7 @@ export default function CRM() {
                       {c.contactRole && <div className="text-xs text-muted-foreground">{c.contactRole}</div>}
                     </TableCell>
                     <TableCell className="max-w-[180px] truncate text-sm">{c.contactEmail}</TableCell>
-                    <TableCell className="whitespace-nowrap text-sm">{c.contactPhone}</TableCell>
+                    <TableCell className="whitespace-nowrap text-sm">{formatPhone(c.contactPhone)}</TableCell>
                     <TableCell className="text-center">
                       <span className={c.isDecisionMaker ? 'text-[hsl(var(--status-approved))] font-medium' : 'text-muted-foreground'}>
                         {c.isDecisionMaker ? 'Yes' : 'No'}
