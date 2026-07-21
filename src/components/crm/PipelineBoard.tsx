@@ -17,13 +17,14 @@ interface Props {
   clients: Client[];
   onStatusChange: (businessId: string, company: string, status: JourneyStatus) => void;
   canEdit: (client: Client) => boolean;
+  isAdmin?: boolean;
 }
 
 function money(n: number): string {
   return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 }
 
-export function PipelineBoard({ clients, onStatusChange, canEdit }: Props) {
+export function PipelineBoard({ clients, onStatusChange, canEdit, isAdmin = false }: Props) {
   const navigate = useNavigate();
   const SALES_TEAM = useSalesTeam();
   const [dragId, setDragId] = useState<string | null>(null);
@@ -36,6 +37,7 @@ export function PipelineBoard({ clients, onStatusChange, canEdit }: Props) {
     setDragId(null);
     setOverCol(null);
     if (!client || client.journeyStatus === status) return;
+    if (status === 'Signed' && !isAdmin) return; // admins only
     onStatusChange(client.businessId, client.company, status);
   };
 
