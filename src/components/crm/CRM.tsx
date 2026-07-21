@@ -67,15 +67,25 @@ export default function CRM() {
   const metrics = useMemo(() => {
     const active = mine.filter((c) => ACTIVE_STATUSES.includes(c.journeyStatus));
     const pipelineValue = active.reduce((s, c) => s + clientMonthlyValue(c), 0);
-    const weighted = active.reduce((s, c) => s + clientMonthlyValue(c) * STAGE_PROBABILITY[c.journeyStatus], 0);
     const approvedValue = mine
       .filter((c) => c.journeyStatus === 'Approved')
       .reduce((s, c) => s + clientMonthlyValue(c), 0);
+    const signedValue = mine
+      .filter((c) => c.journeyStatus === 'Signed')
+      .reduce((s, c) => s + clientMonthlyValue(c), 0);
     const needsAttention = mine.filter((c) => isOverdue(c).overdue).length;
-    return { activeCount: active.length, pipelineValue, weighted, approvedValue, needsAttention };
+    return { activeCount: active.length, pipelineValue, approvedValue, signedValue, needsAttention };
   }, [mine]);
 
+  // Signed records are read-only for non-admins (info + status + owner).
+  const isLocked = (c: (typeof mine)[number]) => c.journeyStatus === 'Signed' && !isAdmin;
+  const canEditRecord = (c: (typeof mine)[number]) => canEdit(c) && !isLocked(c);
+
   const handleStatusChange = (businessId: string, company: string, status: JourneyStatus) => {
+    if (status === 'Signed' && !isAdmin) {
+      toast.error('Only admins can set Signed', { description: 'Signed is applied automatically when Step 4 completes.' });
+      return;
+    }
     changeStatus(businessId, status, currentUser.name);
     if (status === 'Approved') {
       toast.success(`${company} approved`, { description: 'Client automatically sent to Onboarding.' });
@@ -115,8 +125,8 @@ export default function CRM() {
 
   const stats = [
     { label: 'Active pipeline (monthly)', value: money(metrics.pipelineValue), sub: `${metrics.activeCount} open leads` },
-    { label: 'Weighted monthly forecast', value: money(metrics.weighted), sub: 'monthly × active locations × probability', icon: TrendingUp },
-    { label: 'Approved monthly value', value: money(metrics.approvedValue), sub: 'in onboarding' },
+    { label: 'Approved (monthly)', value: money(metrics.approvedValue), sub: 'verbally committed · in onboarding' },
+    { label: 'Signed (monthly)', value: money(metrics.signedValue), sub: 'contract fully executed', accent: 'signed' as const },
     {
       label: 'Needs attention', value: String(metrics.needsAttention),
       sub: 'overdue follow-ups', alert: metrics.needsAttention > 0,
