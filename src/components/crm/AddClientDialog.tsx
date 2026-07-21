@@ -5,6 +5,7 @@ import { useUser } from '@/store/userStore';
 import { ClientType, JourneyStatus, PackageType, SalesPerson, ContactRole, LeadSource } from '@/lib/types';
 import { CLIENT_TYPES, JOURNEY_STATUSES, PACKAGE_TYPES, CONTACT_ROLES, LEAD_SOURCES, US_STATES } from '@/lib/statusConfig';
 import { uid } from '@/lib/ids';
+import { formatPhoneInput, phoneToDigits } from '@/lib/phone';
 import { useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { createClientFn, listSalesTeam } from '@/lib/crm.functions';
@@ -123,7 +124,7 @@ export function AddClientDialog({ open, onOpenChange }: Props) {
         journeyStatus,
         contactName: contactName.trim(),
         contactEmail: contactEmail.trim(),
-        contactPhone: contactPhone.trim(),
+        contactPhone: phoneToDigits(contactPhone),
         contactRole,
         isDecisionMaker,
         packageType,
@@ -227,7 +228,7 @@ export function AddClientDialog({ open, onOpenChange }: Props) {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="contactPhone">Phone *</Label>
-                <Input id="contactPhone" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="(615) 555-0100" />
+                <Input id="contactPhone" value={contactPhone} onChange={(e) => setContactPhone(formatPhoneInput(e.target.value))} placeholder="(615) 555-0100" />
                 <ErrText show={showErr && !contactPhone.trim()}>Required</ErrText>
               </div>
               <div className="space-y-1.5">
