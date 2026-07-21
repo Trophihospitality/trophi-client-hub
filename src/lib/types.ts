@@ -13,11 +13,13 @@ export type ClientType =
 
 export type JourneyStatus =
   | 'Cold Lead'
+  | 'Prospecting'
   | 'MQL'
   | 'SQL'
   | 'Proposal'
   | 'Restrictions'
   | 'Approved'
+  | 'Signed'
   | 'Unresponsive'
   | 'Last Effort'
   | 'Lost Contact';
