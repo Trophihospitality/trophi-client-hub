@@ -165,6 +165,10 @@ export default function ClientDetail() {
   };
 
   const handleStatusChange = (status: JourneyStatus) => {
+    if (status === 'Signed' && !isAdmin) {
+      toast.error('Only admins can set Signed', { description: 'Signed is applied automatically when Step 4 completes.' });
+      return;
+    }
     changeStatus(client.businessId, status, CURRENT_USER);
     if (status === 'Approved') {
       toast.success(`${client.company} approved`, { description: 'Automatically sent to Onboarding.' });
