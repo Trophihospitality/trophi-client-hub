@@ -242,6 +242,14 @@ export const updateClientFn = createServerFn({ method: 'POST' })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const name = await actorName(supabase, userId);
+    const admin = await isAdminUser(supabase, userId);
+    if (!admin) {
+      const { data: cur } = await supabase.from('clients')
+        .select('journey_status').eq('business_id', data.businessId).maybeSingle();
+      if (cur?.journey_status === 'Signed') {
+        throw new Error('This client is Signed — record is locked. Notes and contact logs still work.');
+      }
+    }
     const patch: any = {};
     const u = data.updates;
     if (u.company !== undefined) patch.company = u.company;
