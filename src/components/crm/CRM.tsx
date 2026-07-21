@@ -1,16 +1,16 @@
 import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import {
-  Plus, Search, AlertTriangle, Download, Upload, LayoutGrid, List, TrendingUp,
+  Plus, Search, AlertTriangle, Download, Upload, LayoutGrid, List,
 } from 'lucide-react';
 import { useCrm } from '@/store/crmStore';
 import { useUser } from '@/store/userStore';
 import { useSalesTeam } from '@/hooks/useSalesTeam';
 import { JourneyStatus } from '@/lib/types';
-import { JOURNEY_STATUSES, STAGE_PROBABILITY, ACTIVE_STATUSES, isOverdue } from '@/lib/statusConfig';
+import { JOURNEY_STATUSES, ACTIVE_STATUSES, isOverdue } from '@/lib/statusConfig';
 import { clientsToCsv, downloadCsv, csvToClients } from '@/lib/csv';
 import { formatPhone } from '@/lib/phone';
-import { StatusSelect } from '@/components/crm/StatusBadge';
+import { StatusSelect, StatusBadge } from '@/components/crm/StatusBadge';
 import { AddClientDialog } from '@/components/crm/AddClientDialog';
 import { PipelineBoard } from '@/components/crm/PipelineBoard';
 import { Button } from '@/components/ui/button';
@@ -34,7 +34,7 @@ function formatDate(iso: string): string {
 
 export default function CRM() {
   const { clients, changeStatus, importClients } = useCrm();
-  const { currentUser, isManager, visibleClients, canEdit } = useUser();
+  const { currentUser, isAdmin, isManager, visibleClients, canEdit } = useUser();
   const SALES_TEAM = useSalesTeam();
   const navigate = useNavigate();
   const importRef = useRef<HTMLInputElement>(null);
@@ -67,15 +67,25 @@ export default function CRM() {
   const metrics = useMemo(() => {
     const active = mine.filter((c) => ACTIVE_STATUSES.includes(c.journeyStatus));
     const pipelineValue = active.reduce((s, c) => s + clientMonthlyValue(c), 0);
-    const weighted = active.reduce((s, c) => s + clientMonthlyValue(c) * STAGE_PROBABILITY[c.journeyStatus], 0);
     const approvedValue = mine
       .filter((c) => c.journeyStatus === 'Approved')
       .reduce((s, c) => s + clientMonthlyValue(c), 0);
+    const signedValue = mine
+      .filter((c) => c.journeyStatus === 'Signed')
+      .reduce((s, c) => s + clientMonthlyValue(c), 0);
     const needsAttention = mine.filter((c) => isOverdue(c).overdue).length;
-    return { activeCount: active.length, pipelineValue, weighted, approvedValue, needsAttention };
+    return { activeCount: active.length, pipelineValue, approvedValue, signedValue, needsAttention };
   }, [mine]);
 
+  // Signed records are read-only for non-admins (info + status + owner).
+  const isLocked = (c: (typeof mine)[number]) => c.journeyStatus === 'Signed' && !isAdmin;
+  const canEditRecord = (c: (typeof mine)[number]) => canEdit(c) && !isLocked(c);
+
   const handleStatusChange = (businessId: string, company: string, status: JourneyStatus) => {
+    if (status === 'Signed' && !isAdmin) {
+      toast.error('Only admins can set Signed', { description: 'Signed is applied automatically when Step 4 completes.' });
+      return;
+    }
     changeStatus(businessId, status, currentUser.name);
     if (status === 'Approved') {
       toast.success(`${company} approved`, { description: 'Client automatically sent to Onboarding.' });
@@ -115,8 +125,8 @@ export default function CRM() {
 
   const stats = [
     { label: 'Active pipeline (monthly)', value: money(metrics.pipelineValue), sub: `${metrics.activeCount} open leads` },
-    { label: 'Weighted monthly forecast', value: money(metrics.weighted), sub: 'monthly × active locations × probability', icon: TrendingUp },
-    { label: 'Approved monthly value', value: money(metrics.approvedValue), sub: 'in onboarding' },
+    { label: 'Approved (monthly)', value: money(metrics.approvedValue), sub: 'verbally committed · in onboarding' },
+    { label: 'Signed (monthly)', value: money(metrics.signedValue), sub: 'contract fully executed', accent: 'signed' as const },
     {
       label: 'Needs attention', value: String(metrics.needsAttention),
       sub: 'overdue follow-ups', alert: metrics.needsAttention > 0,
@@ -159,7 +169,11 @@ export default function CRM() {
         {stats.map((s) => (
           <div key={s.label} className="rounded-xl border bg-card p-4">
             <div className="text-xs text-muted-foreground">{s.label}</div>
-            <div className={`mt-1 font-display text-xl font-semibold ${s.alert ? 'text-[hsl(var(--status-restrictions))]' : ''}`}>
+            <div
+              className={`mt-1 font-display text-xl font-semibold ${
+                s.alert ? 'text-[hsl(var(--status-restrictions))]' : ''
+              } ${(s as any).accent === 'signed' ? 'text-[hsl(var(--status-signed))]' : ''}`}
+            >
               {s.value}
             </div>
             <div className="text-[11px] text-muted-foreground">{s.sub}</div>
@@ -221,7 +235,7 @@ export default function CRM() {
 
       {/* Pipeline (kanban) view */}
       {view === 'pipeline' && (
-        <PipelineBoard clients={filtered} onStatusChange={handleStatusChange} canEdit={canEdit} />
+        <PipelineBoard clients={filtered} onStatusChange={handleStatusChange} canEdit={canEditRecord} isAdmin={isAdmin} />
       )}
 
       {/* Table view */}
@@ -245,14 +259,13 @@ export default function CRM() {
                 <TableHead className="text-center">Decision Maker</TableHead>
                 <TableHead>Package</TableHead>
                 <TableHead className="text-right">Monthly Budget / Location</TableHead>
-                <TableHead className="text-right">Weighted (monthly)</TableHead>
                 <TableHead>Owner</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={14} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={13} className="h-32 text-center text-muted-foreground">
                     No clients match. Adjust filters or add a new client to get started.
                   </TableCell>
                 </TableRow>
@@ -260,11 +273,11 @@ export default function CRM() {
               {filtered.map((c) => {
                 const owner = SALES_TEAM.find((sp) => sp.id === c.salesPersonId);
                 const od = isOverdue(c);
-                const weighted = clientMonthlyValue(c) * STAGE_PROBABILITY[c.journeyStatus];
+                const locked = isLocked(c);
                 return (
                   <TableRow
                     key={c.businessId}
-                    className="cursor-pointer"
+                    className={`cursor-pointer ${locked ? 'bg-muted/40 text-muted-foreground' : ''}`}
                     onClick={() => navigate({ to: '/crm/$businessId', params: { businessId: c.businessId } })}
                   >
                     <TableCell className="pr-0">
@@ -275,20 +288,28 @@ export default function CRM() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <div className="font-medium">{c.company}</div>
+                      <div className="font-medium flex items-center gap-1.5">
+                        {c.company}
+                        {locked && (
+                          <span className="text-[10px] uppercase tracking-wide rounded bg-[hsl(var(--status-signed))]/15 text-[hsl(var(--status-signed))] px-1.5 py-0.5">
+                            Locked
+                          </span>
+                        )}
+                      </div>
                       <div className="text-xs text-muted-foreground font-mono">{c.businessId}</div>
                     </TableCell>
                     <TableCell className="max-w-[160px] truncate">{c.brands.join(', ')}</TableCell>
                     <TableCell className="text-center">{c.locations.filter((l) => l.status !== 'closed').length}</TableCell>
                     <TableCell>
-                      {canEdit(c) ? (
+                      {canEdit(c) && !locked ? (
                         <StatusSelect
                           value={c.journeyStatus}
                           stopPropagation
+                          allowSigned={isAdmin}
                           onChange={(s) => handleStatusChange(c.businessId, c.company, s)}
                         />
                       ) : (
-                        <span className="text-sm">{c.journeyStatus}</span>
+                        <StatusBadge status={c.journeyStatus} />
                       )}
                     </TableCell>
                     <TableCell>
@@ -308,9 +329,6 @@ export default function CRM() {
                     </TableCell>
                     <TableCell>{c.packageType}</TableCell>
                     <TableCell className="text-right font-medium">{c.budget !== null ? money(c.budget) : '—'}</TableCell>
-                    <TableCell className="text-right text-sm text-muted-foreground">
-                      {c.budget !== null ? money(weighted) : '—'}
-                    </TableCell>
                     <TableCell className="text-sm">{owner?.name ?? '—'}</TableCell>
                   </TableRow>
                 );

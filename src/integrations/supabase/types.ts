@@ -206,6 +206,7 @@ export type Database = {
       }
       clients: {
         Row: {
+          approved_at: string | null
           brands: string[]
           budget: number | null
           business_id: string
@@ -226,9 +227,11 @@ export type Database = {
           package_type: string
           sales_person_id: string
           sent_to_onboarding: boolean
+          signed_at: string | null
           updated_at: string
         }
         Insert: {
+          approved_at?: string | null
           brands?: string[]
           budget?: number | null
           business_id: string
@@ -249,9 +252,11 @@ export type Database = {
           package_type?: string
           sales_person_id: string
           sent_to_onboarding?: boolean
+          signed_at?: string | null
           updated_at?: string
         }
         Update: {
+          approved_at?: string | null
           brands?: string[]
           budget?: number | null
           business_id?: string
@@ -272,6 +277,7 @@ export type Database = {
           package_type?: string
           sales_person_id?: string
           sent_to_onboarding?: boolean
+          signed_at?: string | null
           updated_at?: string
         }
         Relationships: []

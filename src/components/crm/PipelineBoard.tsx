@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { AlertTriangle, MapPin } from 'lucide-react';
 import { Client, JourneyStatus } from '@/lib/types';
-import { JOURNEY_STATUSES, STAGE_PROBABILITY, isOverdue, statusDotStyle } from '@/lib/statusConfig';
+import { JOURNEY_STATUSES, isOverdue, statusDotStyle } from '@/lib/statusConfig';
 import { useSalesTeam } from '@/hooks/useSalesTeam';
 
 // ============================================================
@@ -17,13 +17,14 @@ interface Props {
   clients: Client[];
   onStatusChange: (businessId: string, company: string, status: JourneyStatus) => void;
   canEdit: (client: Client) => boolean;
+  isAdmin?: boolean;
 }
 
 function money(n: number): string {
   return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 }
 
-export function PipelineBoard({ clients, onStatusChange, canEdit }: Props) {
+export function PipelineBoard({ clients, onStatusChange, canEdit, isAdmin = false }: Props) {
   const navigate = useNavigate();
   const SALES_TEAM = useSalesTeam();
   const [dragId, setDragId] = useState<string | null>(null);
@@ -36,6 +37,7 @@ export function PipelineBoard({ clients, onStatusChange, canEdit }: Props) {
     setDragId(null);
     setOverCol(null);
     if (!client || client.journeyStatus === status) return;
+    if (status === 'Signed' && !isAdmin) return; // admins only
     onStatusChange(client.businessId, client.company, status);
   };
 
@@ -44,14 +46,15 @@ export function PipelineBoard({ clients, onStatusChange, canEdit }: Props) {
       {JOURNEY_STATUSES.map((status) => {
         const col = clients.filter((c) => c.journeyStatus === status);
         const colValue = col.reduce((sum, c) => sum + monthlyValue(c), 0);
-        const weighted = colValue * STAGE_PROBABILITY[status];
+        const isSignedCol = status === 'Signed';
+        const dropBlocked = isSignedCol && !isAdmin;
         return (
           <div
             key={status}
             className={`flex w-64 shrink-0 flex-col rounded-xl border bg-secondary/40 transition-colors ${
-              overCol === status ? 'border-[hsl(var(--trophi-gold))] bg-[hsl(var(--trophi-gold-soft))]' : ''
-            }`}
-            onDragOver={(e) => { e.preventDefault(); setOverCol(status); }}
+              overCol === status && !dropBlocked ? 'border-[hsl(var(--trophi-gold))] bg-[hsl(var(--trophi-gold-soft))]' : ''
+            } ${dropBlocked ? 'opacity-70' : ''}`}
+            onDragOver={(e) => { if (dropBlocked) return; e.preventDefault(); setOverCol(status); }}
             onDragLeave={() => setOverCol((o) => (o === status ? null : o))}
             onDrop={() => handleDrop(status)}
           >
@@ -64,7 +67,7 @@ export function PipelineBoard({ clients, onStatusChange, canEdit }: Props) {
             </div>
             {colValue > 0 && (
               <div className="px-3 pb-2 text-[11px] text-muted-foreground">
-                {money(colValue)} · weighted {money(weighted)}
+                {money(colValue)}
               </div>
             )}
             <div className="flex-1 space-y-2 px-2 pb-2 min-h-[80px]">

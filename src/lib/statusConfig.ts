@@ -8,11 +8,13 @@ import { JourneyStatus, ClientType, PackageType } from './types';
 
 export const JOURNEY_STATUSES: JourneyStatus[] = [
   'Cold Lead',
+  'Prospecting',
   'MQL',
   'SQL',
   'Proposal',
   'Restrictions',
   'Approved',
+  'Signed',
   'Unresponsive',
   'Last Effort',
   'Lost Contact',
@@ -26,11 +28,13 @@ interface StatusStyle {
 
 export const STATUS_CONFIG: Record<JourneyStatus, StatusStyle> = {
   'Cold Lead':     { label: 'Cold Lead',     cssVar: '--status-cold',         description: 'Identified, not yet engaged' },
+  'Prospecting':   { label: 'Prospecting',   cssVar: '--status-prospecting',  description: 'Account owner is actively pursuing' },
   'MQL':           { label: 'MQL',           cssVar: '--status-mql',          description: 'Marketing qualified lead' },
   'SQL':           { label: 'SQL',           cssVar: '--status-sql',          description: 'Sales qualified lead' },
   'Proposal':      { label: 'Proposal',      cssVar: '--status-proposal',     description: 'Proposal sent / in review' },
   'Restrictions':  { label: 'Restrictions',  cssVar: '--status-restrictions', description: 'Blocked — contract, budget, or timing' },
-  'Approved':      { label: 'Approved',      cssVar: '--status-approved',     description: 'Signed — auto-sent to Onboarding' },
+  'Approved':      { label: 'Approved',      cssVar: '--status-approved',     description: 'Verbally committed — sent to Onboarding' },
+  'Signed':        { label: 'Signed',        cssVar: '--status-signed',       description: 'Contract bundle fully executed (admin/system only)' },
   'Unresponsive':  { label: 'Unresponsive',  cssVar: '--status-unresponsive', description: 'No reply after multiple attempts' },
   'Last Effort':   { label: 'Last Effort',   cssVar: '--status-lasteffort',   description: 'Final outreach before closing out' },
   'Lost Contact':  { label: 'Lost Contact',  cssVar: '--status-lostcontact',  description: 'Closed — no path forward' },
@@ -110,17 +114,17 @@ export const US_STATES: readonly { code: string; name: string }[] = [
 export const US_STATE_CODES = US_STATES.map((s) => s.code);
 
 // ============================================================
-// DEAL FORECASTING — stage win probabilities
-// Weighted forecast = budget × probability of the current stage.
-// Tune these as real close rates become known.
+// DEAL FORECASTING — stage win probabilities (retained for future reporting; not shown in UI)
 // ============================================================
 export const STAGE_PROBABILITY: Record<JourneyStatus, number> = {
   'Cold Lead': 0.05,
+  'Prospecting': 0.10,
   'MQL': 0.15,
   'SQL': 0.30,
   'Proposal': 0.60,
   'Restrictions': 0.40,
-  'Approved': 1.0,
+  'Approved': 0.90,
+  'Signed': 1.0,
   'Unresponsive': 0.10,
   'Last Effort': 0.05,
   'Lost Contact': 0,
@@ -128,7 +132,7 @@ export const STAGE_PROBABILITY: Record<JourneyStatus, number> = {
 
 /** Statuses that count as an active, workable pipeline. */
 export const ACTIVE_STATUSES: JourneyStatus[] = [
-  'Cold Lead', 'MQL', 'SQL', 'Proposal', 'Restrictions', 'Unresponsive', 'Last Effort',
+  'Cold Lead', 'Prospecting', 'MQL', 'SQL', 'Proposal', 'Restrictions', 'Unresponsive', 'Last Effort',
 ];
 
 // ============================================================

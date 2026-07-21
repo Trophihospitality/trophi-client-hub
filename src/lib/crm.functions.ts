@@ -97,6 +97,11 @@ async function actorName(supabase: any, userId: string): Promise<string> {
   return data?.name ?? 'Unknown';
 }
 
+async function isAdminUser(supabase: any, userId: string): Promise<boolean> {
+  const { data } = await supabase.rpc('has_role', { _user_id: userId, _role: 'admin' });
+  return !!data;
+}
+
 async function logActivity(
   supabase: any, businessId: string, type: string, description: string, actor: string, actorId: string,
 ) {
@@ -237,6 +242,14 @@ export const updateClientFn = createServerFn({ method: 'POST' })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const name = await actorName(supabase, userId);
+    const admin = await isAdminUser(supabase, userId);
+    if (!admin) {
+      const { data: cur } = await supabase.from('clients')
+        .select('journey_status').eq('business_id', data.businessId).maybeSingle();
+      if (cur?.journey_status === 'Signed') {
+        throw new Error('This client is Signed — record is locked. Notes and contact logs still work.');
+      }
+    }
     const patch: any = {};
     const u = data.updates;
     if (u.company !== undefined) patch.company = u.company;
@@ -299,11 +312,18 @@ export const changeStatusFn = createServerFn({ method: 'POST' })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const name = await actorName(supabase, userId);
+    const admin = await isAdminUser(supabase, userId);
     const { data: prev, error: prevErr } = await supabase.from('clients')
       .select('journey_status').eq('business_id', data.businessId).maybeSingle();
     if (prevErr) throw prevErr;
     if (!prev) throw new Error('Client not found');
     if (prev.journey_status === data.status) return { ok: true };
+    if (!admin && data.status === 'Signed') {
+      throw new Error('Only admins can set the Signed status.');
+    }
+    if (!admin && prev.journey_status === 'Signed') {
+      throw new Error('This client is Signed and locked. Ask an admin to change status.');
+    }
     const { data: updated, error } = await supabase.from('clients')
       .update({ journey_status: data.status })
       .eq('business_id', data.businessId)

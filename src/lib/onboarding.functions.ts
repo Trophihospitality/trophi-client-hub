@@ -380,6 +380,24 @@ export const completeStepFn = createServerFn({ method: 'POST' })
       actor: (await supabaseAdmin.from('profiles').select('name').eq('user_id', userId).maybeSingle()).data?.name ?? 'User',
     });
 
+    // Step 4 = contract bundle fully executed → auto-flip CRM journey to "Signed".
+    // (This is also the hook the PandaDoc webhook will call after countersignature.)
+    if (data.stepNumber === 4) {
+      const { data: curClient } = await supabaseAdmin.from('clients')
+        .select('journey_status').eq('business_id', data.businessId).maybeSingle();
+      if (curClient && curClient.journey_status !== 'Signed') {
+        await supabaseAdmin.from('clients')
+          .update({ journey_status: 'Signed' })
+          .eq('business_id', data.businessId);
+        await supabaseAdmin.from('client_activity').insert({
+          business_id: data.businessId,
+          type: 'status_change',
+          description: `Status changed: ${curClient.journey_status} → Signed · Contract bundle fully executed`,
+          actor: 'System',
+        });
+      }
+    }
+
     return { ok: true, nextStep };
   });
 
