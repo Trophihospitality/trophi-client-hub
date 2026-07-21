@@ -75,11 +75,14 @@ export default function ClientDetail() {
   const [logOpen, setLogOpen] = useState(false);
   const [addLocOpen, setAddLocOpen] = useState(false);
 
-  const { currentUser, isManager, canEdit } = useUser();
+  const { currentUser, isAdmin, isManager, canEdit } = useUser();
   const SALES_TEAM = useSalesTeam();
   const owner = SALES_TEAM.find((sp) => sp.id === client?.salesPersonId);
   const CURRENT_USER = currentUser.name;
   const editable = client ? canEdit(client) : false;
+  // Signed records: contact logging + notes still allowed for the team; info/status/owner locked for non-admins.
+  const signedLocked = !!client && client.journeyStatus === 'Signed' && !isAdmin;
+  const editableInfo = editable && !signedLocked;
 
   const isDirty = useMemo(() => {
     if (!client || !draft) return false;
