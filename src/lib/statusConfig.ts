@@ -8,11 +8,13 @@ import { JourneyStatus, ClientType, PackageType } from './types';
 
 export const JOURNEY_STATUSES: JourneyStatus[] = [
   'Cold Lead',
+  'Prospecting',
   'MQL',
   'SQL',
   'Proposal',
   'Restrictions',
   'Approved',
+  'Signed',
   'Unresponsive',
   'Last Effort',
   'Lost Contact',
@@ -26,11 +28,13 @@ interface StatusStyle {
 
 export const STATUS_CONFIG: Record<JourneyStatus, StatusStyle> = {
   'Cold Lead':     { label: 'Cold Lead',     cssVar: '--status-cold',         description: 'Identified, not yet engaged' },
+  'Prospecting':   { label: 'Prospecting',   cssVar: '--status-prospecting',  description: 'Account owner is actively pursuing' },
   'MQL':           { label: 'MQL',           cssVar: '--status-mql',          description: 'Marketing qualified lead' },
   'SQL':           { label: 'SQL',           cssVar: '--status-sql',          description: 'Sales qualified lead' },
   'Proposal':      { label: 'Proposal',      cssVar: '--status-proposal',     description: 'Proposal sent / in review' },
   'Restrictions':  { label: 'Restrictions',  cssVar: '--status-restrictions', description: 'Blocked — contract, budget, or timing' },
-  'Approved':      { label: 'Approved',      cssVar: '--status-approved',     description: 'Signed — auto-sent to Onboarding' },
+  'Approved':      { label: 'Approved',      cssVar: '--status-approved',     description: 'Verbally committed — sent to Onboarding' },
+  'Signed':        { label: 'Signed',        cssVar: '--status-signed',       description: 'Contract bundle fully executed (admin/system only)' },
   'Unresponsive':  { label: 'Unresponsive',  cssVar: '--status-unresponsive', description: 'No reply after multiple attempts' },
   'Last Effort':   { label: 'Last Effort',   cssVar: '--status-lasteffort',   description: 'Final outreach before closing out' },
   'Lost Contact':  { label: 'Lost Contact',  cssVar: '--status-lostcontact',  description: 'Closed — no path forward' },
