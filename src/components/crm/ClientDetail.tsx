@@ -360,7 +360,7 @@ export default function ClientDetail() {
                   ? ` · ${client.locations.filter((l) => l.status === 'closed').length} closed`
                   : ''})
               </h2>
-              {editable && (
+              {editableInfo && (
                 <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setAddLocOpen(true)}>
                   <Plus className="h-4 w-4" /> Add location
                 </Button>
