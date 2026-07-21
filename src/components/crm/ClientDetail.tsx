@@ -11,6 +11,7 @@ import { ContactRole, JourneyStatus, LeadSource, PackageType } from '@/lib/types
 import { PACKAGE_TYPES, CONTACT_ROLES, LEAD_SOURCES } from '@/lib/statusConfig';
 import { StatusBadge, StatusSelect } from '@/components/crm/StatusBadge';
 import { uid } from '@/lib/ids';
+import { formatPhoneInput, phoneToDigits } from '@/lib/phone';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -127,7 +128,7 @@ export default function ClientDetail() {
       brands: draft.brands.split(',').map((b) => b.trim()).filter(Boolean),
       contactName: draft.contactName.trim(),
       contactEmail: draft.contactEmail.trim(),
-      contactPhone: draft.contactPhone.trim(),
+      contactPhone: phoneToDigits(draft.contactPhone),
       contactRole: draft.contactRole,
       isDecisionMaker: draft.isDecisionMaker,
       packageType: draft.packageType as PackageType,
@@ -272,7 +273,7 @@ export default function ClientDetail() {
               </div>
               <div className="space-y-1.5">
                 <Label>Phone</Label>
-                <Input value={draft.contactPhone} onChange={(e) => set('contactPhone', e.target.value)} />
+                <Input value={formatPhoneInput(draft.contactPhone)} onChange={(e) => set('contactPhone', formatPhoneInput(e.target.value))} />
               </div>
               <div className="flex items-center justify-between rounded-lg border px-3 py-2 mt-6">
                 <Label className="cursor-pointer">Decision maker?</Label>

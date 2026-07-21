@@ -13,6 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Step1ContractBundle } from '@/components/onboarding/Step1ContractBundle';
+import { formatPhone } from '@/lib/phone';
 
 export const Route = createFileRoute('/_authenticated/onboarding/$businessId')({
   component: OnboardingDetailPage,
@@ -201,7 +202,7 @@ function OnboardingDetailPage() {
             <div className="space-y-1">
               <div><span className="text-muted-foreground">Contact:</span> {data.contactName}</div>
               <div className="text-muted-foreground">{data.contactEmail}</div>
-              <div className="text-muted-foreground">{data.contactPhone}</div>
+              <div className="text-muted-foreground">{formatPhone(data.contactPhone)}</div>
               <div className="pt-2"><span className="text-muted-foreground">Sales owner:</span> {data.salesPersonName}</div>
               <div><span className="text-muted-foreground">Specialist:</span> {data.specialistName ?? '—'}</div>
               <div><span className="text-muted-foreground">Account mgr:</span> {data.accountManagerName ?? '—'}</div>

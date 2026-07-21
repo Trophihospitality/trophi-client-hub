@@ -9,6 +9,7 @@ import { useSalesTeam } from '@/hooks/useSalesTeam';
 import { JourneyStatus } from '@/lib/types';
 import { JOURNEY_STATUSES, STAGE_PROBABILITY, ACTIVE_STATUSES, isOverdue } from '@/lib/statusConfig';
 import { clientsToCsv, downloadCsv, csvToClients } from '@/lib/csv';
+import { formatPhone } from '@/lib/phone';
 import { StatusSelect } from '@/components/crm/StatusBadge';
 import { AddClientDialog } from '@/components/crm/AddClientDialog';
 import { PipelineBoard } from '@/components/crm/PipelineBoard';
