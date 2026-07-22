@@ -535,7 +535,7 @@ function CrmReport({ data, filters }: { data: ReportData; filters: Filters }) {
       else if (h.toStatus === 'Approved') A1.add(h.businessId);
       else if (h.toStatus === 'Signed') S1.add(h.businessId);
     }
-    return { person: p, L: bucketMetrics(L1), A: bucketMetrics(A1), S: bucketMetrics(S1) };
+    return { person: p, L: bucketMetrics(L1, false), A: bucketMetrics(A1, false), S: bucketMetrics(S1, true) };
   });
 
   const exportPerPerson = () => {
