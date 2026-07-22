@@ -24,7 +24,7 @@ import { Route as AuthenticatedUsersIndexRouteImport } from './routes/_authentic
 import { Route as AuthenticatedOnboardingIndexRouteImport } from './routes/_authenticated/onboarding.index'
 import { Route as AuthenticatedCrmIndexRouteImport } from './routes/_authenticated/crm.index'
 import { Route as AuthenticatedUsersTrophiRouteImport } from './routes/_authenticated/users.trophi'
-import { Route as AuthenticatedUsersClientRouteImport } from './routes/_authenticated/users.client'
+import { Route as AuthenticatedUsersClientUsersRouteImport } from './routes/_authenticated/users.client-users'
 import { Route as AuthenticatedSettingsPandadocTemplatesRouteImport } from './routes/_authenticated/settings.pandadoc-templates'
 import { Route as AuthenticatedOnboardingBusinessIdRouteImport } from './routes/_authenticated/onboarding.$businessId'
 import { Route as AuthenticatedCrmBusinessIdRouteImport } from './routes/_authenticated/crm.$businessId'
@@ -111,10 +111,10 @@ const AuthenticatedUsersTrophiRoute =
     path: '/trophi',
     getParentRoute: () => AuthenticatedUsersRoute,
   } as any)
-const AuthenticatedUsersClientRoute =
-  AuthenticatedUsersClientRouteImport.update({
-    id: '/client',
-    path: '/client',
+const AuthenticatedUsersClientUsersRoute =
+  AuthenticatedUsersClientUsersRouteImport.update({
+    id: '/client-users',
+    path: '/client-users',
     getParentRoute: () => AuthenticatedUsersRoute,
   } as any)
 const AuthenticatedSettingsPandadocTemplatesRoute =
@@ -174,7 +174,7 @@ export interface FileRoutesByFullPath {
   '/crm/$businessId': typeof AuthenticatedCrmBusinessIdRoute
   '/onboarding/$businessId': typeof AuthenticatedOnboardingBusinessIdRoute
   '/settings/pandadoc-templates': typeof AuthenticatedSettingsPandadocTemplatesRoute
-  '/users/client': typeof AuthenticatedUsersClientRoute
+  '/users/client-users': typeof AuthenticatedUsersClientUsersRoute
   '/users/trophi': typeof AuthenticatedUsersTrophiRouteWithChildren
   '/crm/': typeof AuthenticatedCrmIndexRoute
   '/onboarding/': typeof AuthenticatedOnboardingIndexRoute
@@ -196,7 +196,7 @@ export interface FileRoutesByTo {
   '/crm/$businessId': typeof AuthenticatedCrmBusinessIdRoute
   '/onboarding/$businessId': typeof AuthenticatedOnboardingBusinessIdRoute
   '/settings/pandadoc-templates': typeof AuthenticatedSettingsPandadocTemplatesRoute
-  '/users/client': typeof AuthenticatedUsersClientRoute
+  '/users/client-users': typeof AuthenticatedUsersClientUsersRoute
   '/users/trophi': typeof AuthenticatedUsersTrophiRouteWithChildren
   '/crm': typeof AuthenticatedCrmIndexRoute
   '/onboarding': typeof AuthenticatedOnboardingIndexRoute
@@ -222,7 +222,7 @@ export interface FileRoutesById {
   '/_authenticated/crm/$businessId': typeof AuthenticatedCrmBusinessIdRoute
   '/_authenticated/onboarding/$businessId': typeof AuthenticatedOnboardingBusinessIdRoute
   '/_authenticated/settings/pandadoc-templates': typeof AuthenticatedSettingsPandadocTemplatesRoute
-  '/_authenticated/users/client': typeof AuthenticatedUsersClientRoute
+  '/_authenticated/users/client-users': typeof AuthenticatedUsersClientUsersRoute
   '/_authenticated/users/trophi': typeof AuthenticatedUsersTrophiRouteWithChildren
   '/_authenticated/crm/': typeof AuthenticatedCrmIndexRoute
   '/_authenticated/onboarding/': typeof AuthenticatedOnboardingIndexRoute
@@ -248,7 +248,7 @@ export interface FileRouteTypes {
     | '/crm/$businessId'
     | '/onboarding/$businessId'
     | '/settings/pandadoc-templates'
-    | '/users/client'
+    | '/users/client-users'
     | '/users/trophi'
     | '/crm/'
     | '/onboarding/'
@@ -270,7 +270,7 @@ export interface FileRouteTypes {
     | '/crm/$businessId'
     | '/onboarding/$businessId'
     | '/settings/pandadoc-templates'
-    | '/users/client'
+    | '/users/client-users'
     | '/users/trophi'
     | '/crm'
     | '/onboarding'
@@ -295,7 +295,7 @@ export interface FileRouteTypes {
     | '/_authenticated/crm/$businessId'
     | '/_authenticated/onboarding/$businessId'
     | '/_authenticated/settings/pandadoc-templates'
-    | '/_authenticated/users/client'
+    | '/_authenticated/users/client-users'
     | '/_authenticated/users/trophi'
     | '/_authenticated/crm/'
     | '/_authenticated/onboarding/'
@@ -422,11 +422,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedUsersTrophiRouteImport
       parentRoute: typeof AuthenticatedUsersRoute
     }
-    '/_authenticated/users/client': {
-      id: '/_authenticated/users/client'
-      path: '/client'
-      fullPath: '/users/client'
-      preLoaderRoute: typeof AuthenticatedUsersClientRouteImport
+    '/_authenticated/users/client-users': {
+      id: '/_authenticated/users/client-users'
+      path: '/client-users'
+      fullPath: '/users/client-users'
+      preLoaderRoute: typeof AuthenticatedUsersClientUsersRouteImport
       parentRoute: typeof AuthenticatedUsersRoute
     }
     '/_authenticated/settings/pandadoc-templates': {
@@ -513,13 +513,13 @@ const AuthenticatedUsersTrophiRouteWithChildren =
   )
 
 interface AuthenticatedUsersRouteChildren {
-  AuthenticatedUsersClientRoute: typeof AuthenticatedUsersClientRoute
+  AuthenticatedUsersClientUsersRoute: typeof AuthenticatedUsersClientUsersRoute
   AuthenticatedUsersTrophiRoute: typeof AuthenticatedUsersTrophiRouteWithChildren
   AuthenticatedUsersIndexRoute: typeof AuthenticatedUsersIndexRoute
 }
 
 const AuthenticatedUsersRouteChildren: AuthenticatedUsersRouteChildren = {
-  AuthenticatedUsersClientRoute: AuthenticatedUsersClientRoute,
+  AuthenticatedUsersClientUsersRoute: AuthenticatedUsersClientUsersRoute,
   AuthenticatedUsersTrophiRoute: AuthenticatedUsersTrophiRouteWithChildren,
   AuthenticatedUsersIndexRoute: AuthenticatedUsersIndexRoute,
 }

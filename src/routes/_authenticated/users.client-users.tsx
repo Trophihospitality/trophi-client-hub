@@ -11,7 +11,7 @@ import { listClients } from '@/lib/crm.functions';
 import { formatPhoneInput } from '@/lib/phone';
 import { Plus, RefreshCcw, Search } from 'lucide-react';
 
-export const Route = createFileRoute('/_authenticated/users/client')({
+export const Route = createFileRoute('/_authenticated/users/client-users')({
   component: ClientUsersPage,
 });
 

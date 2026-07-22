@@ -33,7 +33,7 @@ const ADMIN_NAV = [
 
 const USER_MGMT_CHILDREN = [
   { to: '/users/trophi', label: 'Trophi Users' },
-  { to: '/users/client', label: 'Client Users' },
+  { to: '/users/client-users', label: 'Client Users' },
 ] as const;
 
 
