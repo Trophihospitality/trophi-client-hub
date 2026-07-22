@@ -19,7 +19,7 @@ import { Step5PaymentStatusPanel } from '@/components/onboarding/Step5PaymentSta
 import { DocumentsSection } from '@/components/documents/DocumentsSection';
 import { CountersignPanel } from '@/components/onboarding/CountersignPanel';
 import { formatPhone } from '@/lib/phone';
-import { listClientUsersForBusinessFn, resendClientInviteFn } from '@/lib/client-users.functions';
+import { listClientUsersForBusinessFn, resendClientInviteFn, ensurePocInviteFn } from '@/lib/client-users.functions';
 import { InviteStatusCell } from '@/routes/_authenticated/users.client-users';
 import { RefreshCcw } from 'lucide-react';
 
