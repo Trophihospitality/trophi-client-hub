@@ -63,47 +63,61 @@ export function SignContractPanel({ businessId }: Props) {
       </div>
 
       <ul className="divide-y">
-        {ordered.map((c) => (
-          <li key={c.kind} className="flex items-center justify-between gap-3 px-4 py-3">
-            <div className="flex min-w-0 items-center gap-2">
-              {c.completed
-                ? <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-                : <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />}
-              <div className="min-w-0">
-                <div className="truncate text-sm font-medium">{c.label}</div>
-                {c.errored && (
-                  <div className="mt-0.5 text-[11px] text-red-600 dark:text-red-400">
-                    Not ready to sign — Trophi is fixing it{c.blankFields.length ? ` (missing: ${c.blankFields.join(', ')})` : ''}.
-                  </div>
+        {ordered.map((c) => {
+          const awaitingStaff = c.clientSigned && !c.completed;
+          return (
+            <li key={c.kind} className="flex items-center justify-between gap-3 px-4 py-3">
+              <div className="flex min-w-0 items-center gap-2">
+                {c.completed
+                  ? <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                  : awaitingStaff
+                    ? <CheckCircle2 className="h-4 w-4 shrink-0 text-sky-600" />
+                    : <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />}
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium">{c.label}</div>
+                  {c.errored && (
+                    <div className="mt-0.5 text-[11px] text-red-600 dark:text-red-400">
+                      Not ready to sign — Trophi is fixing it{c.blankFields.length ? ` (missing: ${c.blankFields.join(', ')})` : ''}.
+                    </div>
+                  )}
+                  {awaitingStaff && !c.errored && (
+                    <div className="mt-0.5 text-[11px] text-sky-700 dark:text-sky-300">
+                      ✓ Signed by you — awaiting Trophi countersignature
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {c.completed ? (
+                  <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                    Fully executed
+                  </span>
+                ) : awaitingStaff ? (
+                  <span className="rounded-full bg-sky-500/10 px-2 py-0.5 text-[11px] font-medium text-sky-700 dark:text-sky-300">
+                    Awaiting Trophi
+                  </span>
+                ) : c.errored ? (
+                  <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] font-medium text-red-700 dark:text-red-300">
+                    Unavailable
+                  </span>
+                ) : c.pandadocDocumentId ? (
+                  <Button
+                    size="sm"
+                    onClick={() => start.mutate(c.kind)}
+                    disabled={start.isPending}
+                    className="bg-[hsl(var(--trophi-gold))] text-black hover:brightness-95"
+                  >
+                    {start.isPending && start.variables === c.kind
+                      ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Opening…</>
+                      : <><PenLine className="mr-2 h-4 w-4" /> Sign now</>}
+                  </Button>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Not ready yet</span>
                 )}
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {c.completed ? (
-                <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
-                  Signed
-                </span>
-              ) : c.errored ? (
-                <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] font-medium text-red-700 dark:text-red-300">
-                  Unavailable
-                </span>
-              ) : c.pandadocDocumentId ? (
-                <Button
-                  size="sm"
-                  onClick={() => start.mutate(c.kind)}
-                  disabled={start.isPending}
-                  className="bg-[hsl(var(--trophi-gold))] text-black hover:brightness-95"
-                >
-                  {start.isPending && start.variables === c.kind
-                    ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Opening…</>
-                    : <><PenLine className="mr-2 h-4 w-4" /> Sign now</>}
-                </Button>
-              ) : (
-                <span className="text-xs text-muted-foreground">Not ready yet</span>
-              )}
-            </div>
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ul>
 
       {data.anyErrored && (
@@ -112,9 +126,15 @@ export function SignContractPanel({ businessId }: Props) {
         </div>
       )}
 
+      {data.allClientSigned && !data.allComplete && !data.anyErrored && (
+        <div className="border-t bg-sky-500/5 px-4 py-3 text-sm text-sky-700 dark:text-sky-300">
+          You've signed everything. Trophi will countersign shortly — you don't need to do anything else.
+        </div>
+      )}
+
       {data.allComplete && (
         <div className="border-t bg-emerald-500/5 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">
-          All three documents signed. Your Trophi team has been notified.
+          All three documents fully executed. Your Trophi team has been notified.
         </div>
       )}
 
