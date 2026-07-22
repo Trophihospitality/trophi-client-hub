@@ -19,7 +19,7 @@ import { Step5PaymentStatusPanel } from '@/components/onboarding/Step5PaymentSta
 import { DocumentsSection } from '@/components/documents/DocumentsSection';
 import { CountersignPanel } from '@/components/onboarding/CountersignPanel';
 import { formatPhone } from '@/lib/phone';
-import { listClientUsersForBusinessFn, resendClientInviteFn } from '@/lib/client-users.functions';
+import { listClientUsersForBusinessFn, resendClientInviteFn, ensurePocInviteFn } from '@/lib/client-users.functions';
 import { InviteStatusCell } from '@/routes/_authenticated/users.client-users';
 import { RefreshCcw } from 'lucide-react';
 
@@ -307,6 +307,7 @@ function PortalAccessCard({ businessId }: { businessId: string }) {
   const qc = useQueryClient();
   const listFn = useServerFn(listClientUsersForBusinessFn);
   const resend = useServerFn(resendClientInviteFn);
+  const ensurePoc = useServerFn(ensurePocInviteFn);
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['client-users-for-business', businessId],
     queryFn: () => listFn({ data: { businessId } }),
@@ -320,6 +321,23 @@ function PortalAccessCard({ businessId }: { businessId: string }) {
     },
     onError: (e: any) => toast.error(e?.message ?? 'Failed'),
   });
+  const ensureM = useMutation({
+    mutationFn: () => ensurePoc({ data: { businessId } }),
+    onSuccess: (r: any) => {
+      qc.invalidateQueries({ queryKey: ['client-users-for-business', businessId] });
+      qc.invalidateQueries({ queryKey: ['client-users'] });
+      if (r?.ok) {
+        if (r.action === 'already_accepted') toast.success('POC has already accepted');
+        else if (r.action === 'already_invited_recent') toast.success('POC was just invited — check inbox');
+        else toast.success(`Invite sent to ${r.email ?? 'POC'}`);
+      } else {
+        toast.error(r?.error ?? r?.reason ?? 'Could not send invite');
+      }
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Failed'),
+  });
+
+  const noUsers = !isLoading && users.length === 0;
 
   return (
     <div className="rounded-xl border bg-card">
@@ -328,9 +346,23 @@ function PortalAccessCard({ businessId }: { businessId: string }) {
       </div>
       <ul className="divide-y divide-border">
         {isLoading && <li className="px-4 py-3 text-sm text-muted-foreground">Loading…</li>}
-        {!isLoading && users.length === 0 && (
-          <li className="px-4 py-3 text-sm text-muted-foreground">
-            No portal users yet. Add one from the Client Users admin page.
+        {noUsers && (
+          <li className="px-4 py-3 text-sm">
+            <div className="flex items-start justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/5 p-3">
+              <div className="min-w-0">
+                <div className="font-medium text-destructive">No portal invite sent yet</div>
+                <div className="mt-0.5 text-xs text-muted-foreground">
+                  The POC on file hasn't been invited. Send the invite now to unblock Step 3.
+                </div>
+              </div>
+              <button
+                onClick={() => ensureM.mutate()}
+                disabled={ensureM.isPending}
+                className="shrink-0 inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                <RefreshCcw className="h-3.5 w-3.5" /> {ensureM.isPending ? 'Sending…' : 'Send POC invite'}
+              </button>
+            </div>
           </li>
         )}
         {users.map((u) => {

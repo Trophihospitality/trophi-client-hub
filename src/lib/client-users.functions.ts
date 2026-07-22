@@ -570,3 +570,181 @@ export const listAuditLogFn = createServerFn({ method: 'GET' })
       createdAt: r.created_at,
     }));
   });
+
+// ============================================================
+// ensurePocInvite — idempotent, path-agnostic auto-provisioning
+// of a client_admin portal invite for the CRM point-of-contact.
+//
+// Guarantees: safe to call from any onboarding completion path
+// (normal, reconciliation, manual admin completion, future flows).
+// Behavior:
+//   - No POC info on client → returns { skipped: true, reason }
+//   - No client_users row yet for POC email → creates it as
+//     admin_full and sends the invite
+//   - Row exists but not accepted and not recently invited → resends
+//   - Row already accepted → no-op
+// Errors are recorded on the row (invite_last_error) and audit.
+// ============================================================
+export async function ensurePocInviteInternal(
+  admin: any,
+  businessId: string,
+  actorUserId: string | null,
+): Promise<{
+  ok: boolean;
+  action: 'created_and_invited' | 'reinvited' | 'already_accepted' | 'already_invited_recent' | 'skipped';
+  reason?: string;
+  email?: string;
+  rowId?: string;
+  error?: string;
+}> {
+  const { data: client, error: cErr } = await admin
+    .from('clients')
+    .select('business_id, contact_name, contact_email, contact_phone')
+    .eq('business_id', businessId)
+    .maybeSingle();
+  if (cErr || !client) return { ok: false, action: 'skipped', reason: 'client_not_found' };
+  if (!client.contact_email || !client.contact_name) {
+    return { ok: false, action: 'skipped', reason: 'missing_poc_contact' };
+  }
+
+  const email = String(client.contact_email).trim();
+  const nameParts = String(client.contact_name).trim().split(/\s+/);
+  const firstName = nameParts[0] || 'Client';
+  const lastName = nameParts.slice(1).join(' ') || 'Admin';
+  const nowIso = new Date().toISOString();
+
+  // Look for an existing client_users row for this business + email (case-insensitive)
+  const { data: existingRows } = await admin
+    .from('client_users')
+    .select('*')
+    .eq('business_id', businessId);
+  const existing = (existingRows ?? []).find(
+    (r: any) => r.email && r.email.toLowerCase() === email.toLowerCase(),
+  );
+
+  const sendInvite = async (rowId: string, forEmail: string) => {
+    const resp: any = await admin.auth.admin.inviteUserByEmail(forEmail, {
+      data: { name: `${firstName} ${lastName}`.trim(), client_user: true, business_id: businessId },
+      redirectTo: ACCEPT_INVITE_URL,
+    });
+    if (resp?.error) throw new Error(resp.error.message || `Invite failed (${resp.error.status ?? 'unknown'})`);
+    await admin.from('client_users').update({
+      invited_at: nowIso,
+      invite_sent_to: forEmail,
+      status: 'invited',
+      invite_last_error: null,
+      invite_last_attempt_at: nowIso,
+    } as any).eq('id', rowId);
+  };
+
+  const recordFail = async (rowId: string, msg: string) => {
+    await admin.from('client_users').update({
+      invite_last_error: msg,
+      invite_last_attempt_at: nowIso,
+    } as any).eq('id', rowId);
+    await writeAudit(admin, {
+      actorId: actorUserId, actorEmail: null,
+      action: 'client_user.auto_invite', entityType: 'client_user', entityId: rowId,
+      after: { sent_to: email }, metadata: { error: msg, source: 'ensure_poc_invite' }, success: false,
+    });
+    await writeClientActivity(admin, {
+      businessId, type: 'info_updated',
+      description: `Auto portal invite to ${email} FAILED: ${msg}`,
+      actor: 'System', actorId: actorUserId,
+    });
+  };
+
+  if (existing) {
+    if (existing.user_id || existing.status === 'active') {
+      return { ok: true, action: 'already_accepted', email, rowId: existing.id };
+    }
+    // If we invited within the last 5 minutes and no error, don't spam
+    const recentMs = 5 * 60 * 1000;
+    if (existing.invited_at && !existing.invite_last_error) {
+      const age = Date.now() - new Date(existing.invited_at).getTime();
+      if (age < recentMs) {
+        return { ok: true, action: 'already_invited_recent', email, rowId: existing.id };
+      }
+    }
+    try {
+      await sendInvite(existing.id, existing.email);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to send invite';
+      await recordFail(existing.id, msg);
+      return { ok: false, action: 'reinvited', email, rowId: existing.id, error: msg };
+    }
+    await writeAudit(admin, {
+      actorId: actorUserId, actorEmail: null,
+      action: 'client_user.auto_invite', entityType: 'client_user', entityId: existing.id,
+      after: { sent_to: email }, metadata: { source: 'ensure_poc_invite', reason: 'existing_unaccepted' },
+    });
+    await writeClientActivity(admin, {
+      businessId, type: 'info_updated',
+      description: `Auto portal invite re-sent to ${email} (${firstName} ${lastName})`,
+      actor: 'System', actorId: actorUserId,
+    });
+    return { ok: true, action: 'reinvited', email, rowId: existing.id };
+  }
+
+  // Create a fresh client_users row for the POC
+  const { data: inserted, error: insErr } = await admin.from('client_users').insert({
+    business_id: businessId,
+    first_name: firstName,
+    last_name: lastName,
+    email,
+    phone: client.contact_phone || null,
+    location_ids: [],
+    permission_level: 'admin_full',
+    status: 'invited',
+    invited_by: actorUserId,
+    invited_at: nowIso,
+    invite_sent_to: email,
+  } as any).select('*').single();
+  if (insErr || !inserted) {
+    return { ok: false, action: 'skipped', reason: insErr?.message || 'insert_failed' };
+  }
+  try {
+    await sendInvite(inserted.id, email);
+  } catch (e: any) {
+    const msg = e?.message || 'Failed to send invite';
+    await recordFail(inserted.id, msg);
+    return { ok: false, action: 'created_and_invited', email, rowId: inserted.id, error: msg };
+  }
+  await writeAudit(admin, {
+    actorId: actorUserId, actorEmail: null,
+    action: 'client_user.auto_invite', entityType: 'client_user', entityId: inserted.id,
+    after: { sent_to: email, business_id: businessId, permission: 'admin_full' },
+    metadata: { source: 'ensure_poc_invite', reason: 'new_row' },
+  });
+  await writeClientActivity(admin, {
+    businessId, type: 'info_updated',
+    description: `Portal invite auto-sent to POC ${email} (${firstName} ${lastName}) as admin`,
+    actor: 'System', actorId: actorUserId,
+  });
+  return { ok: true, action: 'created_and_invited', email, rowId: inserted.id };
+}
+
+// Server-fn wrapper — usable from staff UI (e.g. a "Send POC invite now"
+// button on the Step 3 panel) as an admin fallback for legacy cases.
+export const ensurePocInviteFn = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ businessId: z.string().min(1) }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    // Authz: only staff who can act on this client
+    const { data: roles } = await supabase.from('user_roles').select('role').eq('user_id', userId);
+    const roleSet = new Set((roles ?? []).map((r: any) => r.role));
+    const isPriv = roleSet.has('admin') || roleSet.has('manager');
+    if (!isPriv) {
+      const { data: client } = await supabase.from('clients')
+        .select('sales_person_id').eq('business_id', data.businessId).maybeSingle();
+      const { data: rec } = await supabase.from('onboarding_records')
+        .select('specialist_id, account_manager_id').eq('business_id', data.businessId).maybeSingle();
+      const owner = client?.sales_person_id === userId;
+      const spec = rec?.specialist_id === userId;
+      const am = rec?.account_manager_id === userId;
+      if (!owner && !spec && !am) throw new Error('Forbidden');
+    }
+    const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+    return ensurePocInviteInternal(supabaseAdmin, data.businessId, userId);
+  });
