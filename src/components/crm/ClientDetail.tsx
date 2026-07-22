@@ -288,6 +288,7 @@ export default function ClientDetail() {
       <div className="flex gap-1 border-b border-border">
         <TabButton active={tab === 'summary'} onClick={() => setTab('summary')}>Client Summary</TabButton>
         <TabButton active={tab === 'contact'} onClick={() => setTab('contact')}>Contact Log</TabButton>
+        <TabButton active={tab === 'documents'} onClick={() => setTab('documents')}>Documents</TabButton>
         <TabButton active={tab === 'attachments'} onClick={() => setTab('attachments')}>Attachments</TabButton>
         <TabButton active={tab === 'activity'} onClick={() => setTab('activity')}>Activity</TabButton>
       </div>
