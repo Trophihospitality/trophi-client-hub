@@ -23,6 +23,8 @@ export interface AppUser {
   mentorId: string | null;
   currentRoleStartedAt: string | null;
   isActive: boolean;
+  avatarPath: string | null;
+  avatarUrl: string | null;
 }
 
 function highestRole(rows: { role: string }[]): AppRole {
