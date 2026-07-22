@@ -253,7 +253,7 @@ export function Step1ContractBundle({ businessId, canEdit, onGenerated }: Props)
             <Button
               size="sm"
               variant="outline"
-              disabled={!canEdit || !data.ready || regen.isPending || gen.isPending}
+              disabled={!canEdit || !data.ready || regen.isPending || gen.isPending || recon.isPending}
               onClick={() => {
                 if (confirm('This will delete all current PandaDoc drafts for this client and create fresh ones using the CURRENT contact email. Continue?')) {
                   regen.mutate();
@@ -267,7 +267,7 @@ export function Step1ContractBundle({ businessId, canEdit, onGenerated }: Props)
           )}
           <Button
             size="sm"
-            disabled={!canEdit || !data.ready || gen.isPending || regen.isPending}
+            disabled={!canEdit || !data.ready || gen.isPending || regen.isPending || recon.isPending}
             onClick={() => gen.mutate()}
           >
             {gen.isPending ? (
