@@ -293,12 +293,6 @@ export const setUserActiveFn = createServerFn({ method: 'POST' })
     return { ok: true };
   });
 
-export interface RoleHistoryEntry {
-  id: string;
-  role: AppRole;
-  startedOn: string;
-  endedOn: string | null;
-}
 
 export interface RoleHistoryEntry {
   id: string;
