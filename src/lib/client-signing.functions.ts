@@ -55,9 +55,31 @@ async function fetchRecipientState(pandadocDocId: string) {
   return {
     clientSigned: signed(client) || status === 'document.completed',
     staffSigned: signed(staff) || status === 'document.completed',
+    clientEmail: (client?.email as string | undefined) ?? null,
     staffEmail: (staff?.email as string | undefined) ?? null,
     status,
   };
+}
+
+function emailsMatch(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+async function markContractErrored(
+  supabaseAdmin: any,
+  businessId: string,
+  kind: BundleKind,
+  currentMetadata: any,
+  errorMessage: string,
+  extra: Record<string, unknown> = {},
+) {
+  const meta = { ...(currentMetadata ?? {}), ...extra, error: errorMessage };
+  await supabaseAdmin.from('client_contracts').update({
+    status: 'error',
+    metadata: meta,
+    updated_at: new Date().toISOString(),
+  }).eq('business_id', businessId).eq('kind', kind);
 }
 
 export const getClientContractsFn = createServerFn({ method: 'GET' })
@@ -144,19 +166,53 @@ async function ensureSendableAndCreateSession(
     current = await pandadoc.waitForDraft(row.pandadoc_document_id);
   }
   if (current === 'document.draft' || current === 'draft' || current === 'document.uploaded') {
-    await pandadoc.sendDocument(row.pandadoc_document_id, {
-      subject: 'Trophi Hospitality — in-portal signing',
-      message: 'Signing happens inside the Trophi client portal. You should not receive this email.',
-      silent: true,
-    });
-    await supabaseAdmin.from('client_contracts').update({
-      status: 'document.sent',
-      updated_at: new Date().toISOString(),
-    }).eq('business_id', businessId).eq('kind', kind);
+    try {
+      await pandadoc.sendDocument(row.pandadoc_document_id, {
+        subject: 'Trophi Hospitality — in-portal signing',
+        message: 'Signing happens inside the Trophi client portal. You should not receive this email.',
+        silent: true,
+      });
+      await supabaseAdmin.from('client_contracts').update({
+        status: 'document.sent',
+        updated_at: new Date().toISOString(),
+      }).eq('business_id', businessId).eq('kind', kind);
+    } catch (err: any) {
+      // 4xx from send is terminal — auth/config refusal, not a race.
+      // Mark contract errored so client sees "Unavailable — Trophi is
+      // fixing it" instead of the raw provider text, and surface a
+      // sanitized message to the caller. Only classify true 4xx as
+      // terminal; anything else falls through so transient failures
+      // stay retryable.
+      if (err?.terminal === true) {
+        await markContractErrored(
+          supabaseAdmin, businessId, kind, row.metadata,
+          `PandaDoc refused to send this document (${err.status ?? '4xx'}): ${err.message ?? 'Forbidden'}. Trophi must resolve this before signing can proceed.`,
+          { last_error_status: err.status ?? null },
+        );
+        throw new Error(
+          'This document is not ready to sign yet — Trophi is resolving a document setup issue and will notify you as soon as it can be signed.',
+        );
+      }
+      throw err;
+    }
   }
 
-  const session = await pandadoc.createSession(row.pandadoc_document_id, recipientEmail, 900);
-  return { sessionUrl: `https://app.pandadoc.com/s/${session.id}`, expiresAt: session.expires_at };
+  try {
+    const session = await pandadoc.createSession(row.pandadoc_document_id, recipientEmail, 900);
+    return { sessionUrl: `https://app.pandadoc.com/s/${session.id}`, expiresAt: session.expires_at };
+  } catch (err: any) {
+    if (err?.terminal === true) {
+      await markContractErrored(
+        supabaseAdmin, businessId, kind, row.metadata,
+        `PandaDoc refused to open a signing session (${err.status ?? '4xx'}): ${err.message ?? 'Forbidden'}.`,
+        { last_error_status: err.status ?? null },
+      );
+      throw new Error(
+        'This document is not ready to sign yet — Trophi is resolving a document setup issue and will notify you as soon as it can be signed.',
+      );
+    }
+    throw err;
+  }
 }
 
 export const createSigningSessionFn = createServerFn({ method: 'POST' })
@@ -189,6 +245,23 @@ export const createSigningSessionFn = createServerFn({ method: 'POST' })
     }
 
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+
+    // Identity drift guard — the document's PandaDoc recipient must
+    // match the client's current POC email. If it doesn't (POC changed
+    // after generation), mark the contract errored so Trophi sees a
+    // clear "documents need regeneration" state instead of the client
+    // hitting a raw PandaDoc failure at session time.
+    if (!emailsMatch(rec.clientEmail, client.contact_email)) {
+      await markContractErrored(
+        supabaseAdmin, data.businessId, data.kind, row.metadata,
+        `Signer identity drift — document was generated for ${rec.clientEmail ?? 'unknown'} but the current POC is ${client.contact_email}. Void and regenerate this bundle.`,
+        { pandadoc_recipient_email: rec.clientEmail, current_poc_email: client.contact_email },
+      );
+      throw new Error(
+        'This document was prepared for a different contact and needs to be regenerated by Trophi before you can sign.',
+      );
+    }
+
     return ensureSendableAndCreateSession(supabaseAdmin, row as any, data.businessId, data.kind, client.contact_email);
   });
 
