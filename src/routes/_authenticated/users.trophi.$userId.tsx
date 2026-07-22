@@ -11,7 +11,8 @@ import { getLeaderboardDataFn } from '@/lib/awards.functions';
 import { useAuth } from '@/store/userStore';
 import { formatPhone, formatPhoneInput } from '@/lib/phone';
 import { AvatarCircle } from '@/components/ui/avatar-circle';
-import { cropToSquareJpeg, uploadAvatarBlob } from '@/lib/avatar';
+import { uploadAvatarBlob, validateAvatarFile, AVATAR_ACCEPT } from '@/lib/avatar';
+import { AvatarCropDialog } from '@/components/ui/avatar-crop-dialog';
 import { ArrowLeft, Pencil, X, Check, Trophy, Upload } from 'lucide-react';
 
 export const Route = createFileRoute('/_authenticated/users/trophi/$userId')({
