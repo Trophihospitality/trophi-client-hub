@@ -438,21 +438,24 @@ function CrmReport({ data, filters }: { data: ReportData; filters: Filters }) {
     else if (h.toStatus === 'Signed') signedBiz.add(h.businessId);
   }
 
-  const bucketMetrics = (biz: Set<string>) => {
+  const bucketMetrics = (biz: Set<string>, useSignedSnapshot: boolean) => {
     let locations = 0;
     let value = 0;
     for (const id of biz) {
       const c = clientsByBiz.get(id);
       if (!c) continue;
-      locations += c.activeLocations;
-      value += (c.budget ?? 0) * c.activeLocations;
+      const locs = useSignedSnapshot
+        ? (c.signedActiveLocations ?? c.activeLocations)
+        : c.activeLocations;
+      locations += locs;
+      value += (c.budget ?? 0) * locs;
     }
     return { brands: biz.size, locations, value };
   };
 
-  const L = bucketMetrics(leadBiz);
-  const A = bucketMetrics(approvedBiz);
-  const S = bucketMetrics(signedBiz);
+  const L = bucketMetrics(leadBiz, false);
+  const A = bucketMetrics(approvedBiz, false);
+  const S = bucketMetrics(signedBiz, true);
 
   const exportFunnel = () => {
     const rows = [
