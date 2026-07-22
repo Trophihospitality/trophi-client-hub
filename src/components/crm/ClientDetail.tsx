@@ -271,6 +271,19 @@ export default function ClientDetail() {
         </div>
       )}
 
+      {pocSync?.emailMismatch && (
+        <div className="ml-12 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-900 dark:text-amber-200">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          <div>
+            <strong>Contact email differs from portal login.</strong> CRM POC email is{' '}
+            <code className="font-mono text-xs">{pocSync.crmEmail}</code>; {pocSync.portalUserName || 'the portal user'} signs in as{' '}
+            <code className="font-mono text-xs">{pocSync.portalEmail}</code>. This is expected once a user has accepted — they own their profile.
+          </div>
+        </div>
+      )}
+
+
+
       {/* Tabs */}
       <div className="flex gap-1 border-b border-border">
         <TabButton active={tab === 'summary'} onClick={() => setTab('summary')}>Client Summary</TabButton>
