@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { AddLocationDialog } from '@/components/crm/AddLocationDialog';
+import { DocumentsSection } from '@/components/documents/DocumentsSection';
 
 // ============================================================
 // CLIENT DETAIL
