@@ -1,3 +1,4 @@
+import { useState, type ReactNode } from 'react';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
@@ -38,6 +39,7 @@ function OnboardingDetailPage() {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const qc = useQueryClient();
+  const [tab, setTab] = useState<'checklist' | 'documents'>('checklist');
 
   const getDetail = useServerFn(getOnboardingDetailFn);
   const listSpec = useServerFn(listSpecialistCandidatesFn);
@@ -117,98 +119,104 @@ function OnboardingDetailPage() {
       </div>
       <div className="gold-rule w-24" />
 
+      <div className="flex gap-1 border-b border-border">
+        <TabButton active={tab === 'checklist'} onClick={() => setTab('checklist')}>Step Checklist</TabButton>
+        <TabButton active={tab === 'documents'} onClick={() => setTab('documents')}>Documents</TabButton>
+      </div>
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-4">
-          {data.currentStep === 1 && data.status !== 'live' && (
-            <Step1ContractBundle
-              businessId={data.businessId}
-              canEdit={
-                !!profile &&
-                (profile.role === 'admin' ||
-                  profile.role === 'manager' ||
-                  profile.id === data.salesPersonId)
-              }
-            />
-          )}
-          {data.currentStep >= 4 && data.status !== 'live' && (
-            <CountersignPanel businessId={data.businessId} />
-          )}
-          <div className="rounded-xl border bg-card">
-            <div className="border-b border-border px-4 py-3 text-sm font-semibold">Step checklist</div>
-            <ul className="divide-y divide-border">
-              {data.steps.map((s) => {
-                const isAssign6 = s.stepNumber === 6 && s.status === 'in_progress' && !data.specialistId;
-                const isAssign13 = s.stepNumber === 13 && s.status === 'in_progress' && !data.accountManagerId;
-                const needsAssignment = isAssign6 || isAssign13;
-                return (
-                  <li key={s.stepNumber} className="flex items-start gap-3 px-4 py-3">
-                    <div className="pt-0.5">
-                      {s.status === 'complete' ? <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                        : s.status === 'in_progress' ? <Clock className="h-5 w-5 text-[hsl(var(--trophi-gold))]" />
-                        : <Lock className="h-5 w-5 text-muted-foreground/50" />}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-mono text-muted-foreground">#{s.stepNumber}</span>
-                        <span className="font-medium">{s.name}</span>
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                          · {s.actor.replace('_', ' ')}
-                          {s.clientVisible && ' · client-visible'}
-                        </span>
-                      </div>
-                      {s.status === 'in_progress' && s.startedAt && (
-                        <div className="text-xs text-muted-foreground mt-0.5">Started {formatDate(s.startedAt)}</div>
-                      )}
-                      {s.status === 'complete' && s.completedAt && (
-                        <div className="text-xs text-muted-foreground mt-0.5">Completed {formatDate(s.completedAt)}</div>
-                      )}
-
-                      {isAssign6 && (
-                        <div className="mt-2 flex items-center gap-2">
-                          <Select onValueChange={(v) => assignSpecMut.mutate(v)}>
-                            <SelectTrigger className="h-8 w-72"><SelectValue placeholder="Assign onboarding specialist…" /></SelectTrigger>
-                            <SelectContent>
-                              {(specCandidates.data ?? []).map((c) => (
-                                <SelectItem key={c.id} value={c.id}>
-                                  {c.name} · {c.activeCount} active
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+          {tab === 'checklist' && (
+            <>
+              {data.currentStep === 1 && data.status !== 'live' && (
+                <Step1ContractBundle
+                  businessId={data.businessId}
+                  canEdit={
+                    !!profile &&
+                    (profile.role === 'admin' ||
+                      profile.role === 'manager' ||
+                      profile.id === data.salesPersonId)
+                  }
+                />
+              )}
+              {data.currentStep >= 4 && data.status !== 'live' && (
+                <CountersignPanel businessId={data.businessId} />
+              )}
+              <div className="rounded-xl border bg-card">
+                <div className="border-b border-border px-4 py-3 text-sm font-semibold">Step checklist</div>
+                <ul className="divide-y divide-border">
+                  {data.steps.map((s) => {
+                    const isAssign6 = s.stepNumber === 6 && s.status === 'in_progress' && !data.specialistId;
+                    const isAssign13 = s.stepNumber === 13 && s.status === 'in_progress' && !data.accountManagerId;
+                    const needsAssignment = isAssign6 || isAssign13;
+                    return (
+                      <li key={s.stepNumber} className="flex items-start gap-3 px-4 py-3">
+                        <div className="pt-0.5">
+                          {s.status === 'complete' ? <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                            : s.status === 'in_progress' ? <Clock className="h-5 w-5 text-[hsl(var(--trophi-gold))]" />
+                            : <Lock className="h-5 w-5 text-muted-foreground/50" />}
                         </div>
-                      )}
-                      {isAssign13 && (
-                        <div className="mt-2 flex items-center gap-2">
-                          <Select onValueChange={(v) => assignAMMut.mutate(v)}>
-                            <SelectTrigger className="h-8 w-72"><SelectValue placeholder="Assign account manager…" /></SelectTrigger>
-                            <SelectContent>
-                              {(amCandidates.data ?? []).map((c) => (
-                                <SelectItem key={c.id} value={c.id}>
-                                  {c.name} · {c.activeCount} active
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-                    </div>
-                    {s.status === 'in_progress' && canCompleteStep(s.actor) && !needsAssignment && (
-                      <Button size="sm" onClick={() => completeMut.mutate(s.stepNumber)} disabled={completeMut.isPending}>
-                        Mark complete
-                      </Button>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono text-muted-foreground">#{s.stepNumber}</span>
+                            <span className="font-medium">{s.name}</span>
+                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                              · {s.actor.replace('_', ' ')}
+                              {s.clientVisible && ' · client-visible'}
+                            </span>
+                          </div>
+                          {s.status === 'in_progress' && s.startedAt && (
+                            <div className="text-xs text-muted-foreground mt-0.5">Started {formatDate(s.startedAt)}</div>
+                          )}
+                          {s.status === 'complete' && s.completedAt && (
+                            <div className="text-xs text-muted-foreground mt-0.5">Completed {formatDate(s.completedAt)}</div>
+                          )}
 
-          <div className="rounded-xl border bg-card">
-            <div className="border-b border-border px-4 py-3 text-sm font-semibold">Documents</div>
-            <div className="p-4">
-              <DocumentsSection businessId={data.businessId} mode="staff" />
-            </div>
-          </div>
+                          {isAssign6 && (
+                            <div className="mt-2 flex items-center gap-2">
+                              <Select onValueChange={(v) => assignSpecMut.mutate(v)}>
+                                <SelectTrigger className="h-8 w-72"><SelectValue placeholder="Assign onboarding specialist…" /></SelectTrigger>
+                                <SelectContent>
+                                  {(specCandidates.data ?? []).map((c) => (
+                                    <SelectItem key={c.id} value={c.id}>
+                                      {c.name} · {c.activeCount} active
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+                          {isAssign13 && (
+                            <div className="mt-2 flex items-center gap-2">
+                              <Select onValueChange={(v) => assignAMMut.mutate(v)}>
+                                <SelectTrigger className="h-8 w-72"><SelectValue placeholder="Assign account manager…" /></SelectTrigger>
+                                <SelectContent>
+                                  {(amCandidates.data ?? []).map((c) => (
+                                    <SelectItem key={c.id} value={c.id}>
+                                      {c.name} · {c.activeCount} active
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+                        </div>
+                        {s.status === 'in_progress' && canCompleteStep(s.actor) && !needsAssignment && (
+                          <Button size="sm" onClick={() => completeMut.mutate(s.stepNumber)} disabled={completeMut.isPending}>
+                            Mark complete
+                          </Button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </>
+          )}
+
+          {tab === 'documents' && (
+            <DocumentsSection businessId={data.businessId} mode="staff" />
+          )}
         </div>
 
         <div className="space-y-4">
@@ -246,6 +254,21 @@ function OnboardingDetailPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
+        active
+          ? 'border-[hsl(var(--trophi-gold))] text-foreground'
+          : 'border-transparent text-muted-foreground hover:text-foreground'
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
