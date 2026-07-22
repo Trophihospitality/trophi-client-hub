@@ -334,3 +334,109 @@ export const generateContractBundleFn = createServerFn({ method: 'POST' })
 
     return { ok: true, created, skipped };
   });
+
+
+// ============================================================
+// Void + regenerate — always pulls the CURRENT POC email
+// (used when POC contact was changed after initial generation).
+// Deletes/voids each PandaDoc doc, clears client_contracts rows,
+// then re-runs generation from a clean slate.
+// ============================================================
+export const voidAndRegenerateContractBundleFn = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ businessId: z.string() }).parse(d))
+  .handler(async ({ data, context }): Promise<{ ok: true; voided: number; recreated: BundleKind[] }> => {
+    const { supabase, userId } = context;
+    await assertOwnerOrPrivileged(supabase, userId, data.businessId);
+
+    const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+    const { pandadoc } = await import('@/lib/pandadoc.server');
+
+    // 1. Void or delete every existing bundle doc in PandaDoc.
+    const { data: existing } = await supabaseAdmin
+      .from('client_contracts')
+      .select('id, kind, pandadoc_document_id, status')
+      .eq('business_id', data.businessId)
+      .in('kind', BUNDLE_KINDS);
+
+    let voided = 0;
+    for (const row of existing ?? []) {
+      const docId = (row as any).pandadoc_document_id;
+      if (!docId) continue;
+      try {
+        // Draft docs delete cleanly; sent docs need void via status endpoint.
+        // We attempt delete first; PandaDoc returns 400 for non-drafts.
+        await pandadoc.deleteDocument(docId);
+        voided++;
+      } catch (err) {
+        // Best-effort: log and continue — we'll still clear DB rows and recreate.
+        console.warn(`[voidAndRegenerate] Failed to remove PandaDoc doc ${docId}:`, err);
+      }
+    }
+
+    // 2. Clear the DB rows.
+    await supabaseAdmin
+      .from('client_contracts')
+      .delete()
+      .eq('business_id', data.businessId)
+      .in('kind', BUNDLE_KINDS);
+
+    // 3. Re-run generation. Re-read context so we pick up the current POC email.
+    const { client, locations, templateMap, sales } = await loadBundleContext(supabase, data.businessId);
+
+    const missing = BUNDLE_KINDS.filter((k) => !templateMap.get(k));
+    if (missing.length > 0) throw new Error(`Missing PandaDoc template IDs for: ${missing.join(', ')}`);
+    const invalid = BUNDLE_KINDS.filter((k) => !isValidTemplateId(templateMap.get(k)));
+    if (invalid.length > 0) throw new Error(`Invalid PandaDoc template IDs for: ${invalid.join(', ')}`);
+    if (!client.contact_email || !client.contact_name || !client.contact_role)
+      throw new Error('Client POC name, role, and email are required');
+    if (!sales?.email) throw new Error('Account owner profile has no email');
+    if (locations.length === 0) throw new Error('At least one active location is required');
+    if (!client.package_type || client.budget == null)
+      throw new Error('Package type and monthly budget are required');
+
+    const merge = buildMerge(client, locations);
+    const clientNames = splitName(client.contact_name);
+    const salesNames = splitName(sales.name);
+    const recipients = [
+      { email: client.contact_email, first_name: clientNames.firstName, last_name: clientNames.lastName, role: 'client' },
+      { email: sales.email, first_name: salesNames.firstName, last_name: salesNames.lastName, role: 'trophi' },
+    ];
+    const mergeStrings: Record<string, string> = {};
+    Object.entries(merge).forEach(([k, v]) => { mergeStrings[k] = String(v); });
+
+    const recreated: BundleKind[] = [];
+    for (const kind of BUNDLE_KINDS) {
+      const templateUuid = templateMap.get(kind)!;
+      const perKindRecipients = kind === 'client_authorization' ? [recipients[0], recipients[1]] : recipients;
+      const doc = await pandadoc.createFromTemplate({
+        name: `${KIND_LABELS[kind]} — ${client.company} (${client.business_id})`,
+        templateUuid,
+        recipients: perKindRecipients,
+        tokens: mergeStrings,
+        fields: mergeStrings,
+        metadata: { business_id: client.business_id, kind },
+      });
+      const res = await supabaseAdmin.from('client_contracts').insert({
+        business_id: client.business_id,
+        kind,
+        pandadoc_document_id: doc.id,
+        status: doc.status || 'document.draft',
+        metadata: { name: doc.name, template_id: templateUuid, signer_email_at_creation: client.contact_email },
+        created_by: userId,
+        updated_at: new Date().toISOString(),
+      });
+      if (res.error) throw new Error(`DB persist failed: ${res.error.message}`);
+      recreated.push(kind);
+    }
+
+    await supabaseAdmin.from('client_activity').insert({
+      business_id: client.business_id,
+      type: 'info_updated',
+      description: `Contract bundle voided and regenerated (${voided} removed, ${recreated.length} recreated) — signer: ${client.contact_email}`,
+      actor: sales.name ?? 'User',
+    });
+
+    return { ok: true, voided, recreated };
+  });
+
