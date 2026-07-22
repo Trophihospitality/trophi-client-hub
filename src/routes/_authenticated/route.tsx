@@ -76,28 +76,42 @@ function AuthedLayout() {
             <>
               <div className="pt-4 pb-1 px-3 text-[10px] uppercase tracking-wider text-white/30">Admin</div>
               {(() => {
-                const items = [
-                  { to: '/reports', label: 'Reports', icon: LineChart, adminOnly: false },
-                  ...(profile?.role === 'admin' ? ADMIN_NAV.map((n) => ({ ...n, adminOnly: true })) : []),
-                ];
-                return items.map(({ to, label, icon: Icon }) => {
-                  const active = pathname.startsWith(to);
-                  return (
-                    <Link key={to} to={to}
-                      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
-                        active
-                          ? 'bg-white/10 text-white font-medium border-l-2 border-[hsl(var(--trophi-gold))]'
-                          : 'text-white/60 hover:bg-white/5 hover:text-white'
-                      }`}
-                    >
-                      <Icon className="h-4 w-4" />{label}
-                    </Link>
-                  );
-                });
+                const active = pathname.startsWith('/reports');
+                return (
+                  <Link to="/reports"
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
+                      active
+                        ? 'bg-white/10 text-white font-medium border-l-2 border-[hsl(var(--trophi-gold))]'
+                        : 'text-white/60 hover:bg-white/5 hover:text-white'
+                    }`}
+                  >
+                    <LineChart className="h-4 w-4" />Reports
+                  </Link>
+                );
               })()}
+              {profile?.role === 'admin' && (
+                <>
+                  <UserMgmtGroup pathname={pathname} />
+                  {ADMIN_NAV.map(({ to, label, icon: Icon }) => {
+                    const active = pathname.startsWith(to);
+                    return (
+                      <Link key={to} to={to}
+                        className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
+                          active
+                            ? 'bg-white/10 text-white font-medium border-l-2 border-[hsl(var(--trophi-gold))]'
+                            : 'text-white/60 hover:bg-white/5 hover:text-white'
+                        }`}
+                      >
+                        <Icon className="h-4 w-4" />{label}
+                      </Link>
+                    );
+                  })}
+                </>
+              )}
             </>
           )}
         </nav>
+
         <div className="border-t border-white/10 px-3 py-3 space-y-2">
           <div className="px-2 text-[10px] uppercase tracking-wider text-white/40">Signed in as</div>
           <div className="px-2 text-sm text-white truncate">{profile?.name ?? '…'}</div>
