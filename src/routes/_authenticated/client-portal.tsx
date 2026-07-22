@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, Clock, Lock, Circle } from 'lucide-react';
 import { SignContractPanel } from '@/components/client-portal/SignContractPanel';
+import { PaymentSetupPanel } from '@/components/client-portal/PaymentSetupPanel';
 
 export const Route = createFileRoute('/_authenticated/client-portal')({
   ssr: false,
@@ -104,6 +105,11 @@ function ClientPortalPage() {
                     {isCurrent && d.step_number === 4 && (
                       <div className="mt-3">
                         <SignContractPanel businessId={client!.businessId} />
+                      </div>
+                    )}
+                    {isCurrent && d.step_number === 5 && (
+                      <div className="mt-3">
+                        <PaymentSetupPanel businessId={client!.businessId} />
                       </div>
                     )}
                   </div>

@@ -14,6 +14,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Step1ContractBundle } from '@/components/onboarding/Step1ContractBundle';
+import { Step2PaymentScopePanel } from '@/components/onboarding/Step2PaymentScopePanel';
+import { Step5PaymentStatusPanel } from '@/components/onboarding/Step5PaymentStatusPanel';
 import { DocumentsSection } from '@/components/documents/DocumentsSection';
 import { CountersignPanel } from '@/components/onboarding/CountersignPanel';
 import { formatPhone } from '@/lib/phone';
@@ -139,8 +141,36 @@ function OnboardingDetailPage() {
                   }
                 />
               )}
-              {data.currentStep >= 4 && data.status !== 'live' && (
+              {data.currentStep === 2 && data.status !== 'live' && (
+                <Step2PaymentScopePanel
+                  businessId={data.businessId}
+                  activeLocations={data.activeLocations}
+                  currentScope={data.paymentScope}
+                  scopeRecordedAt={data.paymentScopeRecordedAt}
+                  canEdit={
+                    !!profile &&
+                    (profile.role === 'admin' ||
+                      profile.role === 'manager' ||
+                      profile.id === data.salesPersonId)
+                  }
+                />
+              )}
+              {data.currentStep >= 4 && data.currentStep < 5 && data.status !== 'live' && (
                 <CountersignPanel businessId={data.businessId} />
+              )}
+              {data.currentStep >= 5 && data.status !== 'live' && (
+                <>
+                  <CountersignPanel businessId={data.businessId} />
+                  <Step5PaymentStatusPanel
+                    businessId={data.businessId}
+                    canManage={
+                      !!profile &&
+                      (profile.role === 'admin' ||
+                        profile.role === 'manager' ||
+                        profile.id === data.salesPersonId)
+                    }
+                  />
+                </>
               )}
               <div className="rounded-xl border bg-card">
                 <div className="border-b border-border px-4 py-3 text-sm font-semibold">Step checklist</div>
