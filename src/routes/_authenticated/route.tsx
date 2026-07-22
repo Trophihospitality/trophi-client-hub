@@ -150,8 +150,29 @@ function ClientLayout({ pathname, signOut, displayName }: { pathname: string; si
   );
 }
 
+function UnknownIdentity({ email, signOut }: { email: string | null; signOut: () => void }) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[hsl(var(--background))] px-6">
+      <div className="max-w-md w-full rounded-2xl border border-border bg-card p-8 text-center shadow-sm">
+        <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-[hsl(var(--trophi-ink))] flex items-center justify-center">
+          <ShieldCheck className="h-6 w-6 text-[hsl(var(--trophi-gold))]" />
+        </div>
+        <h1 className="text-lg font-semibold mb-2">Account not configured</h1>
+        {email && <p className="text-sm text-muted-foreground mb-1">Signed in as <span className="font-medium">{email}</span>.</p>}
+        <p className="text-sm text-muted-foreground mb-6">
+          This account has no assigned access. Please contact Trophi Hospitality to have your access provisioned.
+        </p>
+        <button onClick={signOut}
+          className="inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--trophi-ink))] px-4 py-2 text-sm text-white hover:opacity-90">
+          <LogOut className="h-4 w-4" /> Sign out
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function AuthedLayout() {
-  const { profile, client, isClient, isStaff, loading, signOut } = useAuth();
+  const { user, profile, client, isClient, isStaff, loading, signOut } = useAuth();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   if (loading) {
@@ -162,6 +183,18 @@ function AuthedLayout() {
   if (isClient && !isStaff) {
     const displayName = [client?.firstName, client?.lastName].filter(Boolean).join(' ') || 'Client';
     return <ClientLayout pathname={pathname} signOut={signOut} displayName={displayName} />;
+  }
+
+  // Default-deny: signed in but neither staff nor client. Never render staff chrome.
+  if (!isStaff) {
+    if (typeof window !== 'undefined') {
+      const key = `unknown-identity-logged:${user?.id ?? 'anon'}`;
+      if (!sessionStorage.getItem(key)) {
+        sessionStorage.setItem(key, '1');
+        console.warn('[auth] unknown identity — no staff role and no client_users row', { userId: user?.id, email: user?.email });
+      }
+    }
+    return <UnknownIdentity email={user?.email ?? null} signOut={signOut} />;
   }
 
   return (
