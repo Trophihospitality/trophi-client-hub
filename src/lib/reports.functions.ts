@@ -116,6 +116,8 @@ export const getReportDataFn = createServerFn({ method: 'GET' })
       businessId: c.business_id, company: c.company, journeyStatus: c.journey_status,
       salesPersonId: c.sales_person_id, budget: c.budget !== null ? Number(c.budget) : null,
       activeLocations: activeLocByBiz.get(c.business_id) ?? 0,
+      signedActiveLocations: c.signed_active_locations !== null && c.signed_active_locations !== undefined
+        ? Number(c.signed_active_locations) : null,
       createdAt: c.created_at, approvedAt: c.approved_at ?? null, signedAt: c.signed_at ?? null,
     }));
 
