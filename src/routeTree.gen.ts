@@ -37,6 +37,7 @@ import { Route as LovableEmailAuthWebhookRouteImport } from './routes/lovable/em
 import { Route as LovableEmailAuthPreviewRouteImport } from './routes/lovable/email/auth/preview'
 import { Route as ApiPublicHooksTestOnboardingEmailRouteImport } from './routes/api/public/hooks/test-onboarding-email'
 import { Route as ApiPublicHooksStripeRouteImport } from './routes/api/public/hooks/stripe'
+import { Route as ApiPublicHooksReinvitePaisansRouteImport } from './routes/api/public/hooks/reinvite-paisans'
 import { Route as ApiPublicHooksPandadocRouteImport } from './routes/api/public/hooks/pandadoc'
 import { Route as ApiPublicHooksOnboardingRemindersRouteImport } from './routes/api/public/hooks/onboarding-reminders'
 import { Route as ApiPublicHooksBackfillContractsRouteImport } from './routes/api/public/hooks/backfill-contracts'
@@ -194,6 +195,12 @@ const ApiPublicHooksStripeRoute = ApiPublicHooksStripeRouteImport.update({
   path: '/api/public/hooks/stripe',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksReinvitePaisansRoute =
+  ApiPublicHooksReinvitePaisansRouteImport.update({
+    id: '/api/public/hooks/reinvite-paisans',
+    path: '/api/public/hooks/reinvite-paisans',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksPandadocRoute = ApiPublicHooksPandadocRouteImport.update({
   id: '/api/public/hooks/pandadoc',
   path: '/api/public/hooks/pandadoc',
@@ -244,6 +251,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/backfill-contracts': typeof ApiPublicHooksBackfillContractsRoute
   '/api/public/hooks/onboarding-reminders': typeof ApiPublicHooksOnboardingRemindersRoute
   '/api/public/hooks/pandadoc': typeof ApiPublicHooksPandadocRoute
+  '/api/public/hooks/reinvite-paisans': typeof ApiPublicHooksReinvitePaisansRoute
   '/api/public/hooks/stripe': typeof ApiPublicHooksStripeRoute
   '/api/public/hooks/test-onboarding-email': typeof ApiPublicHooksTestOnboardingEmailRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
@@ -274,6 +282,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/backfill-contracts': typeof ApiPublicHooksBackfillContractsRoute
   '/api/public/hooks/onboarding-reminders': typeof ApiPublicHooksOnboardingRemindersRoute
   '/api/public/hooks/pandadoc': typeof ApiPublicHooksPandadocRoute
+  '/api/public/hooks/reinvite-paisans': typeof ApiPublicHooksReinvitePaisansRoute
   '/api/public/hooks/stripe': typeof ApiPublicHooksStripeRoute
   '/api/public/hooks/test-onboarding-email': typeof ApiPublicHooksTestOnboardingEmailRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
@@ -309,6 +318,7 @@ export interface FileRoutesById {
   '/api/public/hooks/backfill-contracts': typeof ApiPublicHooksBackfillContractsRoute
   '/api/public/hooks/onboarding-reminders': typeof ApiPublicHooksOnboardingRemindersRoute
   '/api/public/hooks/pandadoc': typeof ApiPublicHooksPandadocRoute
+  '/api/public/hooks/reinvite-paisans': typeof ApiPublicHooksReinvitePaisansRoute
   '/api/public/hooks/stripe': typeof ApiPublicHooksStripeRoute
   '/api/public/hooks/test-onboarding-email': typeof ApiPublicHooksTestOnboardingEmailRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
@@ -344,6 +354,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/backfill-contracts'
     | '/api/public/hooks/onboarding-reminders'
     | '/api/public/hooks/pandadoc'
+    | '/api/public/hooks/reinvite-paisans'
     | '/api/public/hooks/stripe'
     | '/api/public/hooks/test-onboarding-email'
     | '/lovable/email/auth/preview'
@@ -374,6 +385,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/backfill-contracts'
     | '/api/public/hooks/onboarding-reminders'
     | '/api/public/hooks/pandadoc'
+    | '/api/public/hooks/reinvite-paisans'
     | '/api/public/hooks/stripe'
     | '/api/public/hooks/test-onboarding-email'
     | '/lovable/email/auth/preview'
@@ -408,6 +420,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/backfill-contracts'
     | '/api/public/hooks/onboarding-reminders'
     | '/api/public/hooks/pandadoc'
+    | '/api/public/hooks/reinvite-paisans'
     | '/api/public/hooks/stripe'
     | '/api/public/hooks/test-onboarding-email'
     | '/lovable/email/auth/preview'
@@ -424,6 +437,7 @@ export interface RootRouteChildren {
   ApiPublicHooksBackfillContractsRoute: typeof ApiPublicHooksBackfillContractsRoute
   ApiPublicHooksOnboardingRemindersRoute: typeof ApiPublicHooksOnboardingRemindersRoute
   ApiPublicHooksPandadocRoute: typeof ApiPublicHooksPandadocRoute
+  ApiPublicHooksReinvitePaisansRoute: typeof ApiPublicHooksReinvitePaisansRoute
   ApiPublicHooksStripeRoute: typeof ApiPublicHooksStripeRoute
   ApiPublicHooksTestOnboardingEmailRoute: typeof ApiPublicHooksTestOnboardingEmailRoute
   LovableEmailAuthPreviewRoute: typeof LovableEmailAuthPreviewRoute
@@ -629,6 +643,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksStripeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/reinvite-paisans': {
+      id: '/api/public/hooks/reinvite-paisans'
+      path: '/api/public/hooks/reinvite-paisans'
+      fullPath: '/api/public/hooks/reinvite-paisans'
+      preLoaderRoute: typeof ApiPublicHooksReinvitePaisansRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/pandadoc': {
       id: '/api/public/hooks/pandadoc'
       path: '/api/public/hooks/pandadoc'
@@ -754,6 +775,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksOnboardingRemindersRoute:
     ApiPublicHooksOnboardingRemindersRoute,
   ApiPublicHooksPandadocRoute: ApiPublicHooksPandadocRoute,
+  ApiPublicHooksReinvitePaisansRoute: ApiPublicHooksReinvitePaisansRoute,
   ApiPublicHooksStripeRoute: ApiPublicHooksStripeRoute,
   ApiPublicHooksTestOnboardingEmailRoute:
     ApiPublicHooksTestOnboardingEmailRoute,
