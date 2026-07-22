@@ -177,3 +177,16 @@ export const getDocumentSignedUrlFn = createServerFn({ method: 'POST' })
     if (error || !signed) throw new Error(error?.message ?? 'Could not create signed URL');
     return { url: signed.signedUrl, expiresIn: 300 };
   });
+
+// Staff-only: pull completed PandaDoc PDFs into storage for one business.
+// Idempotent — re-uploads only rows missing signed_pdf_path.
+export const syncSignedPdfsFn = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { businessId: string }) => input)
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const staff = await isStaffFor(supabase, userId, data.businessId);
+    if (!staff) throw new Error('Forbidden: staff only');
+    const { archiveAllCompletedForBusiness } = await import('@/lib/contract-archive.server');
+    return archiveAllCompletedForBusiness(data.businessId);
+  });
