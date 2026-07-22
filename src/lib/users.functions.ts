@@ -13,6 +13,7 @@ export interface AppUser {
   name: string;
   email: string;
   role: AppRole;
+  team: string | null;
 }
 
 function highestRole(rows: { role: string }[]): AppRole {
@@ -36,7 +37,7 @@ export const listUsersFn = createServerFn({ method: 'GET' })
     const { supabase, userId } = context;
     await assertAdmin(supabase, userId);
     const [{ data: profiles, error: pErr }, { data: roles, error: rErr }] = await Promise.all([
-      supabase.from('profiles').select('user_id, name, email').order('name'),
+      supabase.from('profiles').select('user_id, name, email, team').order('name'),
       supabase.from('user_roles').select('user_id, role'),
     ]);
     if (pErr) throw pErr;
@@ -51,6 +52,7 @@ export const listUsersFn = createServerFn({ method: 'GET' })
       id: p.user_id,
       name: p.name,
       email: p.email,
+      team: p.team ?? null,
       role: highestRole(byUser.get(p.user_id) ?? []),
     }));
   });
@@ -69,8 +71,6 @@ export const setUserRoleFn = createServerFn({ method: 'POST' })
     const { supabase, userId } = context;
     await assertAdmin(supabase, userId);
 
-    // Replace all Trophi-staff roles with the single chosen one.
-    // (client_admin is client-scoped and managed elsewhere; not touched here.)
     const { error: delErr } = await supabase
       .from('user_roles')
       .delete()
@@ -84,5 +84,22 @@ export const setUserRoleFn = createServerFn({ method: 'POST' })
       .insert({ user_id: data.targetUserId, role: data.role } as any);
     if (insErr && !/duplicate key/i.test(insErr.message)) throw insErr;
 
+    return { ok: true };
+  });
+
+export const setUserTeamFn = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      targetUserId: z.string().uuid(),
+      team: z.string().trim().max(80).nullable(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await assertAdmin(supabase, userId);
+    const team = data.team && data.team.length > 0 ? data.team : null;
+    const { error } = await supabase.from('profiles').update({ team } as any).eq('user_id', data.targetUserId);
+    if (error) throw error;
     return { ok: true };
   });

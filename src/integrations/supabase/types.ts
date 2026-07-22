@@ -204,6 +204,47 @@ export type Database = {
           },
         ]
       }
+      client_status_history: {
+        Row: {
+          business_id: string
+          changed_at: string
+          changed_by: string | null
+          changed_by_name: string | null
+          from_status: string | null
+          id: string
+          source: string
+          to_status: string
+        }
+        Insert: {
+          business_id: string
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_name?: string | null
+          from_status?: string | null
+          id?: string
+          source?: string
+          to_status: string
+        }
+        Update: {
+          business_id?: string
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_name?: string | null
+          from_status?: string | null
+          id?: string
+          source?: string
+          to_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_status_history_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["business_id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           approved_at: string | null
@@ -728,6 +769,7 @@ export type Database = {
           created_at: string
           email: string
           name: string
+          team: string | null
           updated_at: string
           user_id: string
         }
@@ -735,6 +777,7 @@ export type Database = {
           created_at?: string
           email: string
           name: string
+          team?: string | null
           updated_at?: string
           user_id: string
         }
@@ -742,6 +785,7 @@ export type Database = {
           created_at?: string
           email?: string
           name?: string
+          team?: string | null
           updated_at?: string
           user_id?: string
         }

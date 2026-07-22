@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, redirect, Link, useRouterState } from '@tanstack/react-router';
-import { Users, ClipboardCheck, BarChart3, Wrench, Globe, LogOut, ShieldCheck, FileText } from 'lucide-react';
+import { Users, ClipboardCheck, BarChart3, Wrench, Globe, LogOut, ShieldCheck, FileText, LineChart } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/store/userStore';
 import trophiMarkAsset from '@/assets/trophi-mark.png.asset.json';
@@ -63,23 +63,29 @@ function AuthedLayout() {
               </Link>
             );
           })}
-          {profile?.role === 'admin' && (
+          {(profile?.role === 'admin' || profile?.role === 'manager') && (
             <>
               <div className="pt-4 pb-1 px-3 text-[10px] uppercase tracking-wider text-white/30">Admin</div>
-              {ADMIN_NAV.map(({ to, label, icon: Icon }) => {
-                const active = pathname.startsWith(to);
-                return (
-                  <Link key={to} to={to}
-                    className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
-                      active
-                        ? 'bg-white/10 text-white font-medium border-l-2 border-[hsl(var(--trophi-gold))]'
-                        : 'text-white/60 hover:bg-white/5 hover:text-white'
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" />{label}
-                  </Link>
-                );
-              })}
+              {(() => {
+                const items = [
+                  { to: '/reports', label: 'Reports', icon: LineChart, adminOnly: false },
+                  ...(profile?.role === 'admin' ? ADMIN_NAV.map((n) => ({ ...n, adminOnly: true })) : []),
+                ];
+                return items.map(({ to, label, icon: Icon }) => {
+                  const active = pathname.startsWith(to);
+                  return (
+                    <Link key={to} to={to}
+                      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
+                        active
+                          ? 'bg-white/10 text-white font-medium border-l-2 border-[hsl(var(--trophi-gold))]'
+                          : 'text-white/60 hover:bg-white/5 hover:text-white'
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />{label}
+                    </Link>
+                  );
+                });
+              })()}
             </>
           )}
         </nav>
