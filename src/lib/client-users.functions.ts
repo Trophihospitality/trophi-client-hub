@@ -4,7 +4,7 @@ import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 
 export type ClientPermission = 'admin_full' | 'leadership' | 'manager';
 export type ClientUserStatus = 'invited' | 'active' | 'inactive';
-export type InviteStatus = 'accepted' | 'invited' | 'expired' | 'never_sent' | 'revoked';
+export type InviteStatus = 'accepted' | 'invited' | 'expired' | 'never_sent' | 'revoked' | 'failed';
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -12,9 +12,11 @@ export function deriveInviteStatus(row: {
   status: ClientUserStatus;
   user_id?: string | null;
   invited_at?: string | null;
+  invite_last_error?: string | null;
 }): InviteStatus {
   if (row.user_id || row.status === 'active') return 'accepted';
   if (row.status === 'inactive') return 'revoked';
+  if (row.invite_last_error) return 'failed';
   if (!row.invited_at) return 'never_sent';
   const ageMs = Date.now() - new Date(row.invited_at).getTime();
   return ageMs > INVITE_TTL_MS ? 'expired' : 'invited';
@@ -38,6 +40,8 @@ export interface ClientUser {
   inviteSentTo: string | null;
   inviteExpiresAt: string | null;
   inviteStatus: InviteStatus;
+  inviteLastError: string | null;
+  inviteLastAttemptAt: string | null;
 }
 
 async function writeAudit(admin: any, params: {
@@ -90,6 +94,8 @@ function mapClientUser(r: any): ClientUser {
     inviteSentTo: r.invite_sent_to ?? null,
     inviteExpiresAt,
     inviteStatus: deriveInviteStatus(r),
+    inviteLastError: r.invite_last_error ?? null,
+    inviteLastAttemptAt: r.invite_last_attempt_at ?? null,
   };
 }
 
@@ -158,20 +164,32 @@ export const createClientUserFn = createServerFn({ method: 'POST' })
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
 
     let inviteSent = false;
+    let inviteError: string | null = null;
     if (data.sendInvite) {
       try {
-        await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
+        const inviteResp: any = await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
           data: {
             name: `${data.firstName} ${data.lastName}`.trim(),
             client_user: true,
             business_id: data.businessId,
           },
         });
+        if (inviteResp?.error) {
+          throw new Error(inviteResp.error.message || `Invite failed (${inviteResp.error.status ?? 'unknown'})`);
+        }
         inviteSent = true;
-      } catch (e) {
-        // Non-fatal; row is still created. Clear invite fields so UI shows never_sent.
         await supabaseAdmin.from('client_users')
-          .update({ invited_at: null, invite_sent_to: null } as any)
+          .update({ invite_last_error: null, invite_last_attempt_at: new Date().toISOString() } as any)
+          .eq('id', inserted.id);
+      } catch (e: any) {
+        inviteError = e?.message || 'Failed to send invite';
+        await supabaseAdmin.from('client_users')
+          .update({
+            invited_at: null,
+            invite_sent_to: null,
+            invite_last_error: inviteError,
+            invite_last_attempt_at: new Date().toISOString(),
+          } as any)
           .eq('id', inserted.id);
       }
     }
@@ -182,15 +200,23 @@ export const createClientUserFn = createServerFn({ method: 'POST' })
         description: `Portal invite sent to ${data.email} (${data.firstName} ${data.lastName})`,
         actor: (claims as any)?.email ?? 'system', actorId: userId,
       });
+    } else if (inviteError) {
+      await writeClientActivity(supabaseAdmin, {
+        businessId: data.businessId, type: 'info_updated',
+        description: `Portal invite to ${data.email} FAILED: ${inviteError}`,
+        actor: (claims as any)?.email ?? 'system', actorId: userId,
+      });
     }
 
     await writeAudit(supabaseAdmin, {
       actorId: userId, actorEmail: (claims as any)?.email ?? null,
       action: 'client_user.create', entityType: 'client_user', entityId: inserted.id,
       after: { email: data.email, business_id: data.businessId, permission: data.permissionLevel, invite_sent: inviteSent },
+      metadata: inviteError ? { invite_error: inviteError } : null,
+      success: !inviteError,
     });
 
-    return { ok: true, id: inserted.id };
+    return { ok: true, id: inserted.id, inviteSent, inviteError };
   });
 
 export const updateClientUserFn = createServerFn({ method: 'POST' })
@@ -273,28 +299,64 @@ export const resendClientInviteFn = createServerFn({ method: 'POST' })
     }
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
 
-    // Best-effort: delete any prior unconfirmed auth user for the current email so
-    // the fresh invite issues a brand-new token (invalidating any old link).
+    // Since this client_users row has not been accepted (user_id is null),
+    // ANY auth.users record for this email is a stale artifact from a prior
+    // invite attempt and must be removed so the fresh invite issues a new
+    // token instead of failing with 422 email_exists.
+    const priorIds: string[] = [];
     try {
       const { data: existing } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
       const priorList = (existing?.users ?? []).filter(
-        (u: any) => u.email?.toLowerCase() === row.email.toLowerCase() && !u.email_confirmed_at && !u.last_sign_in_at,
+        (u: any) => u.email?.toLowerCase() === row.email.toLowerCase(),
       );
       for (const u of priorList) {
-        try { await supabaseAdmin.auth.admin.deleteUser(u.id); } catch { /* ignore */ }
+        try {
+          await supabaseAdmin.auth.admin.deleteUser(u.id);
+          priorIds.push(u.id);
+        } catch { /* ignore */ }
       }
     } catch { /* ignore - not critical */ }
 
+    const nowIso = new Date().toISOString();
+    const recordFailure = async (msg: string) => {
+      await supabaseAdmin.from('client_users')
+        .update({ invite_last_error: msg, invite_last_attempt_at: nowIso } as any)
+        .eq('id', data.id);
+      await writeAudit(supabaseAdmin, {
+        actorId: userId, actorEmail: (claims as any)?.email ?? null,
+        action: 'client_user.invite_resend', entityType: 'client_user', entityId: data.id,
+        after: { sent_to: row.email }, metadata: { error: msg, prior_ids_deleted: priorIds }, success: false,
+      });
+      await writeClientActivity(supabaseAdmin, {
+        businessId: row.business_id, type: 'info_updated',
+        description: `Portal invite resend to ${row.email} FAILED: ${msg}`,
+        actor: (claims as any)?.email ?? 'system', actorId: userId,
+      });
+    };
+
+    let inviteResp: any;
     try {
-      await supabaseAdmin.auth.admin.inviteUserByEmail(row.email, {
+      inviteResp = await supabaseAdmin.auth.admin.inviteUserByEmail(row.email, {
         data: { name: `${row.first_name} ${row.last_name}`.trim(), client_user: true, business_id: row.business_id },
       });
     } catch (e: any) {
-      throw new Error(e?.message || 'Failed to resend invite');
+      const msg = e?.message || 'Failed to resend invite';
+      await recordFailure(msg);
+      throw new Error(msg);
     }
-    const nowIso = new Date().toISOString();
+    if (inviteResp?.error) {
+      const msg = inviteResp.error.message || `Invite failed (${inviteResp.error.status ?? 'unknown'})`;
+      await recordFailure(msg);
+      throw new Error(msg);
+    }
     await supabase.from('client_users')
-      .update({ invited_at: nowIso, invite_sent_to: row.email, status: 'invited' } as any)
+      .update({
+        invited_at: nowIso,
+        invite_sent_to: row.email,
+        status: 'invited',
+        invite_last_error: null,
+        invite_last_attempt_at: nowIso,
+      } as any)
       .eq('id', data.id);
     await writeAudit(supabaseAdmin, {
       actorId: userId, actorEmail: (claims as any)?.email ?? null,

@@ -350,6 +350,8 @@ export type Database = {
           email: string
           first_name: string
           id: string
+          invite_last_attempt_at: string | null
+          invite_last_error: string | null
           invite_sent_to: string | null
           invited_at: string | null
           invited_by: string | null
@@ -369,6 +371,8 @@ export type Database = {
           email: string
           first_name: string
           id?: string
+          invite_last_attempt_at?: string | null
+          invite_last_error?: string | null
           invite_sent_to?: string | null
           invited_at?: string | null
           invited_by?: string | null
@@ -388,6 +392,8 @@ export type Database = {
           email?: string
           first_name?: string
           id?: string
+          invite_last_attempt_at?: string | null
+          invite_last_error?: string | null
           invite_sent_to?: string | null
           invited_at?: string | null
           invited_by?: string | null
