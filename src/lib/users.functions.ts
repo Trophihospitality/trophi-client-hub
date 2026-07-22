@@ -236,7 +236,7 @@ export const createTrophiUserFn = createServerFn({ method: 'POST' })
     const newUserId = invite.user?.id;
     if (!newUserId) throw new Error('Invite returned no user id');
 
-    const today = new Date().toISOString().slice(0, 10);
+    const nowIso = new Date().toISOString();
     const { error: updErr } = await supabaseAdmin.from('profiles').update({
       name,
       first_name: data.firstName,
@@ -247,11 +247,15 @@ export const createTrophiUserFn = createServerFn({ method: 'POST' })
       hire_role: data.role,
       mentor_id: data.mentorId,
       mentor_status: 'assigned',
-      mentor_assigned_at: new Date().toISOString(),
+      mentor_assigned_at: nowIso,
       current_role_started_at: data.hireDate || today,
       is_active: true,
+      invited_at: nowIso,
+      invite_last_attempt_at: nowIso,
+      invite_last_error: null,
     } as any).eq('user_id', newUserId);
     if (updErr) throw updErr;
+
 
     await supabaseAdmin.from('user_roles').delete().eq('user_id', newUserId);
     await supabaseAdmin.from('user_roles').insert({ user_id: newUserId, role: data.role } as any);
