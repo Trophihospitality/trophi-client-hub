@@ -3,7 +3,7 @@ import { useServerFn } from '@tanstack/react-start';
 import { toast } from 'sonner';
 import { FileText, AlertCircle, CheckCircle2, ExternalLink, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { getContractBundleFn, generateContractBundleFn } from '@/lib/contracts.functions';
+import { getContractBundleFn, generateContractBundleFn, voidAndRegenerateContractBundleFn } from '@/lib/contracts.functions';
 
 interface Props {
   businessId: string;
@@ -41,6 +41,7 @@ export function Step1ContractBundle({ businessId, canEdit, onGenerated }: Props)
   const qc = useQueryClient();
   const getBundle = useServerFn(getContractBundleFn);
   const generate = useServerFn(generateContractBundleFn);
+  const voidRegen = useServerFn(voidAndRegenerateContractBundleFn);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['contract-bundle', businessId],
@@ -55,6 +56,16 @@ export function Step1ContractBundle({ businessId, canEdit, onGenerated }: Props)
       onGenerated?.();
     },
     onError: (e: any) => toast.error(e?.message ?? 'Could not generate bundle'),
+  });
+
+  const regen = useMutation({
+    mutationFn: () => voidRegen({ data: { businessId } }),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ['contract-bundle', businessId] });
+      toast.success(`Voided ${r.voided} and recreated ${r.recreated.length} with current signer email.`);
+      onGenerated?.();
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Could not void & regenerate'),
   });
 
   if (isLoading) {
@@ -184,25 +195,43 @@ export function Step1ContractBundle({ businessId, canEdit, onGenerated }: Props)
         </ul>
       </div>
 
-      <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
         <div className="text-xs text-muted-foreground">
           {allExist
-            ? 'All three documents exist in PandaDoc. Review, then mark Step 1 complete above.'
+            ? 'All three documents exist in PandaDoc. Use "Void & regenerate" if signer email changed.'
             : 'Generates draft documents in PandaDoc from the templates. No email is sent yet.'}
         </div>
-        <Button
-          size="sm"
-          disabled={!canEdit || !data.ready || gen.isPending}
-          onClick={() => gen.mutate()}
-        >
-          {gen.isPending ? (
-            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating…</>
-          ) : allExist ? (
-            'Regenerate missing / errored'
-          ) : (
-            'Generate contract bundle'
+        <div className="flex items-center gap-2">
+          {allExist && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!canEdit || !data.ready || regen.isPending || gen.isPending}
+              onClick={() => {
+                if (confirm('This will delete all current PandaDoc drafts for this client and create fresh ones using the CURRENT contact email. Continue?')) {
+                  regen.mutate();
+                }
+              }}
+            >
+              {regen.isPending ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Voiding & regenerating…</>
+              ) : 'Void & regenerate'}
+            </Button>
           )}
-        </Button>
+          <Button
+            size="sm"
+            disabled={!canEdit || !data.ready || gen.isPending || regen.isPending}
+            onClick={() => gen.mutate()}
+          >
+            {gen.isPending ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating…</>
+            ) : allExist ? (
+              'Regenerate missing / errored'
+            ) : (
+              'Generate contract bundle'
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   );

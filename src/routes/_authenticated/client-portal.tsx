@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, Clock, Lock, Circle } from 'lucide-react';
+import { SignContractPanel } from '@/components/client-portal/SignContractPanel';
 
 export const Route = createFileRoute('/_authenticated/client-portal')({
   ssr: false,
@@ -99,6 +100,11 @@ function ClientPortalPage() {
                     <div className="mt-1 font-medium">{d.name}</div>
                     {d.description && (
                       <p className="mt-1 text-sm text-muted-foreground">{d.description}</p>
+                    )}
+                    {isCurrent && d.step_number === 4 && (
+                      <div className="mt-3">
+                        <SignContractPanel businessId={client!.businessId} />
+                      </div>
                     )}
                   </div>
                 </div>
