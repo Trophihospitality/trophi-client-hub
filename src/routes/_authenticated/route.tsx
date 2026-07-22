@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, redirect, Link, useRouterState } from '@tanstack/react-router';
 import { useState } from 'react';
-import { Users, ClipboardCheck, BarChart3, Wrench, Globe, LogOut, ShieldCheck, FileText, LineChart, Trophy, ScrollText, ChevronDown, ChevronRight, FolderClosed } from 'lucide-react';
+import { Users, ClipboardCheck, BarChart3, Wrench, Globe, LogOut, ShieldCheck, FileText, LineChart, Trophy, ScrollText, ChevronDown, ChevronRight, FolderClosed, ListChecks } from 'lucide-react';
 
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/store/userStore';
@@ -30,6 +30,7 @@ const NAV = [
 const ADMIN_NAV = [
   { to: '/audit', label: 'Audit Log', icon: ScrollText },
   { to: '/settings/pandadoc-templates', label: 'PandaDoc Templates', icon: FileText },
+  { to: '/settings/cutover-checklist', label: 'Cutover Checklist', icon: ListChecks },
 ] as const;
 
 const USER_MGMT_CHILDREN = [
