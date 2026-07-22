@@ -10,7 +10,9 @@ import {
 import { getLeaderboardDataFn } from '@/lib/awards.functions';
 import { useAuth } from '@/store/userStore';
 import { formatPhone, formatPhoneInput } from '@/lib/phone';
-import { ArrowLeft, Pencil, X, Check, Trophy } from 'lucide-react';
+import { AvatarCircle } from '@/components/ui/avatar-circle';
+import { cropToSquareJpeg, uploadAvatarBlob } from '@/lib/avatar';
+import { ArrowLeft, Pencil, X, Check, Trophy, Upload } from 'lucide-react';
 
 export const Route = createFileRoute('/_authenticated/users/trophi/$userId')({
   component: TrophiUserDetail,
