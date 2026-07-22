@@ -4,6 +4,7 @@ import { Users, ClipboardCheck, BarChart3, Wrench, Globe, LogOut, ShieldCheck, F
 
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/store/userStore';
+import { AvatarCircle } from '@/components/ui/avatar-circle';
 import trophiMarkAsset from '@/assets/trophi-mark.png.asset.json';
 const trophiMark = trophiMarkAsset.url;
 
@@ -172,7 +173,7 @@ function UnknownIdentity({ email, signOut }: { email: string | null; signOut: ()
 }
 
 function AuthedLayout() {
-  const { user, profile, client, isClient, isStaff, loading, signOut } = useAuth();
+  const { user, profile, client, isClient, isStaff, loading, signOut, avatarUrl } = useAuth();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   if (loading) {
@@ -191,7 +192,7 @@ function AuthedLayout() {
       const key = `unknown-identity-logged:${user?.id ?? 'anon'}`;
       if (!sessionStorage.getItem(key)) {
         sessionStorage.setItem(key, '1');
-        console.warn('[auth] unknown identity — no staff role and no client_users row', { userId: user?.id, email: user?.email });
+        console.warn('[auth] unknown identity — no staff role and no client_users role', { userId: user?.id, email: user?.email });
       }
     }
     return <UnknownIdentity email={user?.email ?? null} signOut={signOut} />;
@@ -258,15 +259,25 @@ function AuthedLayout() {
 
         <div className="border-t border-white/10 px-3 py-3 space-y-2">
           <div className="px-2 text-[10px] uppercase tracking-wider text-white/40">Signed in as</div>
-          <div className="px-2 text-sm text-white truncate">{profile?.name ?? '…'}</div>
-          <div className="px-2 text-[11px] text-white/40">
-            {profile?.role === 'admin' ? 'Admin · full access'
-              : profile?.role === 'manager' ? 'Manager · sees all'
-              : profile?.role === 'onboarding_specialist' ? 'Onboarding Specialist'
-              : profile?.role === 'account_manager' ? 'Account Manager'
-              : profile?.role === 'sales_rep' ? 'Sales Rep · own accounts'
-              : 'Signed in'}
-          </div>
+          <Link
+            to="/users/trophi/$userId"
+            params={{ userId: profile?.id ?? '' }}
+            className="flex items-center gap-2.5 px-2 py-1 rounded-lg hover:bg-white/5 transition-colors group"
+            title="Edit my profile"
+          >
+            <AvatarCircle name={profile?.name ?? null} url={avatarUrl} size={32} />
+            <div className="min-w-0 flex-1">
+              <div className="text-sm text-white truncate group-hover:text-white">{profile?.name ?? '…'}</div>
+              <div className="text-[11px] text-white/40 truncate">
+                {profile?.role === 'admin' ? 'Admin · full access'
+                  : profile?.role === 'manager' ? 'Manager · sees all'
+                  : profile?.role === 'onboarding_specialist' ? 'Onboarding Specialist'
+                  : profile?.role === 'account_manager' ? 'Account Manager'
+                  : profile?.role === 'sales_rep' ? 'Sales Rep · own accounts'
+                  : 'Signed in'}
+              </div>
+            </div>
+          </Link>
           <button onClick={signOut}
             className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-white/60 hover:bg-white/5 hover:text-white">
             <LogOut className="h-4 w-4" /> Sign out

@@ -20,12 +20,16 @@ interface AuthState {
   isClient: boolean;
   isStaff: boolean;
   loading: boolean;
+  avatarPath: string | null;
+  avatarUrl: string | null;
+  refreshAvatar: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState>({
   user: null, profile: null, client: null, isClient: false, isStaff: false,
-  loading: true, signOut: async () => {},
+  loading: true, avatarPath: null, avatarUrl: null,
+  refreshAvatar: async () => {}, signOut: async () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -33,14 +37,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<SalesPerson | null>(null);
   const [client, setClient] = useState<ClientContext | null>(null);
   const [loading, setLoading] = useState(true);
+  const [avatarPath, setAvatarPath] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  async function resolveAvatarUrl(path: string | null) {
+    if (!path) { setAvatarUrl(null); return; }
+    const { data } = await supabase.storage.from('trophi-avatars').createSignedUrl(path, 3600);
+    setAvatarUrl(data?.signedUrl ?? null);
+  }
+
+  async function refreshAvatar() {
+    if (!user) return;
+    const { data } = await supabase.from('profiles').select('avatar_path').eq('user_id', user.id).maybeSingle();
+    const path = (data as any)?.avatar_path ?? null;
+    setAvatarPath(path);
+    await resolveAvatarUrl(path);
+  }
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_ev, session) => {
       setUser(session?.user ?? null);
-      if (!session?.user) { setProfile(null); setClient(null); setLoading(false); return; }
+      if (!session?.user) {
+        setProfile(null); setClient(null); setAvatarPath(null); setAvatarUrl(null); setLoading(false); return;
+      }
       setTimeout(() => {
         Promise.all([
-          supabase.from('profiles').select('user_id, name, email').eq('user_id', session.user.id).maybeSingle(),
+          supabase.from('profiles').select('user_id, name, email, avatar_path').eq('user_id', session.user.id).maybeSingle(),
           supabase.from('user_roles').select('role').eq('user_id', session.user.id),
           supabase.from('client_users')
             .select('business_id, first_name, last_name, permission_level, clients:business_id(company)')
@@ -52,7 +74,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             x === 'admin' ? 5 : x === 'manager' ? 4
               : x === 'onboarding_specialist' ? 3 : x === 'account_manager' ? 3
               : x === 'sales_rep' ? 2 : 0;
-          // No default — a user with zero Trophi roles is NOT staff.
           const role = (roles.length
             ? roles.reduce((a: string, b: string) => rank(b) > rank(a) ? b : a)
             : null) as StaffRole | null;
@@ -61,8 +82,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setProfile({
               id: p.data.user_id, name: p.data.name, email: p.data.email, role,
             });
+            const path = (p.data as any).avatar_path ?? null;
+            setAvatarPath(path);
+            resolveAvatarUrl(path);
           } else {
             setProfile(null);
+            setAvatarPath(null);
+            setAvatarUrl(null);
           }
 
           if (cu.data) {
@@ -95,7 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isClient = !isStaff && !!client;
 
   return (
-    <AuthContext.Provider value={{ user, profile, client, isClient, isStaff, loading, signOut }}>
+    <AuthContext.Provider value={{ user, profile, client, isClient, isStaff, loading, avatarPath, avatarUrl, refreshAvatar, signOut }}>
       {children}
     </AuthContext.Provider>
   );

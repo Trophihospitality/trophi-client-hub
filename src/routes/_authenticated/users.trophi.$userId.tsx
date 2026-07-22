@@ -10,7 +10,9 @@ import {
 import { getLeaderboardDataFn } from '@/lib/awards.functions';
 import { useAuth } from '@/store/userStore';
 import { formatPhone, formatPhoneInput } from '@/lib/phone';
-import { ArrowLeft, Pencil, X, Check, Trophy } from 'lucide-react';
+import { AvatarCircle } from '@/components/ui/avatar-circle';
+import { cropToSquareJpeg, uploadAvatarBlob } from '@/lib/avatar';
+import { ArrowLeft, Pencil, X, Check, Trophy, Upload } from 'lucide-react';
 
 export const Route = createFileRoute('/_authenticated/users/trophi/$userId')({
   component: TrophiUserDetail,
@@ -45,6 +47,9 @@ function TrophiUserDetail() {
   const { userId } = Route.useParams();
   const navigate = useNavigate();
   const isSpiro = useIsSpiro();
+  const { profile, refreshAvatar } = useAuth();
+  const isSelf = profile?.id === userId;
+  const editMode: 'admin' | 'self' | 'none' = isSpiro ? 'admin' : (isSelf ? 'self' : 'none');
 
   const listUsers = useServerFn(listUsersFn);
   const { data: users, isLoading: usersLoading } = useQuery({
@@ -78,19 +83,23 @@ function TrophiUserDetail() {
 
       <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
         <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-mono">
-              Employee #{user.employeeId !== null ? String(user.employeeId).padStart(2, '0') : '—'}
-            </div>
-            <h1 className="font-display text-2xl font-semibold mt-0.5">{user.name}</h1>
-            <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
-              <span className="capitalize">{user.role.replace(/_/g, ' ')}</span>
-              <span>·</span>
-              <span>{user.team ?? 'No team'}</span>
-              <span>·</span>
-              <span className={user.isActive ? 'text-emerald-700' : 'text-muted-foreground'}>
-                {user.isActive ? 'Active' : 'Inactive'}
-              </span>
+          <div className="flex items-center gap-4">
+            <AvatarCircle name={user.name} url={user.avatarUrl ?? null} size={72} />
+            <div>
+              <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-mono">
+                Employee #{user.employeeId !== null ? String(user.employeeId).padStart(2, '0') : '—'}
+              </div>
+              <h1 className="font-display text-2xl font-semibold mt-0.5">{user.name}</h1>
+              <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+                <span className="capitalize">{user.role.replace(/_/g, ' ')}</span>
+                <span>·</span>
+                <span>{user.team ?? 'No team'}</span>
+                <span>·</span>
+                <span className={user.isActive ? 'text-emerald-700' : 'text-muted-foreground'}>
+                  {user.isActive ? 'Active' : 'Inactive'}
+                </span>
+                {editMode === 'self' && <><span>·</span><span className="text-[hsl(var(--trophi-gold))]">Your profile</span></>}
+              </div>
             </div>
           </div>
         </div>
@@ -103,7 +112,7 @@ function TrophiUserDetail() {
       </div>
 
       {tab === 'summary' && (
-        <SummaryTab user={user} mentor={mentor ?? null} users={users ?? []} canEdit={isSpiro} />
+        <SummaryTab user={user} mentor={mentor ?? null} users={users ?? []} editMode={editMode} onAvatarChanged={refreshAvatar} />
       )}
       {tab === 'history' && <HistoryTab user={user} users={users ?? []} />}
       {tab === 'activity' && <ActivityTab user={user} />}
@@ -127,7 +136,13 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 }
 
 /* ================ Summary Tab ================ */
-function SummaryTab({ user, mentor, users, canEdit }: { user: AppUser; mentor: AppUser | null; users: AppUser[]; canEdit: boolean }) {
+function SummaryTab({ user, mentor, users, editMode, onAvatarChanged }: {
+  user: AppUser; mentor: AppUser | null; users: AppUser[];
+  editMode: 'admin' | 'self' | 'none';
+  onAvatarChanged: () => Promise<void> | void;
+}) {
+  const canEdit = editMode !== 'none';
+  const isSelfOnly = editMode === 'self';
   const qc = useQueryClient();
   const update = useServerFn(updateTrophiUserFn);
   const setRole = useServerFn(setUserRoleFn);
@@ -147,6 +162,8 @@ function SummaryTab({ user, mentor, users, canEdit }: { user: AppUser; mentor: A
     isActive: user.isActive,
     trainerId: spiroId ?? '',
   });
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
   useEffect(() => {
     setForm({
@@ -162,40 +179,74 @@ function SummaryTab({ user, mentor, users, canEdit }: { user: AppUser; mentor: A
       isActive: user.isActive,
       trainerId: spiroId ?? '',
     });
+    setPhotoFile(null);
+    setPhotoPreview(null);
   }, [user, spiroId]);
 
-  const roleChanged = form.role !== user.role && form.role !== 'client_admin';
+  const roleChanged = !isSelfOnly && form.role !== user.role && form.role !== 'client_admin';
+
+  function onPickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (f.size > 5 * 1024 * 1024) { toast.error('Image must be under 5 MB'); return; }
+    setPhotoFile(f);
+    setPhotoPreview(URL.createObjectURL(f));
+  }
 
   const saveM = useMutation({
     mutationFn: async () => {
       if (!form.phone.trim()) throw new Error('Phone is required');
-      if (roleChanged && !form.trainerId) throw new Error('Select a trainer for the new role');
-      await update({ data: {
-        targetUserId: user.id,
-        firstName: form.firstName,
-        lastName: form.lastName,
-        phone: form.phone,
-        team: form.team,
-        hireDate: form.hireDate || null,
-        hireRole: form.hireRole,
-        mentorId: form.mentorChoice === 'open' ? null : form.mentorChoice,
-        currentRoleStartedAt: form.currentRoleStartedAt || null,
-      } as any });
-      if (roleChanged) {
-        await setRole({ data: { targetUserId: user.id, role: form.role, trainerId: form.trainerId } as any });
+
+      // Upload avatar first (if changed). Users may only upload to their own folder;
+      // admin (Spiro) has global rights via storage policy.
+      let newAvatarPath: string | null | undefined;
+      if (photoFile) {
+        const blob = await cropToSquareJpeg(photoFile);
+        newAvatarPath = await uploadAvatarBlob(user.id, blob);
       }
-      if (form.isActive !== user.isActive) {
-        await setActive({ data: { targetUserId: user.id, isActive: form.isActive } });
+
+      if (isSelfOnly) {
+        // Self-service: only phone + avatar are allowed by the server.
+        await update({ data: {
+          targetUserId: user.id,
+          phone: form.phone,
+          ...(newAvatarPath !== undefined ? { avatarPath: newAvatarPath } : {}),
+        } as any });
+      } else {
+        if (roleChanged && !form.trainerId) throw new Error('Select a trainer for the new role');
+        await update({ data: {
+          targetUserId: user.id,
+          firstName: form.firstName,
+          lastName: form.lastName,
+          phone: form.phone,
+          team: form.team,
+          hireDate: form.hireDate || null,
+          hireRole: form.hireRole,
+          mentorId: form.mentorChoice === 'open' ? null : form.mentorChoice,
+          currentRoleStartedAt: form.currentRoleStartedAt || null,
+          ...(newAvatarPath !== undefined ? { avatarPath: newAvatarPath } : {}),
+        } as any });
+        if (roleChanged) {
+          await setRole({ data: { targetUserId: user.id, role: form.role, trainerId: form.trainerId } as any });
+        }
+        if (form.isActive !== user.isActive) {
+          await setActive({ data: { targetUserId: user.id, isActive: form.isActive } });
+        }
       }
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       qc.invalidateQueries({ queryKey: ['users'] });
       qc.invalidateQueries({ queryKey: ['role-history', user.id] });
+      if (photoFile) await onAvatarChanged();
       toast.success('Profile updated');
       setEditing(false);
+      setPhotoFile(null);
+      setPhotoPreview(null);
     },
     onError: (e: any) => toast.error(e?.message ?? 'Failed to update'),
   });
+
+  const previewUrl = photoPreview ?? user.avatarUrl ?? null;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -205,12 +256,12 @@ function SummaryTab({ user, mentor, users, canEdit }: { user: AppUser; mentor: A
             <h2 className="font-display text-lg font-semibold">Profile</h2>
             {canEdit && !editing && (
               <button onClick={() => setEditing(true)} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-                <Pencil className="h-3.5 w-3.5" /> Edit
+                <Pencil className="h-3.5 w-3.5" /> {isSelfOnly ? 'Edit my profile' : 'Edit'}
               </button>
             )}
             {editing && (
               <div className="flex gap-2">
-                <button onClick={() => setEditing(false)} className="inline-flex items-center gap-1 rounded-md border border-input px-3 py-1.5 text-sm">
+                <button onClick={() => { setEditing(false); setPhotoFile(null); setPhotoPreview(null); }} className="inline-flex items-center gap-1 rounded-md border border-input px-3 py-1.5 text-sm">
                   <X className="h-3.5 w-3.5" /> Cancel
                 </button>
                 <button disabled={saveM.isPending} onClick={() => saveM.mutate()} className="inline-flex items-center gap-1 rounded-md bg-[hsl(var(--trophi-gold))] px-3 py-1.5 text-sm font-medium text-[hsl(var(--trophi-ink))] disabled:opacity-60">
@@ -219,6 +270,27 @@ function SummaryTab({ user, mentor, users, canEdit }: { user: AppUser; mentor: A
               </div>
             )}
           </div>
+
+          {editing && isSelfOnly && (
+            <div className="mb-4 rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+              You can update your <strong>photo</strong> and <strong>phone number</strong>. Contact your admin to update any other field.
+            </div>
+          )}
+
+          {editing && (
+            <div className="mb-5 flex items-center gap-4">
+              <AvatarCircle name={user.name} url={previewUrl} size={64} />
+              <label className="inline-flex items-center gap-2 rounded-md border border-input px-3 py-1.5 text-sm cursor-pointer hover:bg-muted/40">
+                <Upload className="h-3.5 w-3.5" /> {photoFile ? 'Change photo' : 'Upload photo'}
+                <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={onPickPhoto} />
+              </label>
+              {photoFile && (
+                <button onClick={() => { setPhotoFile(null); setPhotoPreview(null); }} className="text-xs text-muted-foreground hover:text-foreground">
+                  Discard change
+                </button>
+              )}
+            </div>
+          )}
 
           {!editing ? (
             <dl className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
@@ -234,6 +306,17 @@ function SummaryTab({ user, mentor, users, canEdit }: { user: AppUser; mentor: A
               <Info label="Mentor" value={mentor?.name ?? 'Open'} />
               <Info label="Status" value={user.isActive ? 'Active' : 'Inactive'} />
             </dl>
+          ) : isSelfOnly ? (
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <F label="First name"><I value={user.firstName ?? ''} disabled onChange={() => {}} /></F>
+              <F label="Last name"><I value={user.lastName ?? ''} disabled onChange={() => {}} /></F>
+              <F label="Email"><I value={user.email} disabled onChange={() => {}} /></F>
+              <F label="Phone (editable)"><I value={form.phone} onChange={v => setForm({ ...form, phone: formatPhoneInput(v) })} /></F>
+              <F label="Team"><I value={user.team ?? ''} disabled onChange={() => {}} /></F>
+              <F label="Role"><I value={user.role.replace(/_/g, ' ')} disabled onChange={() => {}} /></F>
+              <F label="Hire date"><I type="date" value={user.hireDate ?? ''} disabled onChange={() => {}} /></F>
+              <F label="Status"><I value={user.isActive ? 'Active' : 'Inactive'} disabled onChange={() => {}} /></F>
+            </div>
           ) : (
             <div className="grid grid-cols-2 gap-3 text-sm">
               <F label="First name"><I value={form.firstName} onChange={v => setForm({ ...form, firstName: v })} /></F>
