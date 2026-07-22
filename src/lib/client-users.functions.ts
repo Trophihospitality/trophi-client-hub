@@ -127,6 +127,11 @@ export const listClientUsersForBusinessFn = createServerFn({ method: 'GET' })
 
 const PermSchema = z.enum(['admin_full', 'leadership', 'manager']);
 
+function buildInviteRedirect(origin?: string | null): string | undefined {
+  const base = (origin && /^https?:\/\//.test(origin)) ? origin.replace(/\/$/, '') : null;
+  return base ? `${base}/accept-invite` : undefined;
+}
+
 export const createClientUserFn = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
@@ -139,6 +144,7 @@ export const createClientUserFn = createServerFn({ method: 'POST' })
       locationIds: z.array(z.string()).default([]),
       permissionLevel: PermSchema,
       sendInvite: z.boolean().default(true),
+      origin: z.string().url().optional(),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
