@@ -166,19 +166,53 @@ async function ensureSendableAndCreateSession(
     current = await pandadoc.waitForDraft(row.pandadoc_document_id);
   }
   if (current === 'document.draft' || current === 'draft' || current === 'document.uploaded') {
-    await pandadoc.sendDocument(row.pandadoc_document_id, {
-      subject: 'Trophi Hospitality — in-portal signing',
-      message: 'Signing happens inside the Trophi client portal. You should not receive this email.',
-      silent: true,
-    });
-    await supabaseAdmin.from('client_contracts').update({
-      status: 'document.sent',
-      updated_at: new Date().toISOString(),
-    }).eq('business_id', businessId).eq('kind', kind);
+    try {
+      await pandadoc.sendDocument(row.pandadoc_document_id, {
+        subject: 'Trophi Hospitality — in-portal signing',
+        message: 'Signing happens inside the Trophi client portal. You should not receive this email.',
+        silent: true,
+      });
+      await supabaseAdmin.from('client_contracts').update({
+        status: 'document.sent',
+        updated_at: new Date().toISOString(),
+      }).eq('business_id', businessId).eq('kind', kind);
+    } catch (err: any) {
+      // 4xx from send is terminal — auth/config refusal, not a race.
+      // Mark contract errored so client sees "Unavailable — Trophi is
+      // fixing it" instead of the raw provider text, and surface a
+      // sanitized message to the caller. Only classify true 4xx as
+      // terminal; anything else falls through so transient failures
+      // stay retryable.
+      if (err?.terminal === true) {
+        await markContractErrored(
+          supabaseAdmin, businessId, kind, row.metadata,
+          `PandaDoc refused to send this document (${err.status ?? '4xx'}): ${err.message ?? 'Forbidden'}. Trophi must resolve this before signing can proceed.`,
+          { last_error_status: err.status ?? null },
+        );
+        throw new Error(
+          'This document is not ready to sign yet — Trophi is resolving a document setup issue and will notify you as soon as it can be signed.',
+        );
+      }
+      throw err;
+    }
   }
 
-  const session = await pandadoc.createSession(row.pandadoc_document_id, recipientEmail, 900);
-  return { sessionUrl: `https://app.pandadoc.com/s/${session.id}`, expiresAt: session.expires_at };
+  try {
+    const session = await pandadoc.createSession(row.pandadoc_document_id, recipientEmail, 900);
+    return { sessionUrl: `https://app.pandadoc.com/s/${session.id}`, expiresAt: session.expires_at };
+  } catch (err: any) {
+    if (err?.terminal === true) {
+      await markContractErrored(
+        supabaseAdmin, businessId, kind, row.metadata,
+        `PandaDoc refused to open a signing session (${err.status ?? '4xx'}): ${err.message ?? 'Forbidden'}.`,
+        { last_error_status: err.status ?? null },
+      );
+      throw new Error(
+        'This document is not ready to sign yet — Trophi is resolving a document setup issue and will notify you as soon as it can be signed.',
+      );
+    }
+    throw err;
+  }
 }
 
 export const createSigningSessionFn = createServerFn({ method: 'POST' })
