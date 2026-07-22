@@ -129,10 +129,11 @@ export const getPaymentAuthStatusFn = createServerFn({ method: 'GET' })
 // produces a new signable document.
 export const generatePaymentAuthorizationFn = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => businessIdSchema.parse(d))
+  .inputValidator((d: unknown) => generateSchema.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    await assertClientOrStaff(supabase, data.businessId);
+    const caller = await assertClientOrStaff(supabase, data.businessId);
+    const intent = data.intent ?? 'ensure';
 
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
 
@@ -147,30 +148,67 @@ export const generatePaymentAuthorizationFn = createServerFn({ method: 'POST' })
     if (!rec?.payment_scope) throw new Error('Payment scope not recorded yet (Step 2)');
     if (!tpl?.template_id) throw new Error('Payment Authorization PandaDoc template ID is not configured. Ask an admin to set it in Admin → PandaDoc Templates.');
 
-    // Void any existing non-complete Payment Auth row first — treat as
-    // regenerate. Completed rows are left alone.
     const { data: existing } = await supabaseAdmin.from('client_contracts')
-      .select('id, status, pandadoc_document_id')
+      .select('id, status, pandadoc_document_id, metadata')
       .eq('business_id', data.businessId).eq('kind', 'payment_authorization')
       .order('created_at', { ascending: false }).limit(1).maybeSingle();
-    if (existing && existing.status !== 'document.completed' && existing.status !== 'completed') {
-      await supabaseAdmin.from('client_contracts').update({
-        status: 'void',
-        updated_at: new Date().toISOString(),
-      }).eq('id', existing.id);
-    } else if (existing && (existing.status === 'document.completed' || existing.status === 'completed')) {
+
+    const isCompleted = (s: string | null) => s === 'document.completed' || s === 'completed';
+    const existingMd = (existing?.metadata ?? {}) as any;
+    const existingBlank = Array.isArray(existingMd.blank_fields) ? existingMd.blank_fields : [];
+    const existingErrored = existing && (existing.status === 'error' || existingBlank.length > 0);
+    const existingLive =
+      existing && !!existing.pandadoc_document_id && existing.status !== 'void' && !existingErrored && !isCompleted(existing.status);
+
+    // Self-healing reuse: if a live doc already exists (from a prior client
+    // attempt or a staff manual click), just hand it back. Never dead-end.
+    if (intent === 'ensure' && existingLive) {
+      return {
+        ok: true, id: existing!.id, reused: true, blankFields: [] as string[], error: null as string | null,
+      };
+    }
+    if (existing && isCompleted(existing.status)) {
       throw new Error('Payment Authorization is already fully executed for this client.');
     }
 
-    // Build via the shared payment-auth.server module — enforces blank-guard + silent send.
+    // Void any non-completed row before rebuilding (regenerate, or ensure
+    // with an errored/voided prior row).
+    if (existing && !isCompleted(existing.status) && existing.status !== 'void') {
+      await supabaseAdmin.from('client_contracts').update({
+        status: 'void', updated_at: new Date().toISOString(),
+      }).eq('id', existing.id);
+    }
+
+    // Wrap the PandaDoc build so a transient sandbox failure surfaces as a
+    // friendly retry to the client AND leaves a trail for staff, without
+    // creating a poisoned error row that blocks the next retry.
     const { buildAndCreatePaymentAuthDoc } = await import('@/lib/payment-auth.server');
-    const result = await buildAndCreatePaymentAuthDoc({
-      supabaseAdmin,
-      businessId: data.businessId,
-      scope: rec.payment_scope as 'brand' | 'per_location',
-      templateUuid: tpl.template_id,
-      actorUserId: userId,
-    });
+    let result;
+    try {
+      result = await buildAndCreatePaymentAuthDoc({
+        supabaseAdmin,
+        businessId: data.businessId,
+        scope: rec.payment_scope as 'brand' | 'per_location',
+        templateUuid: tpl.template_id,
+        actorUserId: userId,
+      });
+    } catch (err: any) {
+      const msg = String(err?.message ?? err);
+      console.error(`[payment-auth] generate failed for ${data.businessId} (caller=${caller}):`, msg);
+      await supabaseAdmin.from('client_activity').insert({
+        business_id: data.businessId,
+        type: 'info_updated',
+        description: `Payment Authorization generation hit a transient error (${caller} attempt): ${msg}. Client can retry from portal.`,
+        actor: 'System',
+      });
+      // Friendly retryable error — client UI catches and shows retry state.
+      const isTransient = /\b(429|409|throttl|rate limit|timeout|temporarily)/i.test(msg);
+      throw new Error(
+        isTransient
+          ? "We're still preparing your document. Please try again in a minute."
+          : `Could not prepare the Payment Authorization: ${msg}`,
+      );
+    }
 
     const locationIds = result.snapshot.map((s) => s.locationId).filter(Boolean) as string[];
 
@@ -199,11 +237,11 @@ export const generatePaymentAuthorizationFn = createServerFn({ method: 'POST' })
       type: 'info_updated',
       description: result.error
         ? `Payment Authorization created with blank-field error: ${result.blankFields.join(', ')}`
-        : 'Payment Authorization document created and sent for client signing',
+        : `Payment Authorization document created and sent for client signing (${caller})`,
       actor: (await supabaseAdmin.from('profiles').select('name').eq('user_id', userId).maybeSingle()).data?.name ?? 'User',
     });
 
-    return { ok: true, id: inserted.id, blankFields: result.blankFields, error: result.error ?? null };
+    return { ok: true, id: inserted.id, reused: false, blankFields: result.blankFields, error: result.error ?? null };
   });
 
 // Client (or staff on client's behalf) opens the embedded PandaDoc session
