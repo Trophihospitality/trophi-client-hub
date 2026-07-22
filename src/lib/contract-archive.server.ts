@@ -57,8 +57,11 @@ export async function archiveCompletedContract(row: {
   }
 
   const details = await pandadoc.getDocument(docId);
-  const meta = (details as any).metadata ?? {};
-  const locationIds: string[] = Array.isArray(meta.location_ids) ? meta.location_ids : [];
+  const pdMeta = (details as any).metadata ?? {};
+  const fromPd: string[] = Array.isArray(pdMeta.location_ids) ? pdMeta.location_ids : [];
+  const fromRow: string[] = Array.isArray(row.location_ids) ? row.location_ids
+    : (Array.isArray(row.metadata?.location_ids) ? row.metadata.location_ids : []);
+  const locationIds = fromPd.length ? fromPd : fromRow;
   const documentName = details.name || KIND_LABEL[row.kind] || row.kind;
 
   const { bytes, contentType } = await pandadoc.downloadDocumentPdf(docId);
