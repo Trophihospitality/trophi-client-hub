@@ -127,10 +127,11 @@ export const listClientUsersForBusinessFn = createServerFn({ method: 'GET' })
 
 const PermSchema = z.enum(['admin_full', 'leadership', 'manager']);
 
-function buildInviteRedirect(origin?: string | null): string | undefined {
-  const base = (origin && /^https?:\/\//.test(origin)) ? origin.replace(/\/$/, '') : null;
-  return base ? `${base}/accept-invite` : undefined;
-}
+// Invite emails MUST always link to the production app URL. Never derive
+// from window.location.origin — the editor preview / sandbox / share-preview
+// hosts route through Lovable's platform auth bridge and break the invite.
+import { ACCEPT_INVITE_URL } from './app-urls';
+
 
 export const createClientUserFn = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
@@ -144,7 +145,6 @@ export const createClientUserFn = createServerFn({ method: 'POST' })
       locationIds: z.array(z.string()).default([]),
       permissionLevel: PermSchema,
       sendInvite: z.boolean().default(true),
-      origin: z.string().url().optional(),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
@@ -179,7 +179,7 @@ export const createClientUserFn = createServerFn({ method: 'POST' })
             client_user: true,
             business_id: data.businessId,
           },
-          redirectTo: buildInviteRedirect(data.origin),
+          redirectTo: ACCEPT_INVITE_URL,
         });
         if (inviteResp?.error) {
           throw new Error(inviteResp.error.message || `Invite failed (${inviteResp.error.status ?? 'unknown'})`);
@@ -296,7 +296,6 @@ export const updateClientUserFn = createServerFn({ method: 'POST' })
 
 export const resendClientInviteFn = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ id: z.string().uuid(), origin: z.string().url().optional() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId, claims } = context;
     const { data: row, error } = await supabase.from('client_users').select('*').eq('id', data.id).single();
@@ -345,7 +344,7 @@ export const resendClientInviteFn = createServerFn({ method: 'POST' })
     try {
       inviteResp = await supabaseAdmin.auth.admin.inviteUserByEmail(row.email, {
         data: { name: `${row.first_name} ${row.last_name}`.trim(), client_user: true, business_id: row.business_id },
-        redirectTo: buildInviteRedirect(data.origin),
+        redirectTo: ACCEPT_INVITE_URL,
       });
     } catch (e: any) {
       const msg = e?.message || 'Failed to resend invite';

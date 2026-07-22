@@ -166,7 +166,7 @@ function AddTrophiUserDialog({ users, onClose, onSaved }: { users: AppUser[]; on
       team: form.team, hireDate: form.hireDate,
       trainerId: form.trainerId,
       mentorId: form.mentorChoice === 'open' ? null : form.mentorChoice,
-      origin: window.location.origin,
+      
     } as any }),
     onSuccess: () => { toast.success('User invited — check email to activate'); onSaved(); onClose(); },
     onError: (e: any) => toast.error(e?.message ?? 'Failed to create user'),

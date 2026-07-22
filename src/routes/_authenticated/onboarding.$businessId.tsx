@@ -244,7 +244,7 @@ function PortalAccessCard({ businessId }: { businessId: string }) {
     queryFn: () => listFn({ data: { businessId } }),
   });
   const resendM = useMutation({
-    mutationFn: (id: string) => resend({ data: { id, origin: window.location.origin } }),
+    mutationFn: (id: string) => resend({ data: { id } }),
     onSuccess: (r: any) => {
       qc.invalidateQueries({ queryKey: ['client-users-for-business', businessId] });
       qc.invalidateQueries({ queryKey: ['client-users'] });
