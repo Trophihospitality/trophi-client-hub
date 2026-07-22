@@ -5,11 +5,13 @@ import { useServerFn } from '@tanstack/react-start';
 import { toast } from 'sonner';
 import {
   listClientUsersFn, createClientUserFn, updateClientUserFn, resendClientInviteFn,
+  adminResetAndReinviteFn,
   type ClientUser, type ClientPermission,
 } from '@/lib/client-users.functions';
 import { listClients } from '@/lib/crm.functions';
 import { formatPhoneInput } from '@/lib/phone';
-import { Plus, RefreshCcw, Search } from 'lucide-react';
+import { useAuth } from '@/store/userStore';
+import { Plus, RefreshCcw, Search, AlertTriangle } from 'lucide-react';
 
 export const Route = createFileRoute('/_authenticated/users/client-users')({
   component: ClientUsersPage,
@@ -108,10 +110,16 @@ export function InviteStatusCell({ user }: { user: ClientUser }) {
     : s === 'expired' ? { label: 'Expired', cls: 'bg-orange-100 text-orange-700' }
     : s === 'failed' ? { label: 'Failed', cls: 'bg-red-100 text-red-700' }
     : s === 'revoked' ? { label: 'Revoked', cls: 'bg-muted text-muted-foreground' }
+    : s === 'invite_required' ? { label: 'Invite required', cls: 'bg-red-100 text-red-700' }
     : { label: 'Not sent', cls: 'bg-muted text-muted-foreground' };
   return (
     <div className="space-y-0.5">
       <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${cfg.cls}`}>{cfg.label}</span>
+      {s === 'invite_required' && (
+        <div className="flex items-center gap-1 text-[11px] text-red-700">
+          <AlertTriangle className="h-3 w-3" /> No active login — resend invite
+        </div>
+      )}
       {(s === 'invited' || s === 'expired') && user.invitedAt && (
         <div className="text-[11px] text-muted-foreground">
           Sent {fmtDate(user.invitedAt)} to {user.inviteSentTo ?? user.email}
@@ -133,8 +141,11 @@ export function InviteStatusCell({ user }: { user: ClientUser }) {
 
 function ClientUserRow({ user }: { user: ClientUser }) {
   const qc = useQueryClient();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
   const update = useServerFn(updateClientUserFn);
   const resend = useServerFn(resendClientInviteFn);
+  const adminReset = useServerFn(adminResetAndReinviteFn);
   const [editing, setEditing] = useState(false);
 
   const updateM = useMutation({
@@ -148,8 +159,26 @@ function ClientUserRow({ user }: { user: ClientUser }) {
     onSuccess: (r: any) => { qc.invalidateQueries({ queryKey: ['client-users'] }); toast.success(`Invite sent to ${r?.sentTo ?? user.email}`); },
     onError: (e: any) => toast.error(e?.message ?? 'Failed'),
   });
+  const adminResetM = useMutation({
+    mutationFn: () => adminReset({ data: { id: user.id } }),
+    onSuccess: (r: any) => {
+      qc.invalidateQueries({ queryKey: ['client-users'] });
+      toast.success(`Reset & reinvited ${r?.sentTo ?? user.email}`);
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Failed'),
+  });
 
-  const canResend = user.inviteStatus === 'invited' || user.inviteStatus === 'expired' || user.inviteStatus === 'never_sent';
+  const canResend = user.inviteStatus === 'invited' || user.inviteStatus === 'expired'
+    || user.inviteStatus === 'never_sent' || user.inviteStatus === 'invite_required'
+    || user.inviteStatus === 'failed';
+
+  const handleAdminReset = () => {
+    if (!window.confirm(
+      `Reset & reinvite ${user.firstName} ${user.lastName} (${user.email})?\n\n`
+      + `This invalidates any existing portal access and login, deletes any current auth account for this email, and sends a fresh invite. Use this when the account is stuck, compromised, or the client wants to start over.`
+    )) return;
+    adminResetM.mutate();
+  };
 
   return (
     <>
@@ -179,10 +208,20 @@ function ClientUserRow({ user }: { user: ClientUser }) {
             {canResend && (
               <button
                 onClick={() => resendM.mutate()}
-                disabled={resendM.isPending}
+                disabled={resendM.isPending || adminResetM.isPending}
                 className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
               >
                 <RefreshCcw className="h-3.5 w-3.5" /> {user.inviteStatus === 'never_sent' ? 'Send invite' : 'Resend'}
+              </button>
+            )}
+            {isAdmin && (
+              <button
+                onClick={handleAdminReset}
+                disabled={adminResetM.isPending || resendM.isPending}
+                title="Invalidates existing access and sends a fresh invite"
+                className="inline-flex items-center gap-1 text-xs text-red-700 hover:text-red-900"
+              >
+                <AlertTriangle className="h-3.5 w-3.5" /> {adminResetM.isPending ? 'Resetting…' : 'Reset & reinvite'}
               </button>
             )}
             <button onClick={() => setEditing(true)} className="text-xs text-muted-foreground hover:text-foreground">Edit</button>

@@ -4,7 +4,7 @@ import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 
 export type ClientPermission = 'admin_full' | 'leadership' | 'manager';
 export type ClientUserStatus = 'invited' | 'active' | 'inactive';
-export type InviteStatus = 'accepted' | 'invited' | 'expired' | 'never_sent' | 'revoked' | 'failed';
+export type InviteStatus = 'accepted' | 'invited' | 'expired' | 'never_sent' | 'revoked' | 'failed' | 'invite_required';
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -42,6 +42,7 @@ export interface ClientUser {
   inviteStatus: InviteStatus;
   inviteLastError: string | null;
   inviteLastAttemptAt: string | null;
+  authUserExists: boolean;
 }
 
 async function writeAudit(admin: any, params: {
@@ -72,10 +73,16 @@ async function writeClientActivity(admin: any, params: {
   } catch { /* non-fatal */ }
 }
 
-function mapClientUser(r: any): ClientUser {
+function mapClientUser(r: any, authUserExists = true): ClientUser {
   const inviteExpiresAt = r.invited_at
     ? new Date(new Date(r.invited_at).getTime() + INVITE_TTL_MS).toISOString()
     : null;
+  // If auth artifact is missing but row says accepted/active, override status
+  // so the UI can surface an "Invite required" state with a Resend action.
+  const looksAccepted = !!r.user_id || r.status === 'active';
+  const inviteStatus: InviteStatus = (looksAccepted && !authUserExists)
+    ? 'invite_required'
+    : deriveInviteStatus(r);
   return {
     id: r.id,
     userId: r.user_id ?? null,
@@ -93,10 +100,40 @@ function mapClientUser(r: any): ClientUser {
     createdAt: r.created_at,
     inviteSentTo: r.invite_sent_to ?? null,
     inviteExpiresAt,
-    inviteStatus: deriveInviteStatus(r),
+    inviteStatus,
     inviteLastError: r.invite_last_error ?? null,
     inviteLastAttemptAt: r.invite_last_attempt_at ?? null,
+    authUserExists,
   };
+}
+
+/**
+ * Build a Set of auth.users ids that actually exist among the supplied ids.
+ * Uses paginated listUsers (cheap for our scale) so we make a small, bounded
+ * number of admin calls rather than one per row.
+ */
+async function existingAuthUserIds(admin: any, userIds: string[]): Promise<Set<string>> {
+  const wanted = new Set(userIds.filter(Boolean));
+  const found = new Set<string>();
+  if (wanted.size === 0) return found;
+  let page = 1;
+  while (page < 20) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
+    if (error) break;
+    const users = data?.users ?? [];
+    for (const u of users) if (wanted.has(u.id)) found.add(u.id);
+    if (users.length < 200) break;
+    page += 1;
+  }
+  return found;
+}
+
+async function mapClientUsersWithAuth(rows: any[]): Promise<ClientUser[]> {
+  const ids = rows.map(r => r.user_id).filter((x): x is string => !!x);
+  if (ids.length === 0) return rows.map(r => mapClientUser(r, true));
+  const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+  const existing = await existingAuthUserIds(supabaseAdmin, ids);
+  return rows.map(r => mapClientUser(r, r.user_id ? existing.has(r.user_id) : true));
 }
 
 export const listClientUsersFn = createServerFn({ method: 'GET' })
@@ -108,7 +145,7 @@ export const listClientUsersFn = createServerFn({ method: 'GET' })
       .select('*, clients:business_id(company)')
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return (data ?? []).map(mapClientUser);
+    return mapClientUsersWithAuth(data ?? []);
   });
 
 export const listClientUsersForBusinessFn = createServerFn({ method: 'GET' })
@@ -122,7 +159,7 @@ export const listClientUsersForBusinessFn = createServerFn({ method: 'GET' })
       .eq('business_id', data.businessId)
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return (rows ?? []).map(mapClientUser);
+    return mapClientUsersWithAuth(rows ?? []);
   });
 
 const PermSchema = z.enum(['admin_full', 'leadership', 'manager']);
@@ -378,6 +415,111 @@ export const resendClientInviteFn = createServerFn({ method: 'POST' })
     });
     return { ok: true, sentTo: row.email };
   });
+
+/**
+ * Admin escape hatch: works on ANY client_users row regardless of status.
+ * Deletes any dangling auth artifacts for this email, clears the row's
+ * accepted/activated state, and issues a fresh invite. Intended for cases
+ * where the auth user was deleted, an account was compromised, or the
+ * client asks to start over.
+ */
+export const adminResetAndReinviteFn = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId, claims } = context;
+    const { data: isAdmin } = await supabase.rpc('has_role', { _user_id: userId, _role: 'admin' });
+    if (!isAdmin) throw new Error('Forbidden: admin only');
+
+    const { data: row, error } = await supabase.from('client_users').select('*').eq('id', data.id).single();
+    if (error) throw error;
+
+    const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+
+    // Wipe any auth artifacts for this email so a fresh invite can issue.
+    const priorIds: string[] = [];
+    try {
+      let page = 1;
+      while (page < 20) {
+        const { data: existing } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 200 });
+        const users = existing?.users ?? [];
+        const matches = users.filter((u: any) => u.email?.toLowerCase() === row.email.toLowerCase());
+        for (const u of matches) {
+          try { await supabaseAdmin.auth.admin.deleteUser(u.id); priorIds.push(u.id); } catch { /* ignore */ }
+        }
+        if (users.length < 200) break;
+        page += 1;
+      }
+    } catch { /* non-fatal */ }
+
+    const nowIso = new Date().toISOString();
+    // Reset row to a fresh invited baseline.
+    await supabaseAdmin.from('client_users').update({
+      user_id: null,
+      status: 'invited',
+      activated_at: null,
+      invited_at: null,
+      invite_sent_to: null,
+      invite_last_error: null,
+      invite_last_attempt_at: null,
+    } as any).eq('id', data.id);
+
+    let inviteResp: any;
+    try {
+      inviteResp = await supabaseAdmin.auth.admin.inviteUserByEmail(row.email, {
+        data: { name: `${row.first_name} ${row.last_name}`.trim(), client_user: true, business_id: row.business_id },
+        redirectTo: ACCEPT_INVITE_URL,
+      });
+    } catch (e: any) {
+      const msg = e?.message || 'Reset & reinvite failed';
+      await supabaseAdmin.from('client_users')
+        .update({ invite_last_error: msg, invite_last_attempt_at: nowIso } as any).eq('id', data.id);
+      await writeAudit(supabaseAdmin, {
+        actorId: userId, actorEmail: (claims as any)?.email ?? null,
+        action: 'client_user.admin_reset_reinvite', entityType: 'client_user', entityId: data.id,
+        before: { status: row.status, user_id: row.user_id },
+        metadata: { error: msg, prior_ids_deleted: priorIds }, success: false,
+      });
+      throw new Error(msg);
+    }
+    if (inviteResp?.error) {
+      const msg = inviteResp.error.message || `Invite failed (${inviteResp.error.status ?? 'unknown'})`;
+      await supabaseAdmin.from('client_users')
+        .update({ invite_last_error: msg, invite_last_attempt_at: nowIso } as any).eq('id', data.id);
+      await writeAudit(supabaseAdmin, {
+        actorId: userId, actorEmail: (claims as any)?.email ?? null,
+        action: 'client_user.admin_reset_reinvite', entityType: 'client_user', entityId: data.id,
+        before: { status: row.status, user_id: row.user_id },
+        metadata: { error: msg, prior_ids_deleted: priorIds }, success: false,
+      });
+      throw new Error(msg);
+    }
+
+    await supabaseAdmin.from('client_users').update({
+      invited_at: nowIso,
+      invite_sent_to: row.email,
+      status: 'invited',
+      invite_last_attempt_at: nowIso,
+      invite_last_error: null,
+    } as any).eq('id', data.id);
+
+    await writeAudit(supabaseAdmin, {
+      actorId: userId, actorEmail: (claims as any)?.email ?? null,
+      action: 'client_user.admin_reset_reinvite', entityType: 'client_user', entityId: data.id,
+      before: { status: row.status, user_id: row.user_id, activated_at: row.activated_at },
+      after: { status: 'invited', sent_to: row.email },
+      metadata: { prior_ids_deleted: priorIds, previous_invite_invalidated: true },
+    });
+    await writeClientActivity(supabaseAdmin, {
+      businessId: row.business_id, type: 'info_updated',
+      description: `Admin reset & reinvited ${row.email} (${row.first_name} ${row.last_name}); prior access invalidated`,
+      actor: (claims as any)?.email ?? 'system', actorId: userId,
+    });
+
+    return { ok: true, sentTo: row.email, priorAuthUsersDeleted: priorIds.length };
+  });
+
+
 
 export interface AuditLogEntry {
   id: string;
