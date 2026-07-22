@@ -358,6 +358,34 @@ export const updateClientFn = createServerFn({ method: 'POST' })
     return { ok: true };
   });
 
+// ---------- POC ↔ Portal user sync status (for divergence banner) ----------
+export const getPocSyncStatusFn = createServerFn({ method: 'GET' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ businessId: z.string().min(1) }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const [{ data: cli }, { data: users }] = await Promise.all([
+      supabase.from('clients').select('contact_email, contact_name').eq('business_id', data.businessId).maybeSingle(),
+      supabase.from('client_users').select('id, first_name, last_name, email, user_id, status')
+        .eq('business_id', data.businessId),
+    ]);
+    if (!cli || !users || users.length === 0) return { emailMismatch: false as const };
+    const crmEmail = (cli.contact_email ?? '').toLowerCase();
+    // A user counts as accepted once they've linked an auth user or gone active.
+    const accepted = users.find((u: any) => u.user_id || u.status === 'active');
+    if (!accepted) return { emailMismatch: false as const };
+    const portalEmail = (accepted.email ?? '').toLowerCase();
+    if (!crmEmail || !portalEmail || crmEmail === portalEmail) return { emailMismatch: false as const };
+    return {
+      emailMismatch: true as const,
+      crmEmail: cli.contact_email as string,
+      portalEmail: accepted.email as string,
+      portalUserName: `${accepted.first_name ?? ''} ${accepted.last_name ?? ''}`.trim(),
+    };
+  });
+
+
+
 // ---------- CHANGE STATUS ----------
 const ChangeStatusInput = z.object({
   businessId: z.string(),
