@@ -1085,6 +1085,7 @@ export type Database = {
       is_privileged: { Args: { _user_id: string }; Returns: boolean }
       is_spiro: { Args: { _user_id: string }; Returns: boolean }
       is_trophi_staff_for: { Args: { _business_id: string }; Returns: boolean }
+      is_trophi_user: { Args: { _user_id: string }; Returns: boolean }
       sync_client_next_follow_up: {
         Args: { _business_id: string }
         Returns: undefined
