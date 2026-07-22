@@ -42,6 +42,7 @@ export interface ClientUser {
   inviteStatus: InviteStatus;
   inviteLastError: string | null;
   inviteLastAttemptAt: string | null;
+  authUserExists: boolean;
 }
 
 async function writeAudit(admin: any, params: {
