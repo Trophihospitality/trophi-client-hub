@@ -4,7 +4,7 @@ import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 
 export type ClientPermission = 'admin_full' | 'leadership' | 'manager';
 export type ClientUserStatus = 'invited' | 'active' | 'inactive';
-export type InviteStatus = 'accepted' | 'invited' | 'expired' | 'never_sent' | 'revoked';
+export type InviteStatus = 'accepted' | 'invited' | 'expired' | 'never_sent' | 'revoked' | 'failed';
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -12,9 +12,11 @@ export function deriveInviteStatus(row: {
   status: ClientUserStatus;
   user_id?: string | null;
   invited_at?: string | null;
+  invite_last_error?: string | null;
 }): InviteStatus {
   if (row.user_id || row.status === 'active') return 'accepted';
   if (row.status === 'inactive') return 'revoked';
+  if (row.invite_last_error) return 'failed';
   if (!row.invited_at) return 'never_sent';
   const ageMs = Date.now() - new Date(row.invited_at).getTime();
   return ageMs > INVITE_TTL_MS ? 'expired' : 'invited';
