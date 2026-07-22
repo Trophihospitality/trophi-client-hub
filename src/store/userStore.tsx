@@ -3,40 +3,78 @@ import { supabase } from '@/integrations/supabase/client';
 import type { User } from '@supabase/supabase-js';
 import type { SalesPerson } from '@/lib/types';
 
+type StaffRole = SalesPerson['role'];
+
+interface ClientContext {
+  businessId: string;
+  firstName: string | null;
+  lastName: string | null;
+  company: string | null;
+  permissionLevel: string | null;
+}
+
 interface AuthState {
   user: User | null;
   profile: SalesPerson | null;
+  client: ClientContext | null;
+  isClient: boolean;
+  isStaff: boolean;
   loading: boolean;
   signOut: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthState>({ user: null, profile: null, loading: true, signOut: async () => {} });
+const AuthContext = createContext<AuthState>({
+  user: null, profile: null, client: null, isClient: false, isStaff: false,
+  loading: true, signOut: async () => {},
+});
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<SalesPerson | null>(null);
+  const [client, setClient] = useState<ClientContext | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_ev, session) => {
       setUser(session?.user ?? null);
-      if (!session?.user) { setProfile(null); setLoading(false); return; }
+      if (!session?.user) { setProfile(null); setClient(null); setLoading(false); return; }
       setTimeout(() => {
         Promise.all([
           supabase.from('profiles').select('user_id, name, email').eq('user_id', session.user.id).maybeSingle(),
           supabase.from('user_roles').select('role').eq('user_id', session.user.id),
-        ]).then(([p, r]) => {
+          supabase.from('client_users')
+            .select('business_id, first_name, last_name, permission_level, clients:business_id(company)')
+            .eq('user_id', session.user.id)
+            .maybeSingle(),
+        ]).then(([p, r, cu]) => {
           const roles = (r.data ?? []).map((row: any) => row.role);
           const rank = (x: string) =>
             x === 'admin' ? 5 : x === 'manager' ? 4
               : x === 'onboarding_specialist' ? 3 : x === 'account_manager' ? 3
-              : x === 'sales_rep' ? 2 : 1;
-          const role = (roles.length ? roles.reduce((a: string, b: string) => rank(b) > rank(a) ? b : a) : 'sales_rep') as SalesPerson['role'];
-          if (p.data) {
+              : x === 'sales_rep' ? 2 : 0;
+          // No default — a user with zero Trophi roles is NOT staff.
+          const role = (roles.length
+            ? roles.reduce((a: string, b: string) => rank(b) > rank(a) ? b : a)
+            : null) as StaffRole | null;
+
+          if (role && p.data) {
             setProfile({
-              id: p.data.user_id, name: p.data.name, email: p.data.email,
-              role,
+              id: p.data.user_id, name: p.data.name, email: p.data.email, role,
             });
+          } else {
+            setProfile(null);
+          }
+
+          if (cu.data) {
+            setClient({
+              businessId: cu.data.business_id,
+              firstName: cu.data.first_name,
+              lastName: cu.data.last_name,
+              company: (cu.data.clients as any)?.company ?? null,
+              permissionLevel: cu.data.permission_level,
+            });
+          } else {
+            setClient(null);
           }
           setLoading(false);
         });
@@ -53,11 +91,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.href = '/auth';
   };
 
-  return <AuthContext.Provider value={{ user, profile, loading, signOut }}>{children}</AuthContext.Provider>;
+  const isStaff = !!profile;
+  const isClient = !isStaff && !!client;
+
+  return (
+    <AuthContext.Provider value={{ user, profile, client, isClient, isStaff, loading, signOut }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export const useAuth = () => useContext(AuthContext);
-// Legacy compatibility for CRM UI components
+
+// Legacy compatibility for CRM UI components (Trophi staff surfaces only).
 export function useUser() {
   const { profile } = useAuth();
   const currentUser = profile ?? { id: '', name: '', email: '', role: 'sales_rep' as const };
