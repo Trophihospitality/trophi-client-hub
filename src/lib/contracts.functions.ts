@@ -393,12 +393,32 @@ export const generateContractBundleFn = createServerFn({ method: 'POST' })
     const skipped: BundleKind[] = [];
     const errored: BundleKind[] = [];
 
+    const { pandadoc } = await import('@/lib/pandadoc.server');
+
     for (const kind of BUNDLE_KINDS) {
       const existing = contracts.find((r: any) => r.kind === kind);
-      if (existing && existing.pandadoc_document_id && existing.status !== 'error') {
+      const md = (existing?.metadata ?? {}) as any;
+      const hasStoredError = !!md?.error || (Array.isArray(md?.blank_fields) && md.blank_fields.length > 0);
+      const isHealthy =
+        existing &&
+        existing.pandadoc_document_id &&
+        existing.status !== 'error' &&
+        !hasStoredError;
+      if (isHealthy) {
         skipped.push(kind);
         continue;
       }
+
+      // Retry-safe: if a prior attempt left a stale PandaDoc doc, void it
+      // before creating a fresh one so we don't accumulate duplicates.
+      if (existing?.pandadoc_document_id) {
+        try {
+          await pandadoc.deleteDocument(existing.pandadoc_document_id);
+        } catch (err) {
+          console.warn(`[bundle] Could not delete stale PandaDoc doc ${existing.pandadoc_document_id} for ${kind}:`, err);
+        }
+      }
+
       try {
         const result = await buildAndCreateBundleDoc({
           kind, client, locations, sales,
@@ -426,7 +446,7 @@ export const generateContractBundleFn = createServerFn({ method: 'POST' })
           businessId: client.business_id,
           kind,
           existingRowId: existing?.id ?? null,
-          documentId: existing?.pandadoc_document_id ?? null,
+          documentId: null,
           status: 'error',
           templateId: templateMap.get(kind)!,
           signerEmail: client.contact_email,
