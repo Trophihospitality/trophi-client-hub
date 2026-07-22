@@ -94,6 +94,8 @@ function mapClientUser(r: any): ClientUser {
     inviteSentTo: r.invite_sent_to ?? null,
     inviteExpiresAt,
     inviteStatus: deriveInviteStatus(r),
+    inviteLastError: r.invite_last_error ?? null,
+    inviteLastAttemptAt: r.invite_last_attempt_at ?? null,
   };
 }
 
