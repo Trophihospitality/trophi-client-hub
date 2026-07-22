@@ -557,6 +557,10 @@ export default function ClientDetail() {
         </section>
       )}
 
+      {tab === 'documents' && (
+        <DocumentsSection businessId={client.businessId} mode="staff" />
+      )}
+
       {tab === 'attachments' && (
         <AttachmentsSection client={client} actorName={CURRENT_USER} canEdit={editable} />
       )}
