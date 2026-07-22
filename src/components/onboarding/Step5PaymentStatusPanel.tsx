@@ -30,7 +30,9 @@ export function Step5PaymentStatusPanel({ businessId, canManage }: Props) {
   });
 
   const genM = useMutation({
-    mutationFn: () => generate({ data: { businessId } }),
+    // Staff-side manual click is an admin fallback — force regenerate so
+    // it always rebuilds cleanly rather than reusing a live doc.
+    mutationFn: () => generate({ data: { businessId, intent: 'regenerate' as const } }),
     onSuccess: (r: any) => {
       if (r?.error) toast.error(r.error);
       else toast.success('Payment Authorization generated');

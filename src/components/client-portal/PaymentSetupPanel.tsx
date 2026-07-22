@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { toast } from 'sonner';
-import { CreditCard, CheckCircle2, Loader2, X, Plus } from 'lucide-react';
+import { CreditCard, CheckCircle2, Loader2, X, Plus, RefreshCw } from 'lucide-react';
 import { loadStripe, type Stripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { Button } from '@/components/ui/button';
@@ -61,14 +61,23 @@ export function PaymentSetupPanel({ businessId }: Props) {
     onError: (e: any) => toast.error(e?.message ?? 'Could not start payment capture'),
   });
 
-  const generateM = useMutation({
-    mutationFn: () => generateAuth({ data: { businessId } }),
-    onSuccess: (r: any) => {
-      if (r?.error) toast.error(r.error);
-      else toast.success('Authorization ready to sign');
+  // Self-healing "Continue to authorization": generate is idempotent
+  // (intent='ensure' server-side reuses any live doc), and on success we
+  // immediately open the signing session so the client never has to click
+  // twice. Transient PandaDoc failures surface as a friendly retry state
+  // (see the render block) — no staff involvement required.
+  const generateAndSign = useMutation({
+    mutationFn: async () => {
+      const gen = await generateAuth({ data: { businessId } });
+      if ((gen as any)?.error) throw new Error((gen as any).error);
+      const session = await createAuthSession({ data: { businessId } });
+      return session;
+    },
+    onSuccess: (r) => {
+      setAuthSessionUrl(r.sessionUrl);
       qc.invalidateQueries({ queryKey: ['payment-auth-status', businessId] });
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Could not generate'),
+    // Intentionally NO toast on error — the inline retry banner handles it.
   });
 
   const openSignSession = useMutation({
@@ -153,13 +162,25 @@ export function PaymentSetupPanel({ businessId }: Props) {
             The authorization document isn't ready. Your Trophi team has been notified — you don't need to do anything.
           </div>
         )}
+
+        {/* Transient generate failure — client-side friendly retry, no staff needed. */}
+        {generateAndSign.isError && status.allCaptured && !auth?.exists && (
+          <div className="rounded-md bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+            {(generateAndSign.error as any)?.message ?? "We're still preparing your document. Please try again in a minute."}
+          </div>
+        )}
+
         {status.allCaptured && !auth?.exists && (
           <Button
             className="w-full bg-[hsl(var(--trophi-gold))] text-black hover:brightness-95"
-            disabled={generateM.isPending}
-            onClick={() => generateM.mutate()}
+            disabled={generateAndSign.isPending}
+            onClick={() => generateAndSign.mutate()}
           >
-            {generateM.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Preparing…</> : 'Continue to authorization'}
+            {generateAndSign.isPending
+              ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Preparing…</>
+              : generateAndSign.isError
+                ? <><RefreshCw className="mr-2 h-4 w-4" /> Try again</>
+                : 'Continue to authorization'}
           </Button>
         )}
         {auth?.exists && !auth.completed && !auth.errored && (
@@ -181,6 +202,7 @@ export function PaymentSetupPanel({ businessId }: Props) {
           </div>
         )}
       </div>
+
 
       {open && (
         <Modal title={`Add payment — ${open.label}`} onClose={closeSetup}>
