@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import trophiMarkAsset from '@/assets/trophi-mark.png.asset.json';
 const trophiMark = trophiMarkAsset.url;
@@ -14,65 +14,57 @@ export const Route = createFileRoute('/accept-invite')({
 });
 
 type Ctx = {
-  email: string;
   name: string | null;
   company: string | null;
 } | null;
 
 function AcceptInvitePage() {
-  const [ready, setReady] = useState(false);
+  const params = useMemo(() => {
+    if (typeof window === 'undefined') return { token: '', email: '', type: '' };
+    const q = new URLSearchParams(window.location.search);
+    // Legacy fallback: some older invites still land with tokens in the hash
+    // (after GoTrue /verify redirect). We do NOT consume anything on load —
+    // we just read the params for use on submit.
+    const hash = window.location.hash.startsWith('#')
+      ? new URLSearchParams(window.location.hash.slice(1))
+      : new URLSearchParams();
+    return {
+      token: q.get('token') ?? '',
+      email: q.get('email') ?? '',
+      type: q.get('type') ?? 'invite',
+      hashAccessToken: hash.get('access_token') ?? '',
+    };
+  }, []);
+
+  const missingToken = !params.token && !params.hashAccessToken;
+
   const [ctx, setCtx] = useState<Ctx>(null);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [saving, setSaving] = useState(false);
-  const [tokenError, setTokenError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Read-only context lookup for the greeting. Does NOT consume the token.
+    // Uses the email from the query param against a public-safe lookup that
+    // only returns first/last name + company — no auth artifacts.
     let cancelled = false;
-    const load = async () => {
-      // Supabase JS auto-processes the URL hash and sets the session.
-      // Wait briefly for that, then confirm session + fetch context.
-      await new Promise((r) => setTimeout(r, 50));
-      const { data: sess } = await supabase.auth.getSession();
-      if (!sess.session) {
-        // Try one more time after another tick — hash processing can be async.
-        await new Promise((r) => setTimeout(r, 300));
-        const { data: sess2 } = await supabase.auth.getSession();
-        if (!sess2.session) {
-          if (!cancelled) {
-            setTokenError('This invite link is invalid or has expired. Ask your Trophi contact to resend it.');
-            setReady(true);
-          }
-          return;
-        }
-      }
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData.user;
-      if (!user) {
-        if (!cancelled) { setTokenError('Could not load your invite.'); setReady(true); }
-        return;
-      }
-      // Look up client_users row for name + company
+    (async () => {
+      if (!params.email) return;
       const { data: cu } = await supabase
         .from('client_users')
         .select('first_name, last_name, business_id, clients:business_id(company)')
-        .eq('email', user.email!)
+        .eq('email', params.email)
         .maybeSingle();
       if (cancelled) return;
-      setCtx({
-        email: user.email ?? '',
-        name: cu ? `${cu.first_name} ${cu.last_name}`.trim() : (user.user_metadata?.name ?? null),
-        company: (cu?.clients as any)?.company ?? null,
-      });
-      setReady(true);
-      // Clean the hash so tokens are not left in the URL bar
-      if (window.location.hash) {
-        history.replaceState(null, '', window.location.pathname + window.location.search);
+      if (cu) {
+        setCtx({
+          name: `${cu.first_name} ${cu.last_name}`.trim(),
+          company: (cu.clients as any)?.company ?? null,
+        });
       }
-    };
-    load();
+    })();
     return () => { cancelled = true; };
-  }, []);
+  }, [params.email]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,12 +72,31 @@ function AcceptInvitePage() {
     if (password !== confirm) { toast.error('Passwords do not match'); return; }
     setSaving(true);
     try {
+      // Consume the one-time token ONLY now, on user submit.
+      if (params.token && params.email) {
+        const { error: verifyErr } = await supabase.auth.verifyOtp({
+          email: params.email,
+          token: params.token,
+          type: 'invite',
+        });
+        if (verifyErr) throw verifyErr;
+      } else if (!params.hashAccessToken) {
+        throw new Error('Missing invite token. Ask your Trophi contact to resend the invite.');
+      }
+      // If hash-token path (legacy): Supabase JS already established the
+      // session on load. Either way, we now have a session — set the password.
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
       toast.success('Password set. Welcome!');
+      // Clean any sensitive fragments before navigating
+      if (window.location.hash) {
+        history.replaceState(null, '', window.location.pathname);
+      }
       window.location.href = ctx?.company ? '/client-portal' : '/crm';
     } catch (err: any) {
-      toast.error(err.message ?? 'Could not set password');
+      const msg = err?.message ?? 'Could not set password';
+      // Common: "Token has expired or is invalid"
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -103,23 +114,26 @@ function AcceptInvitePage() {
           <div className="gold-rule w-16 rounded" />
         </div>
 
-        {!ready ? (
-          <p className="text-center text-sm text-muted-foreground">Verifying your invite…</p>
-        ) : tokenError ? (
+        {missingToken ? (
           <div className="text-center space-y-3">
             <h1 className="font-display text-lg font-semibold">Invite link problem</h1>
-            <p className="text-sm text-muted-foreground">{tokenError}</p>
+            <p className="text-sm text-muted-foreground">
+              This invite link is missing its token. Ask your Trophi contact to resend it.
+            </p>
             <Button asChild variant="outline" className="w-full"><a href="/auth">Back to sign in</a></Button>
           </div>
         ) : (
           <>
-            <h1 className="text-center font-display text-lg font-semibold mb-1">Accept your invitation</h1>
+            <h1 className="text-center font-display text-lg font-semibold mb-1">
+              {ctx?.name ? `Welcome, ${ctx.name}` : 'Accept your invitation'}
+            </h1>
             <p className="text-center text-sm text-muted-foreground mb-6">
-              {ctx?.name ? <><strong>{ctx.name}</strong>, y</> : 'Y'}ou're joining{' '}
-              <strong>{ctx?.company ?? 'the Trophi portal'}</strong>. Set a password to finish creating your account.
+              Set up your{' '}
+              <strong>{ctx?.company ? `${ctx.company} account` : 'Trophi portal account'}</strong>{' '}
+              by choosing a password below.
             </p>
             <div className="mb-4 rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
-              Signed in as <strong className="text-foreground">{ctx?.email}</strong>
+              Setting password for <strong className="text-foreground">{params.email || 'your account'}</strong>
             </div>
             <form onSubmit={onSubmit} className="space-y-4">
               <div className="space-y-1.5">
