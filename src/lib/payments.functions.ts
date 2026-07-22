@@ -70,14 +70,15 @@ export const createSetupIntentFn = createServerFn({ method: 'POST' })
       ? { scope: 'location', location_id: data.locationId! }
       : { scope: 'brand', location_id: null as string | null };
 
-    const { data: existing } = await supabaseAdmin
+    let existingQuery = supabaseAdmin
       .from('payment_methods')
       .select('stripe_customer_id')
       .eq('business_id', data.businessId)
-      .eq('scope', scopeFilter.scope)
-      .is('location_id', scopeFilter.location_id ?? null)
-      .limit(1)
-      .maybeSingle();
+      .eq('scope', scopeFilter.scope);
+    existingQuery = scopeFilter.location_id
+      ? existingQuery.eq('location_id', scopeFilter.location_id)
+      : existingQuery.is('location_id', null);
+    const { data: existing } = await existingQuery.limit(1).maybeSingle();
 
     let customerId = existing?.stripe_customer_id as string | undefined;
 

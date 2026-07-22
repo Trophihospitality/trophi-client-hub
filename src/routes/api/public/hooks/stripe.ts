@@ -100,12 +100,15 @@ async function handleSetupIntentSucceeded(setupIntent: any) {
   const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
 
   // First method for this scope becomes default.
-  const { count } = await supabaseAdmin
+  let countQuery = supabaseAdmin
     .from('payment_methods')
     .select('id', { count: 'exact', head: true })
     .eq('business_id', businessId)
-    .eq('scope', scope)
-    .is('location_id', locationId);
+    .eq('scope', scope);
+  countQuery = locationId ? countQuery.eq('location_id', locationId) : countQuery.is('location_id', null);
+  const { count } = await countQuery;
+
+
 
   const isDefault = (count ?? 0) === 0;
 
