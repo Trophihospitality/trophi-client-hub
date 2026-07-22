@@ -264,7 +264,7 @@ function SummaryTab({ user, mentor, users, editMode, onAvatarChanged }: {
             )}
             {editing && (
               <div className="flex gap-2">
-                <button onClick={() => { setEditing(false); setPhotoFile(null); setPhotoPreview(null); }} className="inline-flex items-center gap-1 rounded-md border border-input px-3 py-1.5 text-sm">
+                <button onClick={() => { setEditing(false); setPhotoBlob(null); setPhotoPreview(null); setCropFile(null); }} className="inline-flex items-center gap-1 rounded-md border border-input px-3 py-1.5 text-sm">
                   <X className="h-3.5 w-3.5" /> Cancel
                 </button>
                 <button disabled={saveM.isPending} onClick={() => saveM.mutate()} className="inline-flex items-center gap-1 rounded-md bg-[hsl(var(--trophi-gold))] px-3 py-1.5 text-sm font-medium text-[hsl(var(--trophi-ink))] disabled:opacity-60">
@@ -284,16 +284,29 @@ function SummaryTab({ user, mentor, users, editMode, onAvatarChanged }: {
             <div className="mb-5 flex items-center gap-4">
               <AvatarCircle name={user.name} url={previewUrl} size={64} />
               <label className="inline-flex items-center gap-2 rounded-md border border-input px-3 py-1.5 text-sm cursor-pointer hover:bg-muted/40">
-                <Upload className="h-3.5 w-3.5" /> {photoFile ? 'Change photo' : 'Upload photo'}
-                <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={onPickPhoto} />
+                <Upload className="h-3.5 w-3.5" /> {photoBlob ? 'Change photo' : 'Upload photo'}
+                <input type="file" accept={AVATAR_ACCEPT} className="hidden" onChange={onPickPhoto} />
               </label>
-              {photoFile && (
-                <button onClick={() => { setPhotoFile(null); setPhotoPreview(null); }} className="text-xs text-muted-foreground hover:text-foreground">
+              {photoBlob && (
+                <button onClick={() => { setPhotoBlob(null); setPhotoPreview(null); }} className="text-xs text-muted-foreground hover:text-foreground">
                   Discard change
                 </button>
               )}
             </div>
           )}
+
+          {cropFile && (
+            <AvatarCropDialog
+              file={cropFile}
+              onCancel={() => setCropFile(null)}
+              onConfirm={(blob, url) => {
+                setPhotoBlob(blob);
+                setPhotoPreview(url);
+                setCropFile(null);
+              }}
+            />
+          )}
+
 
           {!editing ? (
             <dl className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
