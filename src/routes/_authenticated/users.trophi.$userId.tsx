@@ -133,17 +133,19 @@ function SummaryTab({ user, mentor, users, canEdit }: { user: AppUser; mentor: A
   const setRole = useServerFn(setUserRoleFn);
   const setActive = useServerFn(setUserActiveFn);
   const [editing, setEditing] = useState(false);
+  const spiroId = users.find(u => u.email.toLowerCase() === 'spiro@trophihospitality.com')?.id ?? null;
   const [form, setForm] = useState({
     firstName: user.firstName ?? '',
     lastName: user.lastName ?? '',
     phone: user.phone ?? '',
-    team: user.team ?? '',
+    team: user.team && (user.team === 'TBD' || user.team === 'Other') ? user.team : 'TBD',
     hireDate: user.hireDate ?? '',
     hireRole: (user.hireRole ?? user.role) as AppRole,
-    mentorId: user.mentorId ?? '',
+    mentorChoice: (user.mentorId ?? 'open') as string,
     role: user.role,
     currentRoleStartedAt: user.currentRoleStartedAt ?? '',
     isActive: user.isActive,
+    trainerId: spiroId ?? '',
   });
 
   useEffect(() => {
@@ -151,31 +153,36 @@ function SummaryTab({ user, mentor, users, canEdit }: { user: AppUser; mentor: A
       firstName: user.firstName ?? '',
       lastName: user.lastName ?? '',
       phone: user.phone ?? '',
-      team: user.team ?? '',
+      team: user.team && (user.team === 'TBD' || user.team === 'Other') ? user.team : 'TBD',
       hireDate: user.hireDate ?? '',
       hireRole: (user.hireRole ?? user.role) as AppRole,
-      mentorId: user.mentorId ?? '',
+      mentorChoice: (user.mentorId ?? 'open') as string,
       role: user.role,
       currentRoleStartedAt: user.currentRoleStartedAt ?? '',
       isActive: user.isActive,
+      trainerId: spiroId ?? '',
     });
-  }, [user]);
+  }, [user, spiroId]);
+
+  const roleChanged = form.role !== user.role && form.role !== 'client_admin';
 
   const saveM = useMutation({
     mutationFn: async () => {
+      if (!form.phone.trim()) throw new Error('Phone is required');
+      if (roleChanged && !form.trainerId) throw new Error('Select a trainer for the new role');
       await update({ data: {
         targetUserId: user.id,
         firstName: form.firstName,
         lastName: form.lastName,
-        phone: form.phone || null,
-        team: form.team || null,
+        phone: form.phone,
+        team: form.team,
         hireDate: form.hireDate || null,
         hireRole: form.hireRole,
-        mentorId: form.mentorId || null,
+        mentorId: form.mentorChoice === 'open' ? null : form.mentorChoice,
         currentRoleStartedAt: form.currentRoleStartedAt || null,
       } as any });
-      if (form.role !== user.role && form.role !== 'client_admin') {
-        await setRole({ data: { targetUserId: user.id, role: form.role } });
+      if (roleChanged) {
+        await setRole({ data: { targetUserId: user.id, role: form.role, trainerId: form.trainerId } as any });
       }
       if (form.isActive !== user.isActive) {
         await setActive({ data: { targetUserId: user.id, isActive: form.isActive } });
@@ -183,6 +190,7 @@ function SummaryTab({ user, mentor, users, canEdit }: { user: AppUser; mentor: A
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['users'] });
+      qc.invalidateQueries({ queryKey: ['role-history', user.id] });
       toast.success('Profile updated');
       setEditing(false);
     },
@@ -223,7 +231,7 @@ function SummaryTab({ user, mentor, users, canEdit }: { user: AppUser; mentor: A
               <Info label="Current role" value={user.role.replace(/_/g, ' ')} capitalize />
               <Info label="Role started" value={fmtDate(user.currentRoleStartedAt)} />
               <Info label="Team" value={user.team ?? '—'} />
-              <Info label="Mentor" value={mentor?.name ?? '—'} />
+              <Info label="Mentor" value={mentor?.name ?? 'Open'} />
               <Info label="Status" value={user.isActive ? 'Active' : 'Inactive'} />
             </dl>
           ) : (
@@ -244,15 +252,26 @@ function SummaryTab({ user, mentor, users, canEdit }: { user: AppUser; mentor: A
                 </select>
               </F>
               <F label="Role started"><I type="date" value={form.currentRoleStartedAt} onChange={v => setForm({ ...form, currentRoleStartedAt: v })} /></F>
-              <F label="Team"><I value={form.team} onChange={v => setForm({ ...form, team: v })} /></F>
-              <F label="Mentor">
-                <select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.mentorId} onChange={e => setForm({ ...form, mentorId: e.target.value })}>
-                  <option value="">None</option>
-                  {users.filter(u => u.id !== user.id).map(u => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
-                  ))}
+              <F label="Team">
+                <select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.team} onChange={e => setForm({ ...form, team: e.target.value })}>
+                  <option value="TBD">TBD</option>
+                  <option value="Other">Other</option>
                 </select>
               </F>
+              <F label="Mentor">
+                <select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.mentorChoice} onChange={e => setForm({ ...form, mentorChoice: e.target.value })}>
+                  <option value="open">Open</option>
+                  {spiroId && <option value={spiroId}>Spiro Douvris</option>}
+                </select>
+              </F>
+              {roleChanged && (
+                <F label="Trainer for new role *">
+                  <select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.trainerId} onChange={e => setForm({ ...form, trainerId: e.target.value })}>
+                    <option value="" disabled>Select trainer…</option>
+                    {spiroId && <option value={spiroId}>Spiro Douvris</option>}
+                  </select>
+                </F>
+              )}
               <F label="Status">
                 <select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.isActive ? 'yes' : 'no'} onChange={e => setForm({ ...form, isActive: e.target.value === 'yes' })}>
                   <option value="yes">Active</option>
@@ -427,6 +446,7 @@ function HistoryTab({ user, users }: { user: AppUser; users: AppUser[] }) {
               <th className="px-2 py-2">Started</th>
               <th className="px-2 py-2">Ended</th>
               <th className="px-2 py-2">Time in role</th>
+              <th className="px-2 py-2">Trainer</th>
               <th className="px-2 py-2">Changed by</th>
             </tr>
           </thead>
@@ -440,6 +460,7 @@ function HistoryTab({ user, users }: { user: AppUser; users: AppUser[] }) {
                   <td className="px-2 py-3 text-muted-foreground">{fmtDate(r.startedOn)}</td>
                   <td className="px-2 py-3 text-muted-foreground">{r.endedOn ? fmtDate(r.endedOn) : 'Present'}</td>
                   <td className="px-2 py-3 text-muted-foreground">{days}d</td>
+                  <td className="px-2 py-3 text-muted-foreground">{r.trainerId ? nameFor(r.trainerId) : '—'}</td>
                   <td className="px-2 py-3 text-muted-foreground">{nameFor(r.changedBy)}</td>
                 </tr>
               );

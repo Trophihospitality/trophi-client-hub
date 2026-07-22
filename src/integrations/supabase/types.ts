@@ -936,7 +936,9 @@ export type Database = {
           hire_role: Database["public"]["Enums"]["app_role"] | null
           is_active: boolean
           last_name: string | null
+          mentor_assigned_at: string | null
           mentor_id: string | null
+          mentor_status: string
           name: string
           phone: string | null
           team: string | null
@@ -953,7 +955,9 @@ export type Database = {
           hire_role?: Database["public"]["Enums"]["app_role"] | null
           is_active?: boolean
           last_name?: string | null
+          mentor_assigned_at?: string | null
           mentor_id?: string | null
+          mentor_status?: string
           name: string
           phone?: string | null
           team?: string | null
@@ -970,7 +974,9 @@ export type Database = {
           hire_role?: Database["public"]["Enums"]["app_role"] | null
           is_active?: boolean
           last_name?: string | null
+          mentor_assigned_at?: string | null
           mentor_id?: string | null
+          mentor_status?: string
           name?: string
           phone?: string | null
           team?: string | null
@@ -995,6 +1001,7 @@ export type Database = {
           id: string
           role: Database["public"]["Enums"]["app_role"]
           started_on: string
+          trainer_id: string | null
           user_id: string
         }
         Insert: {
@@ -1004,6 +1011,7 @@ export type Database = {
           id?: string
           role: Database["public"]["Enums"]["app_role"]
           started_on: string
+          trainer_id?: string | null
           user_id: string
         }
         Update: {
@@ -1013,9 +1021,18 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           started_on?: string
+          trainer_id?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "role_history_trainer_id_fkey"
+            columns: ["trainer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
