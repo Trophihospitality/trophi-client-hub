@@ -4,9 +4,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { toast } from 'sonner';
 import {
-  listUsersFn, createTrophiUserFn,
-  setUserActiveFn, type AppRole, type AppUser,
+  listUsersFn, createTrophiUserFn, type AppRole,
 } from '@/lib/users.functions';
+
 import { useAuth } from '@/store/userStore';
 import { formatPhone, formatPhoneInput } from '@/lib/phone';
 import { Plus, Search } from 'lucide-react';
