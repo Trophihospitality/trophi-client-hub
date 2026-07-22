@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from '@tanstack/react-router';
 import { ArrowLeft, MapPin, StickyNote, Clock, Send, PhoneCall, AlertTriangle, Plus, Ban, RotateCcw } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { useServerFn } from '@tanstack/react-start';
+import { getPocSyncStatusFn } from '@/lib/crm.functions';
 import { useCrm } from '@/store/crmStore';
 import { useUser } from '@/store/userStore';
+
 import { LogContactDialog } from '@/components/crm/LogContactDialog';
 import { AttachmentsSection } from '@/components/crm/AttachmentsSection';
 import { isOverdue } from '@/lib/statusConfig';
@@ -49,6 +53,13 @@ export default function ClientDetail() {
   const navigate = useNavigate();
   const { getClient, updateClient, changeStatus, addNote, setLocationStatus } = useCrm();
   const client = getClient(businessId ?? '');
+  const getPocSync = useServerFn(getPocSyncStatusFn);
+  const { data: pocSync } = useQuery({
+    queryKey: ['poc-sync', businessId],
+    queryFn: () => getPocSync({ data: { businessId } }),
+    enabled: !!businessId,
+  });
+
 
   // Editable draft of client info
   const [draft, setDraft] = useState(() =>
@@ -259,6 +270,19 @@ export default function ClientDetail() {
           Read-only: this account is owned by {owner?.name ?? 'another rep'}. Ask a manager to reassign it if you need edit access.
         </div>
       )}
+
+      {pocSync?.emailMismatch && (
+        <div className="ml-12 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-900 dark:text-amber-200">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          <div>
+            <strong>Contact email differs from portal login.</strong> CRM POC email is{' '}
+            <code className="font-mono text-xs">{pocSync.crmEmail}</code>; {pocSync.portalUserName || 'the portal user'} signs in as{' '}
+            <code className="font-mono text-xs">{pocSync.portalEmail}</code>. This is expected once a user has accepted — they own their profile.
+          </div>
+        </div>
+      )}
+
+
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-border">
