@@ -449,3 +449,82 @@ export const updateTrophiUserFn = createServerFn({ method: 'POST' })
     return { ok: true };
   });
 
+
+export const resendTrophiInviteFn = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ targetUserId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId, claims } = context;
+    await assertSpiro(supabase, userId);
+
+    const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+    const { ACCEPT_INVITE_URL } = await import('./app-urls');
+
+    const { data: profile, error: pErr } = await supabaseAdmin
+      .from('profiles').select('*').eq('user_id', data.targetUserId).maybeSingle();
+    if (pErr) throw pErr;
+    if (!profile) throw new Error('Profile not found');
+
+    const nowIso = new Date().toISOString();
+    const recordFailure = async (msg: string) => {
+      await supabaseAdmin.from('profiles')
+        .update({ invite_last_error: msg, invite_last_attempt_at: nowIso } as any)
+        .eq('user_id', data.targetUserId);
+      await writeAudit(supabaseAdmin, {
+        actorId: userId, actorEmail: (claims as any)?.email ?? null,
+        action: 'trophi_user.invite_resend', entityType: 'profile', entityId: data.targetUserId,
+        after: { sent_to: profile.email }, metadata: { error: msg }, success: false,
+      });
+    };
+
+    // Block resend if the user has already accepted (has signed in / confirmed).
+    let alreadyAccepted = false;
+    try {
+      const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(data.targetUserId);
+      const u: any = authUser?.user;
+      alreadyAccepted = !!(u && (u.email_confirmed_at || u.last_sign_in_at));
+    } catch { /* ignore */ }
+    if (alreadyAccepted) {
+      throw new Error('This user has already accepted their invite');
+    }
+
+    // Try inviteUserByEmail first. If the auth user already exists (typical
+    // for a stalled invite), fall back to admin.generateLink('invite') which
+    // mints a fresh token and fires the same auth email hook.
+    let inviteErr: any = null;
+    try {
+      const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(profile.email, {
+        data: { name: profile.name, first_name: profile.first_name, last_name: profile.last_name },
+        redirectTo: ACCEPT_INVITE_URL,
+      });
+      if (error) inviteErr = error;
+    } catch (e: any) { inviteErr = e; }
+
+    if (inviteErr && /email.*exist|already.*regist|already been register/i.test(inviteErr.message || '')) {
+      const { error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'invite',
+        email: profile.email,
+        options: { redirectTo: ACCEPT_INVITE_URL, data: { name: profile.name } },
+      } as any);
+      if (linkErr) inviteErr = linkErr; else inviteErr = null;
+    }
+
+    if (inviteErr) {
+      const msg = inviteErr.message || 'Failed to resend invite';
+      await recordFailure(msg);
+      throw new Error(msg);
+    }
+
+    await supabaseAdmin.from('profiles').update({
+      invited_at: nowIso,
+      invite_last_attempt_at: nowIso,
+      invite_last_error: null,
+    } as any).eq('user_id', data.targetUserId);
+
+    await writeAudit(supabaseAdmin, {
+      actorId: userId, actorEmail: (claims as any)?.email ?? null,
+      action: 'trophi_user.invite_resend', entityType: 'profile', entityId: data.targetUserId,
+      after: { sent_to: profile.email },
+    });
+    return { ok: true, sentTo: profile.email };
+  });
