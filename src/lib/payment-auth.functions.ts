@@ -23,6 +23,14 @@ import { z } from 'zod';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 
 const businessIdSchema = z.object({ businessId: z.string() });
+const generateSchema = z.object({
+  businessId: z.string(),
+  // 'ensure' = self-healing: reuse any live doc, only create if truly missing.
+  //   Used by the CLIENT "Continue to authorization" path so a transient
+  //   sandbox 429/409 or a doc already created by staff never dead-ends.
+  // 'regenerate' = admin escape hatch: void any non-completed row and rebuild.
+  intent: z.enum(['ensure', 'regenerate']).optional(),
+});
 
 async function assertStaff(supabase: any, businessId: string) {
   const { data: ok } = await supabase.rpc('is_trophi_staff_for', { _business_id: businessId });
