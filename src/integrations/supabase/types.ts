@@ -1066,6 +1066,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      advance_after_portal_access: {
+        Args: { _business_id: string }
+        Returns: undefined
+      }
       business_hours_since: { Args: { _ts: string }; Returns: number }
       can_access_client: { Args: { _business_id: string }; Returns: boolean }
       can_view_onboarding: { Args: { _business_id: string }; Returns: boolean }
