@@ -100,4 +100,18 @@ export const pandadoc = {
       body: JSON.stringify({ recipient: recipientEmail, lifetime: lifetimeSec }),
     });
   },
+
+  // Draft docs are permanently removed. Sent/completed docs return 400; caller
+  // should void those separately. We swallow 404 so a partial cleanup can retry.
+  async deleteDocument(id: string): Promise<void> {
+    const res = await fetch(`${BASE}/documents/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `API-Key ${apiKey()}` },
+    });
+    if (res.status === 404 || res.status === 204) return;
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`PandaDoc delete ${id} → ${res.status}: ${text.slice(0, 200)}`);
+    }
+  },
 };
