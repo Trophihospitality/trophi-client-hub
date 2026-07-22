@@ -431,14 +431,43 @@ function HistoryTab({ user, users }: { user: AppUser; users: AppUser[] }) {
 
   const nameFor = (id: string | null | undefined) => id ? (users.find(u => u.id === id)?.name ?? id.slice(0, 8)) : '—';
 
+  const rows = useMemo(() => {
+    const raw = (data ?? []) as any[];
+    if (raw.length > 0) return raw;
+    // Synthesize from profile fields so the tab is never empty for a hired user.
+    const synth: any[] = [];
+    if (user.hireRole && user.hireDate) {
+      const hireOpen = !user.currentRoleStartedAt || user.currentRoleStartedAt === user.hireDate || user.hireRole === user.role;
+      synth.push({
+        id: 'synth-hire',
+        role: user.hireRole,
+        startedOn: user.hireDate,
+        endedOn: hireOpen ? null : user.currentRoleStartedAt,
+        trainerId: null,
+        changedBy: null,
+      });
+      if (!hireOpen) {
+        synth.push({
+          id: 'synth-current',
+          role: user.role,
+          startedOn: user.currentRoleStartedAt,
+          endedOn: null,
+          trainerId: null,
+          changedBy: null,
+        });
+      }
+    }
+    return synth.sort((a, b) => (b.startedOn > a.startedOn ? 1 : -1));
+  }, [data, user]);
+
   return (
     <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
       <h2 className="font-display text-lg font-semibold mb-4">Role progression</h2>
       {isLoading && <div className="text-sm text-muted-foreground">Loading…</div>}
-      {!isLoading && (data ?? []).length === 0 && (
-        <div className="text-sm text-muted-foreground">No prior role changes recorded.</div>
+      {!isLoading && rows.length === 0 && (
+        <div className="text-sm text-muted-foreground">No role history recorded.</div>
       )}
-      {!isLoading && (data ?? []).length > 0 && (
+      {!isLoading && rows.length > 0 && (
         <table className="w-full text-sm">
           <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
             <tr>
@@ -451,7 +480,7 @@ function HistoryTab({ user, users }: { user: AppUser; users: AppUser[] }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {(data ?? []).map((r: any) => {
+            {rows.map((r: any) => {
               const end = r.endedOn ?? new Date().toISOString().slice(0, 10);
               const days = daysBetween(r.startedOn, end);
               return (
@@ -461,7 +490,7 @@ function HistoryTab({ user, users }: { user: AppUser; users: AppUser[] }) {
                   <td className="px-2 py-3 text-muted-foreground">{r.endedOn ? fmtDate(r.endedOn) : 'Present'}</td>
                   <td className="px-2 py-3 text-muted-foreground">{days}d</td>
                   <td className="px-2 py-3 text-muted-foreground">{r.trainerId ? nameFor(r.trainerId) : '—'}</td>
-                  <td className="px-2 py-3 text-muted-foreground">{nameFor(r.changedBy)}</td>
+                  <td className="px-2 py-3 text-muted-foreground">{r.changedBy ? nameFor(r.changedBy) : '—'}</td>
                 </tr>
               );
             })}
@@ -471,6 +500,7 @@ function HistoryTab({ user, users }: { user: AppUser; users: AppUser[] }) {
     </div>
   );
 }
+
 
 /* ================ Recent Activity ================ */
 function ActivityTab({ user }: { user: AppUser }) {
