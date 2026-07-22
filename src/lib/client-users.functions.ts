@@ -179,6 +179,7 @@ export const createClientUserFn = createServerFn({ method: 'POST' })
             client_user: true,
             business_id: data.businessId,
           },
+          redirectTo: buildInviteRedirect(data.origin),
         });
         if (inviteResp?.error) {
           throw new Error(inviteResp.error.message || `Invite failed (${inviteResp.error.status ?? 'unknown'})`);
