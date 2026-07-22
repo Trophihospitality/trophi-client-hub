@@ -628,7 +628,7 @@ export const reconcileContractBundleFn = createServerFn({ method: 'POST' })
   .inputValidator((d: unknown) => z.object({ businessId: z.string() }).parse(d))
   .handler(async ({ data, context }): Promise<{
     ok: true;
-    reconciled: Array<{ kind: BundleKind; status: string; cleared: boolean; sent: boolean; stillBlank: string[]; note?: string }>;
+    reconciled: Array<{ kind: BundleKind; status: string; cleared: boolean; sent: boolean; created: boolean; stillBlank: string[]; note?: string }>;
   }> => {
     const { supabase, userId } = context;
     await assertOwnerOrPrivileged(supabase, userId, data.businessId);
@@ -642,23 +642,67 @@ export const reconcileContractBundleFn = createServerFn({ method: 'POST' })
       .eq('business_id', data.businessId)
       .in('kind', BUNDLE_KINDS);
 
-    const results: Array<{ kind: BundleKind; status: string; cleared: boolean; sent: boolean; stillBlank: string[]; note?: string }> = [];
+    // Load bundle context once so we can CREATE missing docs in place —
+    // reconcile is the "make it right" button and must handle rows whose
+    // initial create call was throttled (docId=null, metadata.error set).
+    const { client, locations, templateMap, sales } = await loadBundleContext(supabase, data.businessId);
 
-    for (const r of (rows ?? []) as any[]) {
-      const kind = r.kind as BundleKind;
-      const docId: string | null = r.pandadoc_document_id;
+    const results: Array<{ kind: BundleKind; status: string; cleared: boolean; sent: boolean; created: boolean; stillBlank: string[]; note?: string }> = [];
+
+    const rowByKind = new Map<BundleKind, any>();
+    for (const r of (rows ?? []) as any[]) rowByKind.set(r.kind as BundleKind, r);
+
+    for (const kind of BUNDLE_KINDS) {
+      const r = rowByKind.get(kind);
+      const docId: string | null = r?.pandadoc_document_id ?? null;
+
+      // ── Missing doc: attempt to CREATE now (throttle-safe via request layer).
       if (!docId) {
-        results.push({ kind, status: r.status, cleared: false, sent: false, stillBlank: [], note: 'no PandaDoc doc' });
+        const templateUuid = templateMap.get(kind);
+        if (!templateUuid || !isValidTemplateId(templateUuid)) {
+          results.push({ kind, status: r?.status ?? 'not_created', cleared: false, sent: false, created: false, stillBlank: [], note: 'template ID missing/invalid' });
+          continue;
+        }
+        try {
+          assertBundleContextReady(client, locations, sales, templateMap);
+          const result = await buildAndCreateBundleDoc({
+            kind, client, locations, sales, templateUuid, userId,
+          });
+          await persistBundleRow({
+            supabaseAdmin,
+            businessId: client.business_id,
+            kind,
+            existingRowId: r?.id ?? null,
+            documentId: result.documentId,
+            status: result.status,
+            templateId: templateUuid,
+            signerEmail: client.contact_email,
+            locationIds: locations.map((l: any) => l.location_id),
+            userId,
+            blankFields: result.blankFields,
+            error: result.error,
+          });
+          results.push({
+            kind,
+            status: result.status,
+            cleared: true,
+            sent: result.status === 'document.sent',
+            created: true,
+            stillBlank: result.blankFields,
+            note: result.error ? 'created but blank fields' : 'created',
+          });
+        } catch (err: any) {
+          results.push({ kind, status: 'error', cleared: false, sent: false, created: false, stillBlank: [], note: err?.message ?? String(err) });
+        }
         continue;
       }
 
+      // ── Existing doc: re-read true state from PandaDoc.
       try {
-        // Wait for any lingering processing before reading fields.
         await pandadoc.waitForDraft(docId);
         const details = await pandadoc.getDocument(docId);
         const trueStatus = String((details as any).status ?? r.status);
 
-        // Re-verify required merge fields.
         const fieldMap = new Map<string, string>();
         for (const f of (details as any).fields ?? []) {
           const name = f.name ?? f.merge_field ?? f.field_id;
@@ -675,7 +719,6 @@ export const reconcileContractBundleFn = createServerFn({ method: 'POST' })
         const prevMd = (r.metadata ?? {}) as any;
         const nextMd: Record<string, any> = { ...prevMd };
         let cleared = false;
-
         if (stillBlank.length === 0) {
           if (nextMd.blank_fields) { delete nextMd.blank_fields; cleared = true; }
           if (nextMd.error) { delete nextMd.error; cleared = true; }
@@ -685,7 +728,6 @@ export const reconcileContractBundleFn = createServerFn({ method: 'POST' })
 
         let sent = false;
         let effectiveStatus = trueStatus;
-        // Silent-send if still in draft and fields look good.
         if (
           stillBlank.length === 0 &&
           (trueStatus === 'document.draft' || trueStatus === 'draft' ||
@@ -710,12 +752,13 @@ export const reconcileContractBundleFn = createServerFn({ method: 'POST' })
           updated_at: new Date().toISOString(),
         }).eq('id', r.id);
 
-        results.push({ kind, status: effectiveStatus, cleared, sent, stillBlank });
+        results.push({ kind, status: effectiveStatus, cleared, sent, created: false, stillBlank });
       } catch (err: any) {
-        results.push({ kind, status: r.status, cleared: false, sent: false, stillBlank: [], note: err?.message ?? String(err) });
+        results.push({ kind, status: r.status, cleared: false, sent: false, created: false, stillBlank: [], note: err?.message ?? String(err) });
       }
     }
 
     return { ok: true, reconciled: results };
   });
+
 
