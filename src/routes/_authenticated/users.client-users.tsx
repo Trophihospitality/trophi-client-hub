@@ -106,6 +106,7 @@ export function InviteStatusCell({ user }: { user: ClientUser }) {
     s === 'accepted' ? { label: 'Accepted', cls: 'bg-emerald-100 text-emerald-700' }
     : s === 'invited' ? { label: 'Invited', cls: 'bg-amber-100 text-amber-700' }
     : s === 'expired' ? { label: 'Expired', cls: 'bg-orange-100 text-orange-700' }
+    : s === 'failed' ? { label: 'Failed', cls: 'bg-red-100 text-red-700' }
     : s === 'revoked' ? { label: 'Revoked', cls: 'bg-muted text-muted-foreground' }
     : { label: 'Not sent', cls: 'bg-muted text-muted-foreground' };
   return (
@@ -115,6 +116,12 @@ export function InviteStatusCell({ user }: { user: ClientUser }) {
         <div className="text-[11px] text-muted-foreground">
           Sent {fmtDate(user.invitedAt)} to {user.inviteSentTo ?? user.email}
           {s === 'invited' && user.inviteExpiresAt && <> · expires {fmtDate(user.inviteExpiresAt)}</>}
+        </div>
+      )}
+      {s === 'failed' && (
+        <div className="text-[11px] text-red-700">
+          {user.inviteLastAttemptAt && <>Attempted {fmtDate(user.inviteLastAttemptAt)} · </>}
+          {user.inviteLastError ?? 'Send failed'}
         </div>
       )}
       {s === 'accepted' && user.activatedAt && (
