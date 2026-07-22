@@ -235,6 +235,20 @@ export function Step1ContractBundle({ businessId, canEdit, onGenerated }: Props)
             : 'Generates draft documents in PandaDoc from the templates. No email is sent yet.'}
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={recon.isPending || gen.isPending || regen.isPending}
+            onClick={() => recon.mutate()}
+            title="Re-read each document's true state from PandaDoc and clear stale errors caused by throttling."
+          >
+            {recon.isPending ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Refreshing…</>
+            ) : (
+              <><RefreshCw className="mr-2 h-4 w-4" /> Refresh status</>
+            )}
+          </Button>
+
           {allExist && (
             <Button
               size="sm"
