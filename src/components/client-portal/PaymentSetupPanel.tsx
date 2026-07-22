@@ -162,13 +162,25 @@ export function PaymentSetupPanel({ businessId }: Props) {
             The authorization document isn't ready. Your Trophi team has been notified — you don't need to do anything.
           </div>
         )}
+
+        {/* Transient generate failure — client-side friendly retry, no staff needed. */}
+        {generateAndSign.isError && status.allCaptured && !auth?.exists && (
+          <div className="rounded-md bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+            {(generateAndSign.error as any)?.message ?? "We're still preparing your document. Please try again in a minute."}
+          </div>
+        )}
+
         {status.allCaptured && !auth?.exists && (
           <Button
             className="w-full bg-[hsl(var(--trophi-gold))] text-black hover:brightness-95"
-            disabled={generateM.isPending}
-            onClick={() => generateM.mutate()}
+            disabled={generateAndSign.isPending}
+            onClick={() => generateAndSign.mutate()}
           >
-            {generateM.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Preparing…</> : 'Continue to authorization'}
+            {generateAndSign.isPending
+              ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Preparing…</>
+              : generateAndSign.isError
+                ? <><RefreshCw className="mr-2 h-4 w-4" /> Try again</>
+                : 'Continue to authorization'}
           </Button>
         )}
         {auth?.exists && !auth.completed && !auth.errored && (
@@ -190,6 +202,7 @@ export function PaymentSetupPanel({ businessId }: Props) {
           </div>
         )}
       </div>
+
 
       {open && (
         <Modal title={`Add payment — ${open.label}`} onClose={closeSetup}>
