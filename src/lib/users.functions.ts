@@ -303,3 +303,52 @@ export const listRoleHistoryFn = createServerFn({ method: 'GET' })
       id: r.id, role: r.role, startedOn: r.started_on, endedOn: r.ended_on,
     }));
   });
+
+export const updateTrophiUserFn = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      targetUserId: z.string().uuid(),
+      firstName: z.string().trim().min(1).max(80).optional(),
+      lastName: z.string().trim().min(1).max(80).optional(),
+      phone: z.string().trim().max(40).nullable().optional(),
+      team: z.string().trim().max(80).nullable().optional(),
+      hireDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+      hireRole: AssignableRole.nullable().optional(),
+      mentorId: z.string().uuid().nullable().optional(),
+      currentRoleStartedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId, claims } = context;
+    await assertSpiro(supabase, userId);
+    const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+
+    const { data: before } = await supabaseAdmin.from('profiles').select('*').eq('user_id', data.targetUserId).maybeSingle();
+
+    const patch: Record<string, unknown> = {};
+    if (data.firstName !== undefined) patch.first_name = data.firstName;
+    if (data.lastName !== undefined) patch.last_name = data.lastName;
+    if (data.firstName !== undefined || data.lastName !== undefined) {
+      const fn = data.firstName ?? before?.first_name ?? '';
+      const ln = data.lastName ?? before?.last_name ?? '';
+      patch.name = `${fn} ${ln}`.trim();
+    }
+    if (data.phone !== undefined) patch.phone = data.phone || null;
+    if (data.team !== undefined) patch.team = data.team || null;
+    if (data.hireDate !== undefined) patch.hire_date = data.hireDate;
+    if (data.hireRole !== undefined) patch.hire_role = data.hireRole;
+    if (data.mentorId !== undefined) patch.mentor_id = data.mentorId;
+    if (data.currentRoleStartedAt !== undefined) patch.current_role_started_at = data.currentRoleStartedAt;
+
+    const { error } = await supabaseAdmin.from('profiles').update(patch as any).eq('user_id', data.targetUserId);
+    if (error) throw error;
+
+    await writeAudit(supabaseAdmin, {
+      actorId: userId, actorEmail: (claims as any)?.email ?? null,
+      action: 'trophi_user.update', entityType: 'profile', entityId: data.targetUserId,
+      before, after: patch,
+    });
+    return { ok: true };
+  });
+

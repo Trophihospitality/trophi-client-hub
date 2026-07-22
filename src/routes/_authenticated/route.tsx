@@ -1,5 +1,7 @@
 import { createFileRoute, Outlet, redirect, Link, useRouterState } from '@tanstack/react-router';
-import { Users, ClipboardCheck, BarChart3, Wrench, Globe, LogOut, ShieldCheck, FileText, LineChart, Trophy, ScrollText } from 'lucide-react';
+import { useState } from 'react';
+import { Users, ClipboardCheck, BarChart3, Wrench, Globe, LogOut, ShieldCheck, FileText, LineChart, Trophy, ScrollText, ChevronDown, ChevronRight } from 'lucide-react';
+
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/store/userStore';
 import trophiMarkAsset from '@/assets/trophi-mark.png.asset.json';
@@ -25,10 +27,15 @@ const NAV = [
 ] as const;
 
 const ADMIN_NAV = [
-  { to: '/users', label: 'User Management', icon: ShieldCheck },
   { to: '/audit', label: 'Audit Log', icon: ScrollText },
   { to: '/settings/pandadoc-templates', label: 'PandaDoc Templates', icon: FileText },
 ] as const;
+
+const USER_MGMT_CHILDREN = [
+  { to: '/users/trophi', label: 'Trophi Users' },
+  { to: '/users/client', label: 'Client Users' },
+] as const;
+
 
 function TrophiMark() {
   return (
@@ -41,6 +48,47 @@ function TrophiMark() {
     </div>
   );
 }
+
+function UserMgmtGroup({ pathname }: { pathname: string }) {
+  const insideUsers = pathname.startsWith('/users');
+  const [open, setOpen] = useState(insideUsers);
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
+          insideUsers
+            ? 'bg-white/10 text-white font-medium border-l-2 border-[hsl(var(--trophi-gold))]'
+            : 'text-white/60 hover:bg-white/5 hover:text-white'
+        }`}
+      >
+        <ShieldCheck className="h-4 w-4" />
+        <span className="flex-1 text-left">User Management</span>
+        {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+      </button>
+      {open && (
+        <div className="mt-1 space-y-0.5 pl-9">
+          {USER_MGMT_CHILDREN.map(({ to, label }) => {
+            const active = pathname.startsWith(to);
+            return (
+              <Link key={to} to={to}
+                className={`block rounded-lg px-3 py-2 text-sm transition-colors ${
+                  active
+                    ? 'bg-white/10 text-white font-medium'
+                    : 'text-white/60 hover:bg-white/5 hover:text-white'
+                }`}
+              >
+                {label}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 function AuthedLayout() {
   const { profile, signOut } = useAuth();
@@ -69,28 +117,42 @@ function AuthedLayout() {
             <>
               <div className="pt-4 pb-1 px-3 text-[10px] uppercase tracking-wider text-white/30">Admin</div>
               {(() => {
-                const items = [
-                  { to: '/reports', label: 'Reports', icon: LineChart, adminOnly: false },
-                  ...(profile?.role === 'admin' ? ADMIN_NAV.map((n) => ({ ...n, adminOnly: true })) : []),
-                ];
-                return items.map(({ to, label, icon: Icon }) => {
-                  const active = pathname.startsWith(to);
-                  return (
-                    <Link key={to} to={to}
-                      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
-                        active
-                          ? 'bg-white/10 text-white font-medium border-l-2 border-[hsl(var(--trophi-gold))]'
-                          : 'text-white/60 hover:bg-white/5 hover:text-white'
-                      }`}
-                    >
-                      <Icon className="h-4 w-4" />{label}
-                    </Link>
-                  );
-                });
+                const active = pathname.startsWith('/reports');
+                return (
+                  <Link to="/reports"
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
+                      active
+                        ? 'bg-white/10 text-white font-medium border-l-2 border-[hsl(var(--trophi-gold))]'
+                        : 'text-white/60 hover:bg-white/5 hover:text-white'
+                    }`}
+                  >
+                    <LineChart className="h-4 w-4" />Reports
+                  </Link>
+                );
               })()}
+              {profile?.role === 'admin' && (
+                <>
+                  <UserMgmtGroup pathname={pathname} />
+                  {ADMIN_NAV.map(({ to, label, icon: Icon }) => {
+                    const active = pathname.startsWith(to);
+                    return (
+                      <Link key={to} to={to}
+                        className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
+                          active
+                            ? 'bg-white/10 text-white font-medium border-l-2 border-[hsl(var(--trophi-gold))]'
+                            : 'text-white/60 hover:bg-white/5 hover:text-white'
+                        }`}
+                      >
+                        <Icon className="h-4 w-4" />{label}
+                      </Link>
+                    );
+                  })}
+                </>
+              )}
             </>
           )}
         </nav>
+
         <div className="border-t border-white/10 px-3 py-3 space-y-2">
           <div className="px-2 text-[10px] uppercase tracking-wider text-white/40">Signed in as</div>
           <div className="px-2 text-sm text-white truncate">{profile?.name ?? '…'}</div>
