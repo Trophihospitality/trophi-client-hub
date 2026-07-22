@@ -82,62 +82,88 @@ async function handleEvent(supabaseAdmin: any, ev: any) {
   }
 
 
-  // If this event completed the doc AND all three bundle docs are complete,
-  // auto-advance Step 4 (which flips CRM to Signed via existing logic).
-  if (status === 'document.completed') {
-    const { data: all } = await supabaseAdmin
-      .from('client_contracts')
-      .select('kind, status')
-      .eq('business_id', row.business_id)
-      .in('kind', BUNDLE_KINDS);
-    const complete = new Set((all ?? []).filter((r: any) => r.status === 'document.completed').map((r: any) => r.kind));
-    const allDone = BUNDLE_KINDS.every((k) => complete.has(k));
-    if (!allDone) return;
+  // Auto-advance onboarding step 4 (bundle) or step 5 (payment auth)
+  // when the corresponding document(s) reach document.completed.
+  if (status !== 'document.completed') return;
 
-    const { data: prog } = await supabaseAdmin
-      .from('onboarding_step_progress').select('id, status')
-      .eq('business_id', row.business_id).eq('step_number', 4).maybeSingle();
-    if (!prog || prog.status === 'complete') return;
+  if (row.kind === 'payment_authorization') {
+    await autoCompleteOnboardingStep(supabaseAdmin, row.business_id, 5, 6, {
+      description: 'Onboarding step 5 auto-completed by PandaDoc: Payment Authorization fully signed',
+    });
+    return;
+  }
 
-    const now = new Date().toISOString();
-    await supabaseAdmin.from('onboarding_step_progress').update({
-      status: 'complete', completed_at: now,
-    }).eq('id', prog.id);
+  if (!(BUNDLE_KINDS as readonly string[]).includes(row.kind)) return;
 
-    // Unlock step 5
+  const { data: all } = await supabaseAdmin
+    .from('client_contracts')
+    .select('kind, status')
+    .eq('business_id', row.business_id)
+    .in('kind', BUNDLE_KINDS);
+  const complete = new Set((all ?? []).filter((r: any) => r.status === 'document.completed').map((r: any) => r.kind));
+  const allDone = BUNDLE_KINDS.every((k) => complete.has(k));
+  if (!allDone) return;
+
+  await autoCompleteOnboardingStep(supabaseAdmin, row.business_id, 4, 5, {
+    description: 'Onboarding step 4 auto-completed by PandaDoc: all three documents fully signed',
+    onAdvance: async () => {
+      const { data: client } = await supabaseAdmin.from('clients')
+        .select('journey_status').eq('business_id', row.business_id).maybeSingle();
+      if (client && client.journey_status !== 'Signed') {
+        await supabaseAdmin.from('clients')
+          .update({ journey_status: 'Signed' })
+          .eq('business_id', row.business_id);
+        await supabaseAdmin.from('client_activity').insert({
+          business_id: row.business_id,
+          type: 'status_change',
+          description: `Status changed: ${client.journey_status} → Signed · Contract bundle fully executed (PandaDoc)`,
+          actor: 'System',
+        });
+      }
+    },
+  });
+}
+
+// Small helper: mark a step complete, unlock the next step, bump
+// onboarding_records.current_step, log activity. Idempotent — no-ops
+// if the step is already complete.
+async function autoCompleteOnboardingStep(
+  supabaseAdmin: any,
+  businessId: string,
+  stepNumber: number,
+  nextStepNumber: number | null,
+  opts: { description: string; onAdvance?: () => Promise<void> },
+) {
+  const { data: prog } = await supabaseAdmin
+    .from('onboarding_step_progress').select('id, status')
+    .eq('business_id', businessId).eq('step_number', stepNumber).maybeSingle();
+  if (!prog || prog.status === 'complete') return;
+
+  const now = new Date().toISOString();
+  await supabaseAdmin.from('onboarding_step_progress').update({
+    status: 'complete', completed_at: now,
+  }).eq('id', prog.id);
+
+  if (nextStepNumber != null) {
     const { data: next } = await supabaseAdmin
       .from('onboarding_step_progress').select('id, status')
-      .eq('business_id', row.business_id).eq('step_number', 5).maybeSingle();
+      .eq('business_id', businessId).eq('step_number', nextStepNumber).maybeSingle();
     if (next && next.status === 'locked') {
       await supabaseAdmin.from('onboarding_step_progress').update({
         status: 'in_progress', started_at: now,
       }).eq('id', next.id);
     }
-    await supabaseAdmin.from('onboarding_records').update({ current_step: 5 })
-      .eq('business_id', row.business_id);
-
-    // Flip CRM to Signed (matches the manual completeStepFn(step=4) branch).
-    const { data: client } = await supabaseAdmin.from('clients')
-      .select('journey_status').eq('business_id', row.business_id).maybeSingle();
-    if (client && client.journey_status !== 'Signed') {
-      await supabaseAdmin.from('clients')
-        .update({ journey_status: 'Signed' })
-        .eq('business_id', row.business_id);
-      await supabaseAdmin.from('client_activity').insert({
-        business_id: row.business_id,
-        type: 'status_change',
-        description: `Status changed: ${client.journey_status} → Signed · Contract bundle fully executed (PandaDoc)`,
-        actor: 'System',
-      });
-    }
-    await supabaseAdmin.from('client_activity').insert({
-      business_id: row.business_id,
-      type: 'info_updated',
-      description: 'Onboarding step 4 auto-completed by PandaDoc: all three documents fully signed',
-      actor: 'PandaDoc',
-    });
+    await supabaseAdmin.from('onboarding_records').update({ current_step: nextStepNumber })
+      .eq('business_id', businessId);
   }
+
+  if (opts.onAdvance) { try { await opts.onAdvance(); } catch (e) { console.error('[pandadoc webhook] onAdvance error', e); } }
+
+  await supabaseAdmin.from('client_activity').insert({
+    business_id: businessId, type: 'info_updated', description: opts.description, actor: 'PandaDoc',
+  });
 }
+
 
 export const Route = createFileRoute('/api/public/hooks/pandadoc')({
   server: {
