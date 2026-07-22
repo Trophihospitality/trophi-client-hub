@@ -62,7 +62,12 @@ export function Step1ContractBundle({ businessId, canEdit, onGenerated }: Props)
     mutationFn: () => voidRegen({ data: { businessId } }),
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ['contract-bundle', businessId] });
-      toast.success(`Voided ${r.voided} and recreated ${r.recreated.length} with current signer email.`);
+      qc.invalidateQueries({ queryKey: ['client-contracts', businessId] });
+      if (r.errored.length > 0) {
+        toast.error(`Regenerated ${r.recreated.length}, but ${r.errored.length} came back with blank fields — see error below.`);
+      } else {
+        toast.success(`Voided ${r.voided} and recreated ${r.recreated.length} with current signer email.`);
+      }
       onGenerated?.();
     },
     onError: (e: any) => toast.error(e?.message ?? 'Could not void & regenerate'),
