@@ -2,21 +2,51 @@ import { createFileRoute } from '@tanstack/react-router';
 
 // ============================================================
 // One-off backfill: fetch completed PandaDoc PDFs for a business
-// and archive them into the `contracts` bucket. Guarded by the
-// same shared key we already use for the PandaDoc webhook.
+// and archive them into the `contracts` bucket. Two ways to auth:
+//   1. Header: x-lovable-secret: <PANDADOC_WEBHOOK_KEY>
+//      (for automation / this app's own scripts)
+//   2. Header: Authorization: Bearer <Supabase user JWT> for a
+//      signed-in Trophi admin or manager (used from the app UI).
 // POST /api/public/hooks/backfill-contracts
-//   Header: x-lovable-secret: <PANDADOC_WEBHOOK_KEY>
-//   Body:   { "business_id": "TRP-U8RZKR" }
+//   Body: { "business_id": "TRP-U8RZKR" }
 // ============================================================
+
+async function isAdminOrManager(bearer: string): Promise<boolean> {
+  const url = process.env.SUPABASE_URL;
+  const pk = process.env.SUPABASE_PUBLISHABLE_KEY;
+  if (!url || !pk) return false;
+  try {
+    const { createClient } = await import('@supabase/supabase-js');
+    const cli = createClient(url, pk, {
+      global: { headers: { Authorization: `Bearer ${bearer}` } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: user } = await cli.auth.getUser(bearer);
+    if (!user?.user?.id) return false;
+    const uid = user.user.id;
+    const [{ data: a }, { data: m }] = await Promise.all([
+      cli.rpc('has_role', { _user_id: uid, _role: 'admin' }),
+      cli.rpc('has_role', { _user_id: uid, _role: 'manager' }),
+    ]);
+    return !!a || !!m;
+  } catch {
+    return false;
+  }
+}
 
 export const Route = createFileRoute('/api/public/hooks/backfill-contracts')({
   server: {
     handlers: {
       POST: async ({ request }) => {
         const secret = process.env.PANDADOC_WEBHOOK_KEY;
-        if (!secret) return new Response('not configured', { status: 500 });
         const provided = request.headers.get('x-lovable-secret');
-        if (provided !== secret) return new Response('unauthorized', { status: 401 });
+        const auth = request.headers.get('authorization');
+        const bearer = auth?.startsWith('Bearer ') ? auth.slice(7) : null;
+
+        let ok = false;
+        if (secret && provided && provided === secret) ok = true;
+        else if (bearer && (await isAdminOrManager(bearer))) ok = true;
+        if (!ok) return new Response('unauthorized', { status: 401 });
 
         let body: any = {};
         try { body = await request.json(); } catch { /* empty */ }
