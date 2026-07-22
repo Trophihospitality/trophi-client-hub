@@ -114,6 +114,7 @@ export const setUserRoleFn = createServerFn({ method: 'POST' })
     z.object({
       targetUserId: z.string().uuid(),
       role: AssignableRole,
+      trainerId: z.string().uuid(),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
@@ -136,12 +137,23 @@ export const setUserRoleFn = createServerFn({ method: 'POST' })
       .insert({ user_id: data.targetUserId, role: data.role } as any);
     if (insErr && !/duplicate key/i.test(insErr.message)) throw insErr;
 
-    // Update role start date for archival
+    // Update role start date — trigger closes prior open role_history row
+    const today = new Date().toISOString().slice(0, 10);
     await supabase.from('profiles')
-      .update({ current_role_started_at: new Date().toISOString().slice(0, 10) } as any)
+      .update({ current_role_started_at: today } as any)
       .eq('user_id', data.targetUserId);
 
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+
+    // Insert new open role_history row with trainer for this role stint
+    await supabaseAdmin.from('role_history').insert({
+      user_id: data.targetUserId,
+      role: data.role,
+      started_on: today,
+      trainer_id: data.trainerId,
+      changed_by: userId,
+    } as any);
+
     await writeAudit(supabaseAdmin, {
       actorId: userId,
       actorEmail: (claims as any)?.email ?? null,
@@ -149,7 +161,7 @@ export const setUserRoleFn = createServerFn({ method: 'POST' })
       entityType: 'profile',
       entityId: data.targetUserId,
       before: { roles: prevRoles },
-      after: { role: data.role },
+      after: { role: data.role, trainerId: data.trainerId },
     });
 
     return { ok: true };
