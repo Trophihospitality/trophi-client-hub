@@ -133,17 +133,19 @@ function SummaryTab({ user, mentor, users, canEdit }: { user: AppUser; mentor: A
   const setRole = useServerFn(setUserRoleFn);
   const setActive = useServerFn(setUserActiveFn);
   const [editing, setEditing] = useState(false);
+  const spiroId = users.find(u => u.email.toLowerCase() === 'spiro@trophihospitality.com')?.id ?? null;
   const [form, setForm] = useState({
     firstName: user.firstName ?? '',
     lastName: user.lastName ?? '',
     phone: user.phone ?? '',
-    team: user.team ?? '',
+    team: user.team && (user.team === 'TBD' || user.team === 'Other') ? user.team : 'TBD',
     hireDate: user.hireDate ?? '',
     hireRole: (user.hireRole ?? user.role) as AppRole,
-    mentorId: user.mentorId ?? '',
+    mentorChoice: (user.mentorId ?? 'open') as string,
     role: user.role,
     currentRoleStartedAt: user.currentRoleStartedAt ?? '',
     isActive: user.isActive,
+    trainerId: spiroId ?? '',
   });
 
   useEffect(() => {
@@ -151,31 +153,36 @@ function SummaryTab({ user, mentor, users, canEdit }: { user: AppUser; mentor: A
       firstName: user.firstName ?? '',
       lastName: user.lastName ?? '',
       phone: user.phone ?? '',
-      team: user.team ?? '',
+      team: user.team && (user.team === 'TBD' || user.team === 'Other') ? user.team : 'TBD',
       hireDate: user.hireDate ?? '',
       hireRole: (user.hireRole ?? user.role) as AppRole,
-      mentorId: user.mentorId ?? '',
+      mentorChoice: (user.mentorId ?? 'open') as string,
       role: user.role,
       currentRoleStartedAt: user.currentRoleStartedAt ?? '',
       isActive: user.isActive,
+      trainerId: spiroId ?? '',
     });
-  }, [user]);
+  }, [user, spiroId]);
+
+  const roleChanged = form.role !== user.role && form.role !== 'client_admin';
 
   const saveM = useMutation({
     mutationFn: async () => {
+      if (!form.phone.trim()) throw new Error('Phone is required');
+      if (roleChanged && !form.trainerId) throw new Error('Select a trainer for the new role');
       await update({ data: {
         targetUserId: user.id,
         firstName: form.firstName,
         lastName: form.lastName,
-        phone: form.phone || null,
-        team: form.team || null,
+        phone: form.phone,
+        team: form.team,
         hireDate: form.hireDate || null,
         hireRole: form.hireRole,
-        mentorId: form.mentorId || null,
+        mentorId: form.mentorChoice === 'open' ? null : form.mentorChoice,
         currentRoleStartedAt: form.currentRoleStartedAt || null,
       } as any });
-      if (form.role !== user.role && form.role !== 'client_admin') {
-        await setRole({ data: { targetUserId: user.id, role: form.role } });
+      if (roleChanged) {
+        await setRole({ data: { targetUserId: user.id, role: form.role, trainerId: form.trainerId } as any });
       }
       if (form.isActive !== user.isActive) {
         await setActive({ data: { targetUserId: user.id, isActive: form.isActive } });
@@ -183,6 +190,7 @@ function SummaryTab({ user, mentor, users, canEdit }: { user: AppUser; mentor: A
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['users'] });
+      qc.invalidateQueries({ queryKey: ['role-history', user.id] });
       toast.success('Profile updated');
       setEditing(false);
     },
