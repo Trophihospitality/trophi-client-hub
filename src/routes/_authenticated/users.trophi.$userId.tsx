@@ -454,7 +454,8 @@ function computeUserStats(user: AppUser, data: any): { label: string; value: str
   if (role === 'sales_rep' || role === 'manager' || role === 'admin' || involvedSales) {
     const mine = data.clients.filter((c: any) => c.salesPersonId === user.id);
     const signed = mine.filter((c: any) => c.signedAt);
-    const signedSum = signed.reduce((s: number, c: any) => s + (c.budget ?? 0), 0);
+    const brandMonthly = (c: any) => (c.budget ?? 0) * (c.signedActiveLocations ?? c.activeLocations ?? 0);
+    const signedSum = signed.reduce((s: number, c: any) => s + brandMonthly(c), 0);
     const convRate = mine.length ? Math.round((signed.length / mine.length) * 100) : 0;
     const daysList = signed
       .filter((c: any) => c.approvedAt && c.signedAt)
