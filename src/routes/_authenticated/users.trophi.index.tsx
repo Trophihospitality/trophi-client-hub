@@ -4,7 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { toast } from 'sonner';
 import {
-  listUsersFn, createTrophiUserFn, updateTrophiUserFn, type AppRole, type AppUser,
+  listUsersFn, createTrophiUserFn, updateTrophiUserFn, resendTrophiInviteFn,
+  type AppRole, type AppUser,
 } from '@/lib/users.functions';
 
 import { useAuth } from '@/store/userStore';
@@ -12,7 +13,8 @@ import { formatPhone, formatPhoneInput } from '@/lib/phone';
 import { AvatarCircle } from '@/components/ui/avatar-circle';
 import { uploadAvatarBlob, validateAvatarFile, AVATAR_ACCEPT } from '@/lib/avatar';
 import { AvatarCropDialog } from '@/components/ui/avatar-crop-dialog';
-import { Plus, Search, Upload } from 'lucide-react';
+import { AlertTriangle, Mail, Plus, Search, Upload } from 'lucide-react';
+
 
 export const Route = createFileRoute('/_authenticated/users/trophi/')({
   component: TrophiUsersPage,
@@ -99,39 +101,19 @@ function TrophiUsersPage() {
               <th className="px-4 py-3">Role</th>
               <th className="px-4 py-3">Team</th>
               <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Invite</th>
+              {isSpiro && <th className="px-4 py-3 text-right">Actions</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {isLoading && <tr><td className="px-4 py-6 text-muted-foreground" colSpan={8}>Loading…</td></tr>}
+            {isLoading && <tr><td className="px-4 py-6 text-muted-foreground" colSpan={isSpiro ? 10 : 9}>Loading…</td></tr>}
             {filtered.map((u) => (
-              <tr
-                key={u.id}
-                className="hover:bg-muted/20 cursor-pointer"
-                onClick={() => navigate({ to: '/users/trophi/$userId', params: { userId: u.id } })}
-              >
-                <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                  {u.employeeId !== null ? String(u.employeeId).padStart(2, '0') : '—'}
-                </td>
-                <td className="px-4 py-3">
-                  <AvatarCircle name={u.name} url={u.avatarUrl ?? null} size={32} />
-                </td>
-                <td className="px-4 py-3 font-medium">{u.name}</td>
-                <td className="px-4 py-3 text-muted-foreground">{u.email}</td>
-                <td className="px-4 py-3 text-muted-foreground">{u.phone ? formatPhone(u.phone) : '—'}</td>
-                <td className="px-4 py-3 capitalize text-muted-foreground">{u.role.replace(/_/g, ' ')}</td>
-                <td className="px-4 py-3 text-muted-foreground">{u.team ?? '—'}</td>
-                <td className="px-4 py-3">
-                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    u.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'
-                  }`}>
-                    {u.isActive ? 'Active' : 'Inactive'}
-                  </span>
-                </td>
-              </tr>
+              <TrophiUserRow key={u.id} u={u} isSpiro={isSpiro} onNavigate={() => navigate({ to: '/users/trophi/$userId', params: { userId: u.id } })} />
             ))}
             {!isLoading && filtered.length === 0 && (
-              <tr><td className="px-4 py-6 text-muted-foreground text-center" colSpan={8}>No users found</td></tr>
+              <tr><td className="px-4 py-6 text-muted-foreground text-center" colSpan={isSpiro ? 10 : 9}>No users found</td></tr>
             )}
+
           </tbody>
         </table>
       </div>
@@ -147,7 +129,82 @@ function TrophiUsersPage() {
   );
 }
 
+function TrophiUserRow({ u, isSpiro, onNavigate }: { u: AppUser; isSpiro: boolean; onNavigate: () => void }) {
+  const qc = useQueryClient();
+  const resend = useServerFn(resendTrophiInviteFn);
+  const resendM = useMutation({
+    mutationFn: () => resend({ data: { targetUserId: u.id } }),
+    onSuccess: (res: any) => {
+      toast.success(`Invite resent to ${res?.sentTo ?? u.email}`);
+      qc.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Failed to resend invite'),
+  });
+
+  const accepted = u.hasAcceptedInvite;
+  const hasError = !!u.inviteLastError;
+  const invitePending = !accepted && !hasError;
+  const showResend = isSpiro && !accepted;
+
+  return (
+    <tr className="hover:bg-muted/20 cursor-pointer" onClick={onNavigate}>
+      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+        {u.employeeId !== null ? String(u.employeeId).padStart(2, '0') : '—'}
+      </td>
+      <td className="px-4 py-3"><AvatarCircle name={u.name} url={u.avatarUrl ?? null} size={32} /></td>
+      <td className="px-4 py-3 font-medium">{u.name}</td>
+      <td className="px-4 py-3 text-muted-foreground">{u.email}</td>
+      <td className="px-4 py-3 text-muted-foreground">{u.phone ? formatPhone(u.phone) : '—'}</td>
+      <td className="px-4 py-3 capitalize text-muted-foreground">{u.role.replace(/_/g, ' ')}</td>
+      <td className="px-4 py-3 text-muted-foreground">{u.team ?? '—'}</td>
+      <td className="px-4 py-3">
+        <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+          u.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'
+        }`}>
+          {u.isActive ? 'Active' : 'Inactive'}
+        </span>
+      </td>
+      <td className="px-4 py-3">
+        {accepted ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-700 px-2.5 py-0.5 text-xs font-medium">
+            Accepted
+          </span>
+        ) : hasError ? (
+          <span
+            className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 px-2.5 py-0.5 text-xs font-medium"
+            title={u.inviteLastError ?? ''}
+          >
+            <AlertTriangle className="h-3 w-3" /> Invite failed
+          </span>
+        ) : invitePending && u.invitedAt ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-800 px-2.5 py-0.5 text-xs font-medium">
+            <Mail className="h-3 w-3" /> Invited — not accepted
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 px-2.5 py-0.5 text-xs font-medium">
+            <AlertTriangle className="h-3 w-3" /> No invite sent
+          </span>
+        )}
+      </td>
+      {isSpiro && (
+        <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+          {showResend && (
+            <button
+              disabled={resendM.isPending}
+              onClick={() => resendM.mutate()}
+              className="rounded-md border border-input px-2.5 py-1 text-xs hover:bg-muted/40 disabled:opacity-60"
+            >
+              {resendM.isPending ? 'Sending…' : 'Resend invite'}
+            </button>
+          )}
+        </td>
+      )}
+    </tr>
+  );
+}
+
 function AddTrophiUserDialog({ users, onClose, onSaved }: { users: AppUser[]; onClose: () => void; onSaved: () => void }) {
+
   const createUser = useServerFn(createTrophiUserFn);
   const updateUser = useServerFn(updateTrophiUserFn);
   const spiroId = findSpiroId(users);

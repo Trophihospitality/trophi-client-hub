@@ -25,7 +25,14 @@ export interface AppUser {
   isActive: boolean;
   avatarPath: string | null;
   avatarUrl: string | null;
+  // Invite / auth-access state
+  invitedAt: string | null;
+  inviteLastError: string | null;
+  inviteLastAttemptAt: string | null;
+  hasAcceptedInvite: boolean;
+  authUserExists: boolean;
 }
+
 
 function highestRole(rows: { role: string }[]): AppRole {
   let best: AppRole = 'sales_rep';
@@ -106,18 +113,43 @@ export const listUsersFn = createServerFn({ method: 'GET' })
       currentRoleStartedAt: p.current_role_started_at ?? null,
       isActive: p.is_active !== false,
       avatarPath: p.avatar_path ?? null,
+      invitedAt: p.invited_at ?? null,
+      inviteLastError: p.invite_last_error ?? null,
+      inviteLastAttemptAt: p.invite_last_attempt_at ?? null,
     }));
+
+    // Merge auth-side state (accepted-invite + auth row still exists) via
+    // a small paginated admin listUsers call. Cheap for our scale.
+    const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+    const wanted = new Set(withPaths.map(u => u.id));
+    const authInfo = new Map<string, { accepted: boolean; exists: boolean }>();
+    let page = 1;
+    while (page < 20) {
+      const { data: adm, error: aErr } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 200 });
+      if (aErr) break;
+      const users = adm?.users ?? [];
+      for (const u of users) {
+        if (!wanted.has(u.id)) continue;
+        const accepted = !!(u.email_confirmed_at || u.last_sign_in_at);
+        authInfo.set(u.id, { accepted, exists: true });
+      }
+      if (users.length < 200) break;
+      page += 1;
+    }
 
     // Batch sign avatar URLs (1h). Failures leave avatarUrl null; the UI falls back to initials.
     const signed = await Promise.all(
       withPaths.map(async (u) => {
-        if (!u.avatarPath) return { ...u, avatarUrl: null as string | null };
+        const info = authInfo.get(u.id) ?? { accepted: false, exists: false };
+        const base = { ...u, hasAcceptedInvite: info.accepted, authUserExists: info.exists };
+        if (!u.avatarPath) return { ...base, avatarUrl: null as string | null };
         const { data } = await supabase.storage.from('trophi-avatars').createSignedUrl(u.avatarPath, 3600);
-        return { ...u, avatarUrl: data?.signedUrl ?? null };
+        return { ...base, avatarUrl: data?.signedUrl ?? null };
       }),
     );
     return signed;
   });
+
 
 const AssignableRole = z.enum(['admin', 'manager', 'sales_rep', 'onboarding_specialist', 'account_manager']);
 
@@ -237,6 +269,8 @@ export const createTrophiUserFn = createServerFn({ method: 'POST' })
     if (!newUserId) throw new Error('Invite returned no user id');
 
     const today = new Date().toISOString().slice(0, 10);
+    const nowIso = new Date().toISOString();
+
     const { error: updErr } = await supabaseAdmin.from('profiles').update({
       name,
       first_name: data.firstName,
@@ -247,11 +281,15 @@ export const createTrophiUserFn = createServerFn({ method: 'POST' })
       hire_role: data.role,
       mentor_id: data.mentorId,
       mentor_status: 'assigned',
-      mentor_assigned_at: new Date().toISOString(),
+      mentor_assigned_at: nowIso,
       current_role_started_at: data.hireDate || today,
       is_active: true,
+      invited_at: nowIso,
+      invite_last_attempt_at: nowIso,
+      invite_last_error: null,
     } as any).eq('user_id', newUserId);
     if (updErr) throw updErr;
+
 
     await supabaseAdmin.from('user_roles').delete().eq('user_id', newUserId);
     await supabaseAdmin.from('user_roles').insert({ user_id: newUserId, role: data.role } as any);
@@ -411,3 +449,124 @@ export const updateTrophiUserFn = createServerFn({ method: 'POST' })
     return { ok: true };
   });
 
+
+export const resendTrophiInviteFn = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ targetUserId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId, claims } = context;
+    await assertSpiro(supabase, userId);
+
+    const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+    const { ACCEPT_INVITE_URL } = await import('./app-urls');
+
+    const { data: profile, error: pErr } = await supabaseAdmin
+      .from('profiles').select('*').eq('user_id', data.targetUserId).maybeSingle();
+    if (pErr) throw pErr;
+    if (!profile) throw new Error('Profile not found');
+
+    const nowIso = new Date().toISOString();
+    const recordFailure = async (msg: string) => {
+      await supabaseAdmin.from('profiles')
+        .update({ invite_last_error: msg, invite_last_attempt_at: nowIso } as any)
+        .eq('user_id', data.targetUserId);
+      await writeAudit(supabaseAdmin, {
+        actorId: userId, actorEmail: (claims as any)?.email ?? null,
+        action: 'trophi_user.invite_resend', entityType: 'profile', entityId: data.targetUserId,
+        after: { sent_to: profile.email }, metadata: { error: msg }, success: false,
+      });
+    };
+
+    // Block resend if the user has already accepted (has signed in / confirmed).
+    let alreadyAccepted = false;
+    try {
+      const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(data.targetUserId);
+      const u: any = authUser?.user;
+      alreadyAccepted = !!(u && (u.email_confirmed_at || u.last_sign_in_at));
+    } catch { /* ignore */ }
+    if (alreadyAccepted) {
+      throw new Error('This user has already accepted their invite');
+    }
+
+    // Try inviteUserByEmail first — this fires our auth email webhook end
+    // to end. If the auth user already exists (typical stalled invite),
+    // fall back to admin.generateLink('invite') + send our branded invite
+    // template directly, because generateLink alone does NOT dispatch email.
+    let inviteErr: any = null;
+    try {
+      const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(profile.email, {
+        data: { name: profile.name, first_name: profile.first_name, last_name: profile.last_name },
+        redirectTo: ACCEPT_INVITE_URL,
+      });
+      if (error) inviteErr = error;
+    } catch (e: any) { inviteErr = e; }
+
+    if (inviteErr && /email.*exist|already.*regist|already been register/i.test(inviteErr.message || '')) {
+      try {
+        const { data: link, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
+          type: 'invite',
+          email: profile.email,
+          options: { redirectTo: ACCEPT_INVITE_URL, data: { name: profile.name } },
+        } as any);
+        if (linkErr) throw linkErr;
+
+        const props: any = (link as any)?.properties ?? {};
+        const token = props.hashed_token ?? props.email_otp ?? '';
+        const [{ default: React }, { render }, { sendLovableEmail }, { InviteEmail }] = await Promise.all([
+          import('react'),
+          import('@react-email/render'),
+          import('@lovable.dev/email-js'),
+          import('./email-templates/invite'),
+        ]);
+        const SITE_NAME = 'Trophi Client Hub';
+        const SENDER_DOMAIN = 'notify.trophihospitality.com';
+        const FROM_DOMAIN = 'trophihospitality.com';
+        const SITE_URL = 'https://trophi-client-hub.lovable.app';
+        const acceptUrl = `${SITE_URL}/accept-invite?token=${encodeURIComponent(token)}&email=${encodeURIComponent(profile.email)}&type=invite`;
+        const element = React.createElement(InviteEmail, {
+          siteName: SITE_NAME,
+          siteUrl: SITE_URL,
+          confirmationUrl: acceptUrl,
+        });
+        const html = await render(element);
+        const text = await render(element, { plainText: true });
+        await sendLovableEmail(
+          {
+            to: profile.email,
+            from: `${SITE_NAME} <noreply@${FROM_DOMAIN}>`,
+            sender_domain: SENDER_DOMAIN,
+            subject: "You've been invited",
+            html,
+            text,
+            purpose: 'transactional',
+            label: 'trophi_user.invite_resend',
+            idempotency_key: `trophi-reinvite-${data.targetUserId}-${Date.now()}`,
+          },
+          { apiKey: process.env.LOVABLE_API_KEY!, sendUrl: process.env.LOVABLE_SEND_URL },
+        );
+        inviteErr = null;
+      } catch (e: any) {
+        inviteErr = e;
+      }
+    }
+
+    if (inviteErr) {
+      const msg = inviteErr.message || 'Failed to resend invite';
+      await recordFailure(msg);
+      throw new Error(msg);
+    }
+
+
+    await supabaseAdmin.from('profiles').update({
+      invited_at: nowIso,
+      invite_last_attempt_at: nowIso,
+      invite_last_error: null,
+    } as any).eq('user_id', data.targetUserId);
+
+    await writeAudit(supabaseAdmin, {
+      actorId: userId, actorEmail: (claims as any)?.email ?? null,
+      action: 'trophi_user.invite_resend', entityType: 'profile', entityId: data.targetUserId,
+      after: { sent_to: profile.email },
+    });
+    return { ok: true, sentTo: profile.email };
+  });
