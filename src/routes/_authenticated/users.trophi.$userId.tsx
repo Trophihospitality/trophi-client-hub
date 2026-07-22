@@ -47,6 +47,9 @@ function TrophiUserDetail() {
   const { userId } = Route.useParams();
   const navigate = useNavigate();
   const isSpiro = useIsSpiro();
+  const { profile, refreshAvatar } = useAuth();
+  const isSelf = profile?.id === userId;
+  const editMode: 'admin' | 'self' | 'none' = isSpiro ? 'admin' : (isSelf ? 'self' : 'none');
 
   const listUsers = useServerFn(listUsersFn);
   const { data: users, isLoading: usersLoading } = useQuery({
@@ -80,19 +83,23 @@ function TrophiUserDetail() {
 
       <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
         <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-mono">
-              Employee #{user.employeeId !== null ? String(user.employeeId).padStart(2, '0') : '—'}
-            </div>
-            <h1 className="font-display text-2xl font-semibold mt-0.5">{user.name}</h1>
-            <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
-              <span className="capitalize">{user.role.replace(/_/g, ' ')}</span>
-              <span>·</span>
-              <span>{user.team ?? 'No team'}</span>
-              <span>·</span>
-              <span className={user.isActive ? 'text-emerald-700' : 'text-muted-foreground'}>
-                {user.isActive ? 'Active' : 'Inactive'}
-              </span>
+          <div className="flex items-center gap-4">
+            <AvatarCircle name={user.name} url={user.avatarUrl ?? null} size={72} />
+            <div>
+              <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-mono">
+                Employee #{user.employeeId !== null ? String(user.employeeId).padStart(2, '0') : '—'}
+              </div>
+              <h1 className="font-display text-2xl font-semibold mt-0.5">{user.name}</h1>
+              <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+                <span className="capitalize">{user.role.replace(/_/g, ' ')}</span>
+                <span>·</span>
+                <span>{user.team ?? 'No team'}</span>
+                <span>·</span>
+                <span className={user.isActive ? 'text-emerald-700' : 'text-muted-foreground'}>
+                  {user.isActive ? 'Active' : 'Inactive'}
+                </span>
+                {editMode === 'self' && <><span>·</span><span className="text-[hsl(var(--trophi-gold))]">Your profile</span></>}
+              </div>
             </div>
           </div>
         </div>
@@ -105,7 +112,7 @@ function TrophiUserDetail() {
       </div>
 
       {tab === 'summary' && (
-        <SummaryTab user={user} mentor={mentor ?? null} users={users ?? []} canEdit={isSpiro} />
+        <SummaryTab user={user} mentor={mentor ?? null} users={users ?? []} editMode={editMode} onAvatarChanged={refreshAvatar} />
       )}
       {tab === 'history' && <HistoryTab user={user} users={users ?? []} />}
       {tab === 'activity' && <ActivityTab user={user} />}
