@@ -73,10 +73,16 @@ async function writeClientActivity(admin: any, params: {
   } catch { /* non-fatal */ }
 }
 
-function mapClientUser(r: any): ClientUser {
+function mapClientUser(r: any, authUserExists = true): ClientUser {
   const inviteExpiresAt = r.invited_at
     ? new Date(new Date(r.invited_at).getTime() + INVITE_TTL_MS).toISOString()
     : null;
+  // If auth artifact is missing but row says accepted/active, override status
+  // so the UI can surface an "Invite required" state with a Resend action.
+  const looksAccepted = !!r.user_id || r.status === 'active';
+  const inviteStatus: InviteStatus = (looksAccepted && !authUserExists)
+    ? 'invite_required'
+    : deriveInviteStatus(r);
   return {
     id: r.id,
     userId: r.user_id ?? null,
@@ -94,10 +100,40 @@ function mapClientUser(r: any): ClientUser {
     createdAt: r.created_at,
     inviteSentTo: r.invite_sent_to ?? null,
     inviteExpiresAt,
-    inviteStatus: deriveInviteStatus(r),
+    inviteStatus,
     inviteLastError: r.invite_last_error ?? null,
     inviteLastAttemptAt: r.invite_last_attempt_at ?? null,
+    authUserExists,
   };
+}
+
+/**
+ * Build a Set of auth.users ids that actually exist among the supplied ids.
+ * Uses paginated listUsers (cheap for our scale) so we make a small, bounded
+ * number of admin calls rather than one per row.
+ */
+async function existingAuthUserIds(admin: any, userIds: string[]): Promise<Set<string>> {
+  const wanted = new Set(userIds.filter(Boolean));
+  const found = new Set<string>();
+  if (wanted.size === 0) return found;
+  let page = 1;
+  while (page < 20) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
+    if (error) break;
+    const users = data?.users ?? [];
+    for (const u of users) if (wanted.has(u.id)) found.add(u.id);
+    if (users.length < 200) break;
+    page += 1;
+  }
+  return found;
+}
+
+async function mapClientUsersWithAuth(rows: any[]): Promise<ClientUser[]> {
+  const ids = rows.map(r => r.user_id).filter((x): x is string => !!x);
+  if (ids.length === 0) return rows.map(r => mapClientUser(r, true));
+  const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+  const existing = await existingAuthUserIds(supabaseAdmin, ids);
+  return rows.map(r => mapClientUser(r, r.user_id ? existing.has(r.user_id) : true));
 }
 
 export const listClientUsersFn = createServerFn({ method: 'GET' })
@@ -109,7 +145,7 @@ export const listClientUsersFn = createServerFn({ method: 'GET' })
       .select('*, clients:business_id(company)')
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return (data ?? []).map(mapClientUser);
+    return mapClientUsersWithAuth(data ?? []);
   });
 
 export const listClientUsersForBusinessFn = createServerFn({ method: 'GET' })
@@ -123,7 +159,7 @@ export const listClientUsersForBusinessFn = createServerFn({ method: 'GET' })
       .eq('business_id', data.businessId)
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return (rows ?? []).map(mapClientUser);
+    return mapClientUsersWithAuth(rows ?? []);
   });
 
 const PermSchema = z.enum(['admin_full', 'leadership', 'manager']);
