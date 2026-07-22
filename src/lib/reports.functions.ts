@@ -22,6 +22,7 @@ export interface ReportClient {
   salesPersonId: string;
   budget: number | null;
   activeLocations: number;
+  signedActiveLocations: number | null;
   createdAt: string;
   approvedAt: string | null;
   signedAt: string | null;
