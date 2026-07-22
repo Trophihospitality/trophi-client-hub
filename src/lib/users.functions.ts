@@ -113,18 +113,43 @@ export const listUsersFn = createServerFn({ method: 'GET' })
       currentRoleStartedAt: p.current_role_started_at ?? null,
       isActive: p.is_active !== false,
       avatarPath: p.avatar_path ?? null,
+      invitedAt: p.invited_at ?? null,
+      inviteLastError: p.invite_last_error ?? null,
+      inviteLastAttemptAt: p.invite_last_attempt_at ?? null,
     }));
+
+    // Merge auth-side state (accepted-invite + auth row still exists) via
+    // a small paginated admin listUsers call. Cheap for our scale.
+    const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+    const wanted = new Set(withPaths.map(u => u.id));
+    const authInfo = new Map<string, { accepted: boolean; exists: boolean }>();
+    let page = 1;
+    while (page < 20) {
+      const { data: adm, error: aErr } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 200 });
+      if (aErr) break;
+      const users = adm?.users ?? [];
+      for (const u of users) {
+        if (!wanted.has(u.id)) continue;
+        const accepted = !!(u.email_confirmed_at || u.last_sign_in_at);
+        authInfo.set(u.id, { accepted, exists: true });
+      }
+      if (users.length < 200) break;
+      page += 1;
+    }
 
     // Batch sign avatar URLs (1h). Failures leave avatarUrl null; the UI falls back to initials.
     const signed = await Promise.all(
       withPaths.map(async (u) => {
-        if (!u.avatarPath) return { ...u, avatarUrl: null as string | null };
+        const info = authInfo.get(u.id) ?? { accepted: false, exists: false };
+        const base = { ...u, hasAcceptedInvite: info.accepted, authUserExists: info.exists };
+        if (!u.avatarPath) return { ...base, avatarUrl: null as string | null };
         const { data } = await supabase.storage.from('trophi-avatars').createSignedUrl(u.avatarPath, 3600);
-        return { ...u, avatarUrl: data?.signedUrl ?? null };
+        return { ...base, avatarUrl: data?.signedUrl ?? null };
       }),
     );
     return signed;
   });
+
 
 const AssignableRole = z.enum(['admin', 'manager', 'sales_rep', 'onboarding_specialist', 'account_manager']);
 
