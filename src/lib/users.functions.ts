@@ -349,11 +349,27 @@ export const updateTrophiUserFn = createServerFn({ method: 'POST' })
       hireRole: AssignableRole.nullable().optional(),
       mentorId: z.string().uuid().nullable().optional(),
       currentRoleStartedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+      avatarPath: z.string().trim().max(300).nullable().optional(),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId, claims } = context;
-    await assertSpiro(supabase, userId);
+
+    // Authorization:
+    // - Spiro can edit any field on any user.
+    // - Anyone else can edit ONLY their own record, and ONLY phone + avatarPath.
+    const { data: isSpiro } = await supabase.rpc('is_spiro', { _user_id: userId });
+    if (!isSpiro) {
+      if (data.targetUserId !== userId) {
+        throw new Error('Forbidden: only Spiro can edit other users');
+      }
+      const allowed = new Set(['targetUserId', 'phone', 'avatarPath']);
+      const attempted = Object.entries(data).filter(([k, v]) => v !== undefined && !allowed.has(k));
+      if (attempted.length > 0) {
+        throw new Error('Forbidden: you may only update your photo and phone number');
+      }
+    }
+
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
 
     const { data: before } = await supabaseAdmin.from('profiles').select('*').eq('user_id', data.targetUserId).maybeSingle();
@@ -371,6 +387,7 @@ export const updateTrophiUserFn = createServerFn({ method: 'POST' })
     if (data.hireDate !== undefined) patch.hire_date = data.hireDate;
     if (data.hireRole !== undefined) patch.hire_role = data.hireRole;
     if (data.currentRoleStartedAt !== undefined) patch.current_role_started_at = data.currentRoleStartedAt;
+    if (data.avatarPath !== undefined) patch.avatar_path = data.avatarPath;
     if (data.mentorId !== undefined) {
       const prevMentor = before?.mentor_id ?? null;
       if (prevMentor !== data.mentorId) {
@@ -387,7 +404,8 @@ export const updateTrophiUserFn = createServerFn({ method: 'POST' })
 
     await writeAudit(supabaseAdmin, {
       actorId: userId, actorEmail: (claims as any)?.email ?? null,
-      action: 'trophi_user.update', entityType: 'profile', entityId: data.targetUserId,
+      action: isSpiro ? 'trophi_user.update' : 'trophi_user.self_update',
+      entityType: 'profile', entityId: data.targetUserId,
       before, after: patch,
     });
     return { ok: true };
