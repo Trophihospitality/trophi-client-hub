@@ -49,6 +49,47 @@ function TrophiMark() {
   );
 }
 
+function UserMgmtGroup({ pathname }: { pathname: string }) {
+  const insideUsers = pathname.startsWith('/users');
+  const [open, setOpen] = useState(insideUsers);
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
+          insideUsers
+            ? 'bg-white/10 text-white font-medium border-l-2 border-[hsl(var(--trophi-gold))]'
+            : 'text-white/60 hover:bg-white/5 hover:text-white'
+        }`}
+      >
+        <ShieldCheck className="h-4 w-4" />
+        <span className="flex-1 text-left">User Management</span>
+        {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+      </button>
+      {open && (
+        <div className="mt-1 space-y-0.5 pl-9">
+          {USER_MGMT_CHILDREN.map(({ to, label }) => {
+            const active = pathname.startsWith(to);
+            return (
+              <Link key={to} to={to}
+                className={`block rounded-lg px-3 py-2 text-sm transition-colors ${
+                  active
+                    ? 'bg-white/10 text-white font-medium'
+                    : 'text-white/60 hover:bg-white/5 hover:text-white'
+                }`}
+              >
+                {label}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 function AuthedLayout() {
   const { profile, signOut } = useAuth();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
