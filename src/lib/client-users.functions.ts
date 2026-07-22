@@ -308,16 +308,36 @@ export const resendClientInviteFn = createServerFn({ method: 'POST' })
       }
     } catch { /* ignore - not critical */ }
 
+    const nowIso = new Date().toISOString();
     try {
       await supabaseAdmin.auth.admin.inviteUserByEmail(row.email, {
         data: { name: `${row.first_name} ${row.last_name}`.trim(), client_user: true, business_id: row.business_id },
       });
     } catch (e: any) {
-      throw new Error(e?.message || 'Failed to resend invite');
+      const msg = e?.message || 'Failed to resend invite';
+      await supabaseAdmin.from('client_users')
+        .update({ invite_last_error: msg, invite_last_attempt_at: nowIso } as any)
+        .eq('id', data.id);
+      await writeAudit(supabaseAdmin, {
+        actorId: userId, actorEmail: (claims as any)?.email ?? null,
+        action: 'client_user.invite_resend', entityType: 'client_user', entityId: data.id,
+        after: { sent_to: row.email }, metadata: { error: msg }, success: false,
+      });
+      await writeClientActivity(supabaseAdmin, {
+        businessId: row.business_id, type: 'info_updated',
+        description: `Portal invite resend to ${row.email} FAILED: ${msg}`,
+        actor: (claims as any)?.email ?? 'system', actorId: userId,
+      });
+      throw new Error(msg);
     }
-    const nowIso = new Date().toISOString();
     await supabase.from('client_users')
-      .update({ invited_at: nowIso, invite_sent_to: row.email, status: 'invited' } as any)
+      .update({
+        invited_at: nowIso,
+        invite_sent_to: row.email,
+        status: 'invited',
+        invite_last_error: null,
+        invite_last_attempt_at: nowIso,
+      } as any)
       .eq('id', data.id);
     await writeAudit(supabaseAdmin, {
       actorId: userId, actorEmail: (claims as any)?.email ?? null,
