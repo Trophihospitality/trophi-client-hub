@@ -5,11 +5,13 @@ import { useServerFn } from '@tanstack/react-start';
 import { toast } from 'sonner';
 import {
   listClientUsersFn, createClientUserFn, updateClientUserFn, resendClientInviteFn,
+  adminResetAndReinviteFn,
   type ClientUser, type ClientPermission,
 } from '@/lib/client-users.functions';
 import { listClients } from '@/lib/crm.functions';
 import { formatPhoneInput } from '@/lib/phone';
-import { Plus, RefreshCcw, Search } from 'lucide-react';
+import { useAuth } from '@/store/userStore';
+import { Plus, RefreshCcw, Search, AlertTriangle } from 'lucide-react';
 
 export const Route = createFileRoute('/_authenticated/users/client-users')({
   component: ClientUsersPage,
