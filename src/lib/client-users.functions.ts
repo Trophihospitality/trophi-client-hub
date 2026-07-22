@@ -145,7 +145,6 @@ export const createClientUserFn = createServerFn({ method: 'POST' })
       locationIds: z.array(z.string()).default([]),
       permissionLevel: PermSchema,
       sendInvite: z.boolean().default(true),
-      origin: z.string().url().optional(),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
@@ -297,7 +296,6 @@ export const updateClientUserFn = createServerFn({ method: 'POST' })
 
 export const resendClientInviteFn = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ id: z.string().uuid(), origin: z.string().url().optional() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId, claims } = context;
     const { data: row, error } = await supabase.from('client_users').select('*').eq('id', data.id).single();
