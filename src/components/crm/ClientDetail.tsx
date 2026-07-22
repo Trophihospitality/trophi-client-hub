@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from '@tanstack/react-router';
 import { ArrowLeft, MapPin, StickyNote, Clock, Send, PhoneCall, AlertTriangle, Plus, Ban, RotateCcw } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { useServerFn } from '@tanstack/react-start';
+import { getPocSyncStatusFn } from '@/lib/crm.functions';
 import { useCrm } from '@/store/crmStore';
 import { useUser } from '@/store/userStore';
+
 import { LogContactDialog } from '@/components/crm/LogContactDialog';
 import { AttachmentsSection } from '@/components/crm/AttachmentsSection';
 import { isOverdue } from '@/lib/statusConfig';
