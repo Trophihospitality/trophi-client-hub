@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { toast } from 'sonner';
 import {
-  listUsersFn, createTrophiUserFn, type AppRole,
+  listUsersFn, createTrophiUserFn, type AppRole, type AppUser,
 } from '@/lib/users.functions';
 
 import { useAuth } from '@/store/userStore';
@@ -22,6 +22,12 @@ const ROLE_OPTIONS: { value: AppRole; label: string }[] = [
   { value: 'onboarding_specialist', label: 'Onboarding Specialist' },
   { value: 'account_manager', label: 'Account Manager' },
 ];
+
+export const TEAM_OPTIONS = ['TBD', 'Other'] as const;
+
+export function findSpiroId(users: AppUser[] | undefined): string | null {
+  return users?.find(u => u.email.toLowerCase() === 'spiro@trophihospitality.com')?.id ?? null;
+}
 
 function useIsSpiro() {
   const { profile } = useAuth();
@@ -123,28 +129,51 @@ function TrophiUsersPage() {
         </table>
       </div>
 
-      {showAdd && <AddTrophiUserDialog onClose={() => setShowAdd(false)} onSaved={() => qc.invalidateQueries({ queryKey: ['users'] })} />}
+      {showAdd && (
+        <AddTrophiUserDialog
+          users={users ?? []}
+          onClose={() => setShowAdd(false)}
+          onSaved={() => qc.invalidateQueries({ queryKey: ['users'] })}
+        />
+      )}
     </div>
   );
 }
 
-function AddTrophiUserDialog({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function AddTrophiUserDialog({ users, onClose, onSaved }: { users: AppUser[]; onClose: () => void; onSaved: () => void }) {
   const createUser = useServerFn(createTrophiUserFn);
+  const spiroId = findSpiroId(users);
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', phone: '',
-    role: 'sales_rep' as AppRole, team: '', hireDate: new Date().toISOString().slice(0, 10),
+    role: 'sales_rep' as AppRole, team: 'TBD', hireDate: new Date().toISOString().slice(0, 10),
+    trainerId: spiroId ?? '',
+    mentorChoice: 'open' as 'open' | string, // 'open' or user id
   });
+
+  const trainerOptions = useMemo(
+    () => (spiroId ? [{ id: spiroId, label: 'Spiro Douvris' }] : []),
+    [spiroId],
+  );
+  const mentorOptions = useMemo(
+    () => (spiroId ? [{ id: spiroId, label: 'Spiro Douvris' }] : []),
+    [spiroId],
+  );
+
   const m = useMutation({
     mutationFn: () => createUser({ data: {
       firstName: form.firstName, lastName: form.lastName,
-      email: form.email, phone: form.phone || null, role: form.role,
-      team: form.team || null, hireDate: form.hireDate,
+      email: form.email, phone: form.phone, role: form.role,
+      team: form.team, hireDate: form.hireDate,
+      trainerId: form.trainerId,
+      mentorId: form.mentorChoice === 'open' ? null : form.mentorChoice,
     } as any }),
     onSuccess: () => { toast.success('User invited — check email to activate'); onSaved(); onClose(); },
     onError: (e: any) => toast.error(e?.message ?? 'Failed to create user'),
   });
 
-  const canSubmit = form.firstName && form.lastName && form.email && form.role && form.hireDate;
+  const canSubmit =
+    form.firstName && form.lastName && form.email && form.phone &&
+    form.role && form.team && form.hireDate && form.trainerId && form.mentorChoice;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
@@ -154,14 +183,30 @@ function AddTrophiUserDialog({ onClose, onSaved }: { onClose: () => void; onSave
           <Field label="First name *"><Input value={form.firstName} onChange={v => setForm({ ...form, firstName: v })} /></Field>
           <Field label="Last name *"><Input value={form.lastName} onChange={v => setForm({ ...form, lastName: v })} /></Field>
           <Field label="Email *" className="col-span-2"><Input type="email" value={form.email} onChange={v => setForm({ ...form, email: v })} /></Field>
-          <Field label="Phone"><Input value={form.phone} onChange={v => setForm({ ...form, phone: formatPhoneInput(v) })} /></Field>
-          <Field label="Team"><Input value={form.team} onChange={v => setForm({ ...form, team: v })} /></Field>
+          <Field label="Phone *"><Input value={form.phone} onChange={v => setForm({ ...form, phone: formatPhoneInput(v) })} /></Field>
+          <Field label="Team *">
+            <select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.team} onChange={e => setForm({ ...form, team: e.target.value })}>
+              {TEAM_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </Field>
           <Field label="Role *">
             <select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.role} onChange={e => setForm({ ...form, role: e.target.value as AppRole })}>
               {ROLE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </Field>
           <Field label="Hire date *"><Input type="date" value={form.hireDate} onChange={v => setForm({ ...form, hireDate: v })} /></Field>
+          <Field label="Trainer *">
+            <select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.trainerId} onChange={e => setForm({ ...form, trainerId: e.target.value })}>
+              <option value="" disabled>Select trainer…</option>
+              {trainerOptions.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+            </select>
+          </Field>
+          <Field label="Mentor *">
+            <select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.mentorChoice} onChange={e => setForm({ ...form, mentorChoice: e.target.value })}>
+              <option value="open">Open</option>
+              {mentorOptions.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+            </select>
+          </Field>
         </div>
         <div className="mt-5 flex justify-end gap-2">
           <button onClick={onClose} className="rounded-md border border-input px-3.5 py-2 text-sm">Cancel</button>
@@ -196,5 +241,3 @@ function Input({ value, onChange, type = 'text' }: { value: string; onChange: (v
     />
   );
 }
-
-
