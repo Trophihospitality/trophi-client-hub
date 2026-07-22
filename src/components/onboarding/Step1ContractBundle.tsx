@@ -52,7 +52,12 @@ export function Step1ContractBundle({ businessId, canEdit, onGenerated }: Props)
     mutationFn: () => generate({ data: { businessId } }),
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ['contract-bundle', businessId] });
-      toast.success(`Bundle generated (${r.created.length} new, ${r.skipped.length} existing).`);
+      qc.invalidateQueries({ queryKey: ['client-contracts', businessId] });
+      if (r.errored.length > 0) {
+        toast.error(`Created ${r.created.length}, but ${r.errored.length} came back with blank fields — see error below.`);
+      } else {
+        toast.success(`Bundle generated (${r.created.length} new, ${r.skipped.length} existing).`);
+      }
       onGenerated?.();
     },
     onError: (e: any) => toast.error(e?.message ?? 'Could not generate bundle'),
