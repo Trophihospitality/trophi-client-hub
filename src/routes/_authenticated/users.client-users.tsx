@@ -95,10 +95,41 @@ function ClientUsersPage() {
   );
 }
 
+function fmtDate(iso: string | null): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+export function InviteStatusCell({ user }: { user: ClientUser }) {
+  const s = user.inviteStatus;
+  const cfg =
+    s === 'accepted' ? { label: 'Accepted', cls: 'bg-emerald-100 text-emerald-700' }
+    : s === 'invited' ? { label: 'Invited', cls: 'bg-amber-100 text-amber-700' }
+    : s === 'expired' ? { label: 'Expired', cls: 'bg-orange-100 text-orange-700' }
+    : s === 'revoked' ? { label: 'Revoked', cls: 'bg-muted text-muted-foreground' }
+    : { label: 'Not sent', cls: 'bg-muted text-muted-foreground' };
+  return (
+    <div className="space-y-0.5">
+      <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${cfg.cls}`}>{cfg.label}</span>
+      {(s === 'invited' || s === 'expired') && user.invitedAt && (
+        <div className="text-[11px] text-muted-foreground">
+          Sent {fmtDate(user.invitedAt)} to {user.inviteSentTo ?? user.email}
+          {s === 'invited' && user.inviteExpiresAt && <> · expires {fmtDate(user.inviteExpiresAt)}</>}
+        </div>
+      )}
+      {s === 'accepted' && user.activatedAt && (
+        <div className="text-[11px] text-muted-foreground">Activated {fmtDate(user.activatedAt)}</div>
+      )}
+    </div>
+  );
+}
+
 function ClientUserRow({ user }: { user: ClientUser }) {
   const qc = useQueryClient();
   const update = useServerFn(updateClientUserFn);
   const resend = useServerFn(resendClientInviteFn);
+  const [editing, setEditing] = useState(false);
+
   const updateM = useMutation({
     mutationFn: (patch: { permissionLevel?: ClientPermission; status?: 'invited' | 'active' | 'inactive' }) =>
       update({ data: { id: user.id, ...patch } as any }),
@@ -107,59 +138,132 @@ function ClientUserRow({ user }: { user: ClientUser }) {
   });
   const resendM = useMutation({
     mutationFn: () => resend({ data: { id: user.id } }),
-    onSuccess: () => toast.success('Invite resent'),
+    onSuccess: (r: any) => { qc.invalidateQueries({ queryKey: ['client-users'] }); toast.success(`Invite sent to ${r?.sentTo ?? user.email}`); },
     onError: (e: any) => toast.error(e?.message ?? 'Failed'),
   });
 
-  const statusColor =
-    user.status === 'active' ? 'bg-emerald-100 text-emerald-700'
-    : user.status === 'invited' ? 'bg-amber-100 text-amber-700'
-    : 'bg-muted text-muted-foreground';
+  const canResend = user.inviteStatus === 'invited' || user.inviteStatus === 'expired' || user.inviteStatus === 'never_sent';
 
   return (
-    <tr className="hover:bg-muted/20">
-      <td className="px-4 py-3 font-medium">{user.firstName} {user.lastName}</td>
-      <td className="px-4 py-3 text-muted-foreground">{user.email}</td>
-      <td className="px-4 py-3">
-        <div className="text-sm">{user.businessName ?? '—'}</div>
-        <div className="text-xs text-muted-foreground font-mono">{user.businessId}</div>
-      </td>
-      <td className="px-4 py-3 text-xs text-muted-foreground">
-        {user.locationIds.length === 0 ? 'All' : `${user.locationIds.length} location${user.locationIds.length === 1 ? '' : 's'}`}
-      </td>
-      <td className="px-4 py-3">
-        <select
-          className="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-          value={user.permissionLevel}
-          disabled={updateM.isPending}
-          onChange={e => updateM.mutate({ permissionLevel: e.target.value as ClientPermission })}
-        >
-          {PERM_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-      </td>
-      <td className="px-4 py-3">
-        <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColor}`}>{user.status}</span>
-      </td>
-      <td className="px-4 py-3 text-right">
-        <div className="flex justify-end gap-2">
-          {user.status === 'invited' && (
-            <button
-              onClick={() => resendM.mutate()}
-              disabled={resendM.isPending}
-              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <RefreshCcw className="h-3.5 w-3.5" /> Resend
-            </button>
-          )}
-          <button
-            onClick={() => updateM.mutate({ status: user.status === 'inactive' ? 'active' : 'inactive' })}
-            className="text-xs text-muted-foreground hover:text-foreground"
+    <>
+      <tr className="hover:bg-muted/20">
+        <td className="px-4 py-3 font-medium">{user.firstName} {user.lastName}</td>
+        <td className="px-4 py-3 text-muted-foreground">{user.email}</td>
+        <td className="px-4 py-3">
+          <div className="text-sm">{user.businessName ?? '—'}</div>
+          <div className="text-xs text-muted-foreground font-mono">{user.businessId}</div>
+        </td>
+        <td className="px-4 py-3 text-xs text-muted-foreground">
+          {user.locationIds.length === 0 ? 'All' : `${user.locationIds.length} location${user.locationIds.length === 1 ? '' : 's'}`}
+        </td>
+        <td className="px-4 py-3">
+          <select
+            className="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+            value={user.permissionLevel}
+            disabled={updateM.isPending}
+            onChange={e => updateM.mutate({ permissionLevel: e.target.value as ClientPermission })}
           >
-            {user.status === 'inactive' ? 'Reactivate' : 'Deactivate'}
-          </button>
-        </div>
-      </td>
-    </tr>
+            {PERM_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </td>
+        <td className="px-4 py-3"><InviteStatusCell user={user} /></td>
+        <td className="px-4 py-3 text-right">
+          <div className="flex justify-end gap-3">
+            {canResend && (
+              <button
+                onClick={() => resendM.mutate()}
+                disabled={resendM.isPending}
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <RefreshCcw className="h-3.5 w-3.5" /> {user.inviteStatus === 'never_sent' ? 'Send invite' : 'Resend'}
+              </button>
+            )}
+            <button onClick={() => setEditing(true)} className="text-xs text-muted-foreground hover:text-foreground">Edit</button>
+            <button
+              onClick={() => updateM.mutate({ status: user.status === 'inactive' ? 'active' : 'inactive' })}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              {user.status === 'inactive' ? 'Reactivate' : 'Deactivate'}
+            </button>
+          </div>
+        </td>
+      </tr>
+      {editing && <EditClientUserDialog user={user} onClose={() => setEditing(false)} />}
+    </>
+  );
+}
+
+function EditClientUserDialog({ user, onClose }: { user: ClientUser; onClose: () => void }) {
+  const qc = useQueryClient();
+  const update = useServerFn(updateClientUserFn);
+  const resend = useServerFn(resendClientInviteFn);
+  const [form, setForm] = useState({
+    firstName: user.firstName, lastName: user.lastName, email: user.email, phone: user.phone ?? '',
+  });
+  const [pendingResendConfirm, setPendingResendConfirm] = useState<null | { sentTo: string }>(null);
+
+  const saveM = useMutation({
+    mutationFn: () => update({ data: {
+      id: user.id,
+      firstName: form.firstName, lastName: form.lastName,
+      email: form.email, phone: form.phone || null,
+    } as any }),
+    onSuccess: (r: any) => {
+      qc.invalidateQueries({ queryKey: ['client-users'] });
+      if (r?.emailChangedWhileInvited) {
+        setPendingResendConfirm({ sentTo: form.email });
+      } else {
+        toast.success('Updated'); onClose();
+      }
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Failed'),
+  });
+  const resendM = useMutation({
+    mutationFn: () => resend({ data: { id: user.id } }),
+    onSuccess: (r: any) => { qc.invalidateQueries({ queryKey: ['client-users'] }); toast.success(`Invite sent to ${r?.sentTo}`); onClose(); },
+    onError: (e: any) => toast.error(e?.message ?? 'Failed'),
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-xl" onClick={e => e.stopPropagation()}>
+        {!pendingResendConfirm ? (
+          <>
+            <h2 className="font-display text-lg font-semibold mb-4">Edit Client User</h2>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="First name *"><Input value={form.firstName} onChange={v => setForm({ ...form, firstName: v })} /></Field>
+              <Field label="Last name *"><Input value={form.lastName} onChange={v => setForm({ ...form, lastName: v })} /></Field>
+              <Field label="Email *" className="col-span-2"><Input type="email" value={form.email} onChange={v => setForm({ ...form, email: v })} /></Field>
+              <Field label="Phone" className="col-span-2"><Input value={form.phone} onChange={v => setForm({ ...form, phone: formatPhoneInput(v) })} /></Field>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={onClose} className="rounded-md border border-input px-3.5 py-2 text-sm">Cancel</button>
+              <button
+                disabled={saveM.isPending}
+                onClick={() => saveM.mutate()}
+                className="rounded-md bg-[hsl(var(--trophi-gold))] px-3.5 py-2 text-sm font-medium text-[hsl(var(--trophi-ink))] disabled:opacity-60"
+              >{saveM.isPending ? 'Saving…' : 'Save'}</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <h2 className="font-display text-lg font-semibold">Send invite to new address?</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Email updated to <b>{pendingResendConfirm.sentTo}</b>. Any previously issued invite links have been invalidated.
+              Send a fresh invite to the new address now?
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={onClose} className="rounded-md border border-input px-3.5 py-2 text-sm">Not now</button>
+              <button
+                disabled={resendM.isPending}
+                onClick={() => resendM.mutate()}
+                className="rounded-md bg-[hsl(var(--trophi-gold))] px-3.5 py-2 text-sm font-medium text-[hsl(var(--trophi-ink))] disabled:opacity-60"
+              >{resendM.isPending ? 'Sending…' : 'Send invite'}</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 
