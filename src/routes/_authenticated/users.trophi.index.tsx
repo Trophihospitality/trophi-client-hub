@@ -148,13 +148,16 @@ function TrophiUsersPage() {
 
 function AddTrophiUserDialog({ users, onClose, onSaved }: { users: AppUser[]; onClose: () => void; onSaved: () => void }) {
   const createUser = useServerFn(createTrophiUserFn);
+  const updateUser = useServerFn(updateTrophiUserFn);
   const spiroId = findSpiroId(users);
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', phone: '',
     role: 'sales_rep' as AppRole, team: 'TBD', hireDate: new Date().toISOString().slice(0, 10),
     trainerId: spiroId ?? '',
-    mentorChoice: 'open' as 'open' | string, // 'open' or user id
+    mentorChoice: 'open' as 'open' | string,
   });
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
   const trainerOptions = useMemo(
     () => (spiroId ? [{ id: spiroId, label: 'Spiro Douvris' }] : []),
@@ -165,15 +168,34 @@ function AddTrophiUserDialog({ users, onClose, onSaved }: { users: AppUser[]; on
     [spiroId],
   );
 
+  function onPickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (f.size > 5 * 1024 * 1024) { toast.error('Image must be under 5 MB'); return; }
+    setPhotoFile(f);
+    setPhotoPreview(URL.createObjectURL(f));
+  }
+
   const m = useMutation({
-    mutationFn: () => createUser({ data: {
-      firstName: form.firstName, lastName: form.lastName,
-      email: form.email, phone: form.phone, role: form.role,
-      team: form.team, hireDate: form.hireDate,
-      trainerId: form.trainerId,
-      mentorId: form.mentorChoice === 'open' ? null : form.mentorChoice,
-      
-    } as any }),
+    mutationFn: async () => {
+      const res: any = await createUser({ data: {
+        firstName: form.firstName, lastName: form.lastName,
+        email: form.email, phone: form.phone, role: form.role,
+        team: form.team, hireDate: form.hireDate,
+        trainerId: form.trainerId,
+        mentorId: form.mentorChoice === 'open' ? null : form.mentorChoice,
+      } as any });
+      const newUserId = res?.userId;
+      if (photoFile && newUserId) {
+        try {
+          const blob = await cropToSquareJpeg(photoFile);
+          const path = await uploadAvatarBlob(newUserId, blob);
+          await updateUser({ data: { targetUserId: newUserId, avatarPath: path } as any });
+        } catch (err: any) {
+          toast.error(`User created but photo upload failed: ${err?.message ?? err}`);
+        }
+      }
+    },
     onSuccess: () => { toast.success('User invited — check email to activate'); onSaved(); onClose(); },
     onError: (e: any) => toast.error(e?.message ?? 'Failed to create user'),
   });
@@ -186,6 +208,24 @@ function AddTrophiUserDialog({ users, onClose, onSaved }: { users: AppUser[]; on
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="w-full max-w-lg rounded-xl bg-card p-6 shadow-xl" onClick={e => e.stopPropagation()}>
         <h2 className="font-display text-lg font-semibold mb-4">New Trophi User</h2>
+
+        <div className="mb-4 flex items-center gap-4">
+          {photoPreview ? (
+            <img src={photoPreview} alt="" className="h-16 w-16 rounded-full object-cover bg-muted" />
+          ) : (
+            <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center text-muted-foreground text-xs">No photo</div>
+          )}
+          <label className="inline-flex items-center gap-2 rounded-md border border-input px-3 py-1.5 text-sm cursor-pointer hover:bg-muted/40">
+            <Upload className="h-3.5 w-3.5" /> {photoFile ? 'Change photo' : 'Upload photo'}
+            <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={onPickPhoto} />
+          </label>
+          {photoFile && (
+            <button onClick={() => { setPhotoFile(null); setPhotoPreview(null); }} className="text-xs text-muted-foreground hover:text-foreground">
+              Remove
+            </button>
+          )}
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
           <Field label="First name *"><Input value={form.firstName} onChange={v => setForm({ ...form, firstName: v })} /></Field>
           <Field label="Last name *"><Input value={form.lastName} onChange={v => setForm({ ...form, lastName: v })} /></Field>
