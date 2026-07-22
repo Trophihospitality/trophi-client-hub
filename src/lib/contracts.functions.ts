@@ -453,6 +453,22 @@ export const voidAndRegenerateContractBundleFn = createServerFn({ method: 'POST'
       });
       if (res.error) throw new Error(`DB persist failed: ${res.error.message}`);
       recreated.push(kind);
+
+      // Silent-send so the doc lands in document.sent (signing-ready) with
+      // no PandaDoc email sent to the client.
+      try {
+        await pandadoc.waitForDraft(doc.id);
+        await pandadoc.sendDocument(doc.id, {
+          subject: 'Trophi Hospitality — in-portal signing',
+          message: 'Signing happens inside the Trophi client portal. You should not receive this email.',
+          silent: true,
+        });
+        await supabaseAdmin.from('client_contracts').update({
+          status: 'document.sent', updated_at: new Date().toISOString(),
+        }).eq('business_id', client.business_id).eq('kind', kind);
+      } catch (err) {
+        console.warn(`[voidAndRegenerate] silent send failed for ${kind} (${doc.id}):`, err);
+      }
     }
 
     await supabaseAdmin.from('client_activity').insert({
