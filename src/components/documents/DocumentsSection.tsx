@@ -131,7 +131,7 @@ function ContractsCard({
   return (
     <div className="rounded-xl border border-border bg-card">
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <div className="flex items-center gap-2 text-sm font-semibold">
+        <div className="flex items-center gap-2 text-sm font-semibold text-[hsl(var(--trophi-ink))]">
           <FileText className="h-4 w-4 text-[hsl(var(--trophi-gold))]" /> Contracts
         </div>
         <div className="text-[11px] font-mono text-muted-foreground">{businessId}</div>
@@ -144,7 +144,7 @@ function ContractsCard({
         </div>
       ) : (
         <table className="w-full text-sm">
-          <thead className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+          <thead className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border bg-muted">
             <tr>
               <th className="px-4 py-2">Document</th>
               <th className="px-4 py-2">Business ID</th>
