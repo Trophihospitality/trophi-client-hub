@@ -25,7 +25,7 @@ function ClientPortalPage() {
       const bid = client!.businessId;
       const [record, defs, progress] = await Promise.all([
         supabase.from('onboarding_records').select('current_step, status').eq('business_id', bid).maybeSingle(),
-        supabase.from('onboarding_step_definitions').select('step_number, title, description, client_visible').eq('client_visible', true).order('step_number'),
+        supabase.from('onboarding_step_definitions').select('step_number, name, description, client_visible').eq('client_visible', true).order('step_number'),
         supabase.from('onboarding_step_progress').select('step_number, status, completed_at').eq('business_id', bid),
       ]);
       return {
@@ -75,7 +75,7 @@ function ClientPortalPage() {
             const p = data.progress[d.step_number];
             const status = p?.status ?? 'locked';
             const isCurrent = status === 'in_progress';
-            const isDone = status === 'completed';
+            const isDone = status === 'complete' || status === 'completed';
             return (
               <li
                 key={d.step_number}
@@ -96,7 +96,7 @@ function ClientPortalPage() {
                       {isCurrent && <Badge className="bg-[hsl(var(--trophi-gold))] text-black">Action needed</Badge>}
                       {isDone && <Badge variant="secondary">Completed</Badge>}
                     </div>
-                    <div className="mt-1 font-medium">{d.title}</div>
+                    <div className="mt-1 font-medium">{d.name}</div>
                     {d.description && (
                       <p className="mt-1 text-sm text-muted-foreground">{d.description}</p>
                     )}
