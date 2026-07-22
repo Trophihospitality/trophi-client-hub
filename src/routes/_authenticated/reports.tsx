@@ -74,9 +74,14 @@ function ReportsPage() {
   }
 
   const getReports = useServerFn(getReportDataFn);
+  const listAwards = useServerFn(listAwardsFn);
   const { data, isLoading } = useQuery({
     queryKey: ['reports-data'],
     queryFn: () => getReports(),
+  });
+  const { data: awards = [] } = useQuery({
+    queryKey: ['awards'],
+    queryFn: () => listAwards(),
   });
 
   const [preset, setPreset] = useState<PresetKey>('this_month');
@@ -86,7 +91,8 @@ function ReportsPage() {
   const [personId, setPersonId] = useState<string>('');
   const [team, setTeam] = useState<string>('');
   const [role, setRole] = useState<string>('');
-  const [tab, setTab] = useState<'crm' | 'onboarding'>('crm');
+  const [tab, setTab] = useState<'crm' | 'onboarding' | 'leaderboards'>('crm');
+  const [grantSeed, setGrantSeed] = useState<GrantSeed | null>(null);
 
   const setPresetAndDates = (p: PresetKey) => {
     setPreset(p);
