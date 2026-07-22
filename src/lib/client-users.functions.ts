@@ -296,7 +296,7 @@ export const updateClientUserFn = createServerFn({ method: 'POST' })
 
 export const resendClientInviteFn = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .inputValidator((d: unknown) => z.object({ id: z.string().uuid(), origin: z.string().url().optional() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId, claims } = context;
     const { data: row, error } = await supabase.from('client_users').select('*').eq('id', data.id).single();
