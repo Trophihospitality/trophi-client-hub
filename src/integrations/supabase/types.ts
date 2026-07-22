@@ -968,6 +968,9 @@ export type Database = {
           first_name: string | null
           hire_date: string | null
           hire_role: Database["public"]["Enums"]["app_role"] | null
+          invite_last_attempt_at: string | null
+          invite_last_error: string | null
+          invited_at: string | null
           is_active: boolean
           last_name: string | null
           mentor_assigned_at: string | null
@@ -988,6 +991,9 @@ export type Database = {
           first_name?: string | null
           hire_date?: string | null
           hire_role?: Database["public"]["Enums"]["app_role"] | null
+          invite_last_attempt_at?: string | null
+          invite_last_error?: string | null
+          invited_at?: string | null
           is_active?: boolean
           last_name?: string | null
           mentor_assigned_at?: string | null
@@ -1008,6 +1014,9 @@ export type Database = {
           first_name?: string | null
           hire_date?: string | null
           hire_role?: Database["public"]["Enums"]["app_role"] | null
+          invite_last_attempt_at?: string | null
+          invite_last_error?: string | null
+          invited_at?: string | null
           is_active?: boolean
           last_name?: string | null
           mentor_assigned_at?: string | null
