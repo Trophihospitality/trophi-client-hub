@@ -66,6 +66,19 @@ export function DocumentsSection({
 
   return (
     <div className="space-y-6">
+      {mode === 'staff' && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => syncM.mutate()}
+            disabled={syncM.isPending}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
+          >
+            <RefreshCcw className={`h-3.5 w-3.5 ${syncM.isPending ? 'animate-spin' : ''}`} />
+            {syncM.isPending ? 'Syncing…' : 'Re-sync signed PDFs'}
+          </button>
+        </div>
+      )}
       <ContractsCard
         items={data.contracts} businessId={businessId} mode={mode}
         onOpen={(p) => open('contracts', p)}
