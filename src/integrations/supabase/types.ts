@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      awards: {
+        Row: {
+          awarded_at: string
+          awarded_by: string | null
+          created_at: string
+          id: string
+          metric_key: string | null
+          metric_label: string | null
+          metric_value: number | null
+          name: string
+          period: string
+          period_type: string
+          recipient_user_id: string
+          updated_at: string
+        }
+        Insert: {
+          awarded_at?: string
+          awarded_by?: string | null
+          created_at?: string
+          id?: string
+          metric_key?: string | null
+          metric_label?: string | null
+          metric_value?: number | null
+          name: string
+          period: string
+          period_type: string
+          recipient_user_id: string
+          updated_at?: string
+        }
+        Update: {
+          awarded_at?: string
+          awarded_by?: string | null
+          created_at?: string
+          id?: string
+          metric_key?: string | null
+          metric_label?: string | null
+          metric_value?: number | null
+          name?: string
+          period?: string
+          period_type?: string
+          recipient_user_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       client_activity: {
         Row: {
           actor: string

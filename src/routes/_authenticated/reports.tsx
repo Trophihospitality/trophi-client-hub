@@ -1,12 +1,22 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { Download, Info } from 'lucide-react';
+import { Download, Info, X } from 'lucide-react';
 import { getReportDataFn, type ReportData } from '@/lib/reports.functions';
+import { listAwardsFn, grantAwardFn, type Award } from '@/lib/awards.functions';
 import { useAuth } from '@/store/userStore';
 import { JOURNEY_STATUSES } from '@/lib/statusConfig';
 import { downloadCsv } from '@/lib/csv';
+import {
+  CrmLeaderboard,
+  OnboardingLeaderboard,
+  RecentAwardsStrip,
+  currentAndPreviousPeriods,
+  indexAwardsByRecipient,
+  type CrmLbRow,
+  type OnbLbRow,
+} from '@/components/leaderboards/Leaderboards';
 
 export const Route = createFileRoute('/_authenticated/reports')({
   component: ReportsPage,
@@ -64,9 +74,14 @@ function ReportsPage() {
   }
 
   const getReports = useServerFn(getReportDataFn);
+  const listAwards = useServerFn(listAwardsFn);
   const { data, isLoading } = useQuery({
     queryKey: ['reports-data'],
     queryFn: () => getReports(),
+  });
+  const { data: awards = [] } = useQuery({
+    queryKey: ['awards'],
+    queryFn: () => listAwards(),
   });
 
   const [preset, setPreset] = useState<PresetKey>('this_month');
@@ -76,7 +91,8 @@ function ReportsPage() {
   const [personId, setPersonId] = useState<string>('');
   const [team, setTeam] = useState<string>('');
   const [role, setRole] = useState<string>('');
-  const [tab, setTab] = useState<'crm' | 'onboarding'>('crm');
+  const [tab, setTab] = useState<'crm' | 'onboarding' | 'leaderboards'>('crm');
+  const [grantSeed, setGrantSeed] = useState<GrantSeed | null>(null);
 
   const setPresetAndDates = (p: PresetKey) => {
     setPreset(p);
@@ -170,19 +186,212 @@ function ReportsPage() {
 
       {/* Tabs */}
       <div className="flex gap-2 border-b border-border">
-        {(['crm', 'onboarding'] as const).map((k) => (
+        {(['crm', 'onboarding', 'leaderboards'] as const).map((k) => (
           <button key={k} onClick={() => setTab(k)}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
               tab === k
                 ? 'border-[hsl(var(--trophi-gold))] text-foreground'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}>
-            {k === 'crm' ? 'CRM Pipeline' : 'Onboarding'}
+            {k === 'crm' ? 'CRM Pipeline' : k === 'onboarding' ? 'Onboarding' : 'Leaderboards'}
           </button>
         ))}
       </div>
 
-      {tab === 'crm' ? <CrmReport data={data} filters={filters} /> : <OnboardingReport data={data} filters={filters} />}
+      {tab === 'crm' && <CrmReport data={data} filters={filters} />}
+      {tab === 'onboarding' && <OnboardingReport data={data} filters={filters} />}
+      {tab === 'leaderboards' && (
+        <LeaderboardsTab
+          data={data}
+          awards={awards}
+          filters={filters}
+          isAdmin={profile?.role === 'admin'}
+          onGrant={setGrantSeed}
+        />
+      )}
+      {grantSeed && (
+        <GrantAwardDialog
+          seed={grantSeed}
+          people={data.people}
+          onClose={() => setGrantSeed(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// Leaderboards tab (admin/manager Reports view)
+// ============================================================
+
+interface GrantSeed {
+  personId: string;
+  personName: string;
+  metricKey: string;
+  metricLabel: string;
+  metricValue: number;
+}
+
+function LeaderboardsTab({
+  data, awards, filters, isAdmin, onGrant,
+}: {
+  data: ReportData;
+  awards: Award[];
+  filters: Filters;
+  isAdmin: boolean;
+  onGrant: (seed: GrantSeed) => void;
+}) {
+  const lbData = useMemo(() => ({
+    people: data.people,
+    clients: data.clients,
+    statusHistory: data.statusHistory,
+    onboardingRecords: data.onboardingRecords,
+    stepProgress: data.stepProgress,
+    stepDefinitions: data.stepDefinitions,
+    awards,
+    viewerRole: 'admin' as const,
+    backfillCutoff: data.backfillCutoff,
+  }), [data, awards]);
+  const lbFilters = { from: filters.from, to: filters.to, team: filters.team, role: filters.role };
+  const periods = useMemo(() => currentAndPreviousPeriods(), []);
+  const awardsIndex = useMemo(() => indexAwardsByRecipient(awards, periods), [awards, periods]);
+
+  const CRM_LABELS: Record<string, string> = {
+    signedValue: 'Signed $', signedCount: 'Signed #', approvedValue: 'Approved $',
+    approvedCount: 'Approved #', leadCount: 'Leads #', approvalRate: 'Approval %',
+    signedRate: 'Signed %', conversionRate: 'Conversion %', avgApprovedToSigned: 'Avg A→S days',
+  };
+  const ONB_LABELS: Record<string, string> = {
+    goLives: 'Go-Lives', goLiveLocations: 'Locations', currentActive: 'Active',
+    avgTotalDays: 'Avg total days', avgOwnedStepDays: 'Avg owned step', fastestDays: 'Fastest', slowestDays: 'Slowest',
+  };
+
+  return (
+    <div className="space-y-6">
+      <RecentAwardsStrip awards={awards} people={data.people} />
+      <CrmLeaderboard
+        data={lbData}
+        filters={lbFilters}
+        showExport
+        canGrantAward={isAdmin}
+        awardsIndex={awardsIndex}
+        onGrantAward={(row: CrmLbRow, key, val) => onGrant({
+          personId: row.personId!, personName: row.name,
+          metricKey: `crm.${String(key)}`, metricLabel: CRM_LABELS[String(key)] ?? String(key),
+          metricValue: val,
+        })}
+      />
+      <OnboardingLeaderboard
+        data={lbData}
+        filters={lbFilters}
+        showExport
+        canGrantAward={isAdmin}
+        awardsIndex={awardsIndex}
+        onGrantAward={(row: OnbLbRow, key, val) => onGrant({
+          personId: row.personId!, personName: row.name,
+          metricKey: `onb.${String(key)}`, metricLabel: ONB_LABELS[String(key)] ?? String(key),
+          metricValue: val,
+        })}
+      />
+    </div>
+  );
+}
+
+// ============================================================
+// Grant Award dialog (admin only)
+// ============================================================
+
+function GrantAwardDialog({
+  seed, people, onClose,
+}: {
+  seed: GrantSeed;
+  people: ReportData['people'];
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const grantFn = useServerFn(grantAwardFn);
+  const [name, setName] = useState('');
+  const [periodType, setPeriodType] = useState<'monthly' | 'quarterly' | 'yearly'>('monthly');
+  const now = new Date();
+  const defaultPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const [period, setPeriod] = useState(defaultPeriod);
+  const [recipientId, setRecipientId] = useState(seed.personId);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) { setError('Award name required'); return; }
+    setSaving(true); setError(null);
+    try {
+      await grantFn({ data: {
+        name: name.trim(), periodType, period: period.trim(), recipientUserId: recipientId,
+        metricKey: seed.metricKey, metricLabel: seed.metricLabel, metricValue: seed.metricValue,
+      } });
+      await qc.invalidateQueries({ queryKey: ['awards'] });
+      onClose();
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to grant award');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-md rounded-xl border border-border bg-card p-5 shadow-xl">
+        <div className="mb-4 flex items-start justify-between">
+          <div>
+            <h3 className="font-display text-lg font-semibold">Grant award</h3>
+            <p className="text-xs text-muted-foreground">Prefilled from current leaderboard.</p>
+          </div>
+          <button onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted"><X className="h-4 w-4" /></button>
+        </div>
+        <form onSubmit={submit} className="space-y-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Award name</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Top Closer"
+              className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Period type</label>
+              <select value={periodType} onChange={(e) => setPeriodType(e.target.value as any)}
+                className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm">
+                <option value="monthly">Monthly</option>
+                <option value="quarterly">Quarterly</option>
+                <option value="yearly">Yearly</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Period</label>
+              <input value={period} onChange={(e) => setPeriod(e.target.value)} placeholder="2026-07 · 2026-Q3 · 2026"
+                className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm" />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Recipient</label>
+            <select value={recipientId} onChange={(e) => setRecipientId(e.target.value)}
+              className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm">
+              {people.filter((p) => p.role !== 'client_admin').map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="rounded-md border border-border bg-muted/40 p-2 text-xs">
+            <div className="text-muted-foreground">Metric snapshot</div>
+            <div className="font-medium">{seed.metricLabel}: <span className="text-[hsl(var(--trophi-gold))]">{seed.metricValue.toLocaleString()}</span></div>
+          </div>
+          {error && <div className="text-xs text-destructive">{error}</div>}
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={onClose} className="rounded-md border border-border px-3 py-1.5 text-sm">Cancel</button>
+            <button type="submit" disabled={saving}
+              className="rounded-md bg-[hsl(var(--trophi-gold))] px-3 py-1.5 text-sm font-medium text-black hover:opacity-90 disabled:opacity-60">
+              {saving ? 'Granting…' : 'Grant award'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
