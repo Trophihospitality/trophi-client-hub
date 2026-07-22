@@ -11,7 +11,7 @@ import { useAuth } from '@/store/userStore';
 import { formatPhone, formatPhoneInput } from '@/lib/phone';
 import { Plus, Search } from 'lucide-react';
 
-export const Route = createFileRoute('/_authenticated/users/trophi')({
+export const Route = createFileRoute('/_authenticated/users/trophi/')({
   component: TrophiUsersPage,
 });
 

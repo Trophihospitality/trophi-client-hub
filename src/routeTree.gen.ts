@@ -23,11 +23,11 @@ import { Route as AuthenticatedAccountsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedUsersIndexRouteImport } from './routes/_authenticated/users.index'
 import { Route as AuthenticatedOnboardingIndexRouteImport } from './routes/_authenticated/onboarding.index'
 import { Route as AuthenticatedCrmIndexRouteImport } from './routes/_authenticated/crm.index'
-import { Route as AuthenticatedUsersTrophiRouteImport } from './routes/_authenticated/users.trophi'
 import { Route as AuthenticatedUsersClientUsersRouteImport } from './routes/_authenticated/users.client-users'
 import { Route as AuthenticatedSettingsPandadocTemplatesRouteImport } from './routes/_authenticated/settings.pandadoc-templates'
 import { Route as AuthenticatedOnboardingBusinessIdRouteImport } from './routes/_authenticated/onboarding.$businessId'
 import { Route as AuthenticatedCrmBusinessIdRouteImport } from './routes/_authenticated/crm.$businessId'
+import { Route as AuthenticatedUsersTrophiIndexRouteImport } from './routes/_authenticated/users.trophi.index'
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
 import { Route as ApiPublicHooksTestOnboardingEmailRouteImport } from './routes/api/public/hooks/test-onboarding-email'
 import { Route as ApiPublicHooksOnboardingRemindersRouteImport } from './routes/api/public/hooks/onboarding-reminders'
@@ -105,12 +105,6 @@ const AuthenticatedCrmIndexRoute = AuthenticatedCrmIndexRouteImport.update({
   path: '/crm/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedUsersTrophiRoute =
-  AuthenticatedUsersTrophiRouteImport.update({
-    id: '/trophi',
-    path: '/trophi',
-    getParentRoute: () => AuthenticatedUsersRoute,
-  } as any)
 const AuthenticatedUsersClientUsersRoute =
   AuthenticatedUsersClientUsersRouteImport.update({
     id: '/client-users',
@@ -135,6 +129,12 @@ const AuthenticatedCrmBusinessIdRoute =
     path: '/crm/$businessId',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedUsersTrophiIndexRoute =
+  AuthenticatedUsersTrophiIndexRouteImport.update({
+    id: '/trophi/',
+    path: '/trophi/',
+    getParentRoute: () => AuthenticatedUsersRoute,
+  } as any)
 const LovableEmailTransactionalPreviewRoute =
   LovableEmailTransactionalPreviewRouteImport.update({
     id: '/lovable/email/transactional/preview',
@@ -155,9 +155,9 @@ const ApiPublicHooksOnboardingRemindersRoute =
   } as any)
 const AuthenticatedUsersTrophiUserIdRoute =
   AuthenticatedUsersTrophiUserIdRouteImport.update({
-    id: '/$userId',
-    path: '/$userId',
-    getParentRoute: () => AuthenticatedUsersTrophiRoute,
+    id: '/trophi/$userId',
+    path: '/trophi/$userId',
+    getParentRoute: () => AuthenticatedUsersRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -175,7 +175,6 @@ export interface FileRoutesByFullPath {
   '/onboarding/$businessId': typeof AuthenticatedOnboardingBusinessIdRoute
   '/settings/pandadoc-templates': typeof AuthenticatedSettingsPandadocTemplatesRoute
   '/users/client-users': typeof AuthenticatedUsersClientUsersRoute
-  '/users/trophi': typeof AuthenticatedUsersTrophiRouteWithChildren
   '/crm/': typeof AuthenticatedCrmIndexRoute
   '/onboarding/': typeof AuthenticatedOnboardingIndexRoute
   '/users/': typeof AuthenticatedUsersIndexRoute
@@ -183,6 +182,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/onboarding-reminders': typeof ApiPublicHooksOnboardingRemindersRoute
   '/api/public/hooks/test-onboarding-email': typeof ApiPublicHooksTestOnboardingEmailRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
+  '/users/trophi/': typeof AuthenticatedUsersTrophiIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -197,7 +197,6 @@ export interface FileRoutesByTo {
   '/onboarding/$businessId': typeof AuthenticatedOnboardingBusinessIdRoute
   '/settings/pandadoc-templates': typeof AuthenticatedSettingsPandadocTemplatesRoute
   '/users/client-users': typeof AuthenticatedUsersClientUsersRoute
-  '/users/trophi': typeof AuthenticatedUsersTrophiRouteWithChildren
   '/crm': typeof AuthenticatedCrmIndexRoute
   '/onboarding': typeof AuthenticatedOnboardingIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
@@ -205,6 +204,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/onboarding-reminders': typeof ApiPublicHooksOnboardingRemindersRoute
   '/api/public/hooks/test-onboarding-email': typeof ApiPublicHooksTestOnboardingEmailRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
+  '/users/trophi': typeof AuthenticatedUsersTrophiIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -223,7 +223,6 @@ export interface FileRoutesById {
   '/_authenticated/onboarding/$businessId': typeof AuthenticatedOnboardingBusinessIdRoute
   '/_authenticated/settings/pandadoc-templates': typeof AuthenticatedSettingsPandadocTemplatesRoute
   '/_authenticated/users/client-users': typeof AuthenticatedUsersClientUsersRoute
-  '/_authenticated/users/trophi': typeof AuthenticatedUsersTrophiRouteWithChildren
   '/_authenticated/crm/': typeof AuthenticatedCrmIndexRoute
   '/_authenticated/onboarding/': typeof AuthenticatedOnboardingIndexRoute
   '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
@@ -231,6 +230,7 @@ export interface FileRoutesById {
   '/api/public/hooks/onboarding-reminders': typeof ApiPublicHooksOnboardingRemindersRoute
   '/api/public/hooks/test-onboarding-email': typeof ApiPublicHooksTestOnboardingEmailRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
+  '/_authenticated/users/trophi/': typeof AuthenticatedUsersTrophiIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -249,7 +249,6 @@ export interface FileRouteTypes {
     | '/onboarding/$businessId'
     | '/settings/pandadoc-templates'
     | '/users/client-users'
-    | '/users/trophi'
     | '/crm/'
     | '/onboarding/'
     | '/users/'
@@ -257,6 +256,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/onboarding-reminders'
     | '/api/public/hooks/test-onboarding-email'
     | '/lovable/email/transactional/preview'
+    | '/users/trophi/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -271,7 +271,6 @@ export interface FileRouteTypes {
     | '/onboarding/$businessId'
     | '/settings/pandadoc-templates'
     | '/users/client-users'
-    | '/users/trophi'
     | '/crm'
     | '/onboarding'
     | '/users'
@@ -279,6 +278,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/onboarding-reminders'
     | '/api/public/hooks/test-onboarding-email'
     | '/lovable/email/transactional/preview'
+    | '/users/trophi'
   id:
     | '__root__'
     | '/'
@@ -296,7 +296,6 @@ export interface FileRouteTypes {
     | '/_authenticated/onboarding/$businessId'
     | '/_authenticated/settings/pandadoc-templates'
     | '/_authenticated/users/client-users'
-    | '/_authenticated/users/trophi'
     | '/_authenticated/crm/'
     | '/_authenticated/onboarding/'
     | '/_authenticated/users/'
@@ -304,6 +303,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/onboarding-reminders'
     | '/api/public/hooks/test-onboarding-email'
     | '/lovable/email/transactional/preview'
+    | '/_authenticated/users/trophi/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -415,13 +415,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCrmIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/users/trophi': {
-      id: '/_authenticated/users/trophi'
-      path: '/trophi'
-      fullPath: '/users/trophi'
-      preLoaderRoute: typeof AuthenticatedUsersTrophiRouteImport
-      parentRoute: typeof AuthenticatedUsersRoute
-    }
     '/_authenticated/users/client-users': {
       id: '/_authenticated/users/client-users'
       path: '/client-users'
@@ -450,6 +443,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCrmBusinessIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/users/trophi/': {
+      id: '/_authenticated/users/trophi/'
+      path: '/trophi'
+      fullPath: '/users/trophi/'
+      preLoaderRoute: typeof AuthenticatedUsersTrophiIndexRouteImport
+      parentRoute: typeof AuthenticatedUsersRoute
+    }
     '/lovable/email/transactional/preview': {
       id: '/lovable/email/transactional/preview'
       path: '/lovable/email/transactional/preview'
@@ -473,10 +473,10 @@ declare module '@tanstack/react-router' {
     }
     '/_authenticated/users/trophi/$userId': {
       id: '/_authenticated/users/trophi/$userId'
-      path: '/$userId'
+      path: '/trophi/$userId'
       fullPath: '/users/trophi/$userId'
       preLoaderRoute: typeof AuthenticatedUsersTrophiUserIdRouteImport
-      parentRoute: typeof AuthenticatedUsersTrophiRoute
+      parentRoute: typeof AuthenticatedUsersRoute
     }
   }
 }
@@ -498,30 +498,18 @@ const AuthenticatedOnboardingRouteWithChildren =
     AuthenticatedOnboardingRouteChildren,
   )
 
-interface AuthenticatedUsersTrophiRouteChildren {
-  AuthenticatedUsersTrophiUserIdRoute: typeof AuthenticatedUsersTrophiUserIdRoute
-}
-
-const AuthenticatedUsersTrophiRouteChildren: AuthenticatedUsersTrophiRouteChildren =
-  {
-    AuthenticatedUsersTrophiUserIdRoute: AuthenticatedUsersTrophiUserIdRoute,
-  }
-
-const AuthenticatedUsersTrophiRouteWithChildren =
-  AuthenticatedUsersTrophiRoute._addFileChildren(
-    AuthenticatedUsersTrophiRouteChildren,
-  )
-
 interface AuthenticatedUsersRouteChildren {
   AuthenticatedUsersClientUsersRoute: typeof AuthenticatedUsersClientUsersRoute
-  AuthenticatedUsersTrophiRoute: typeof AuthenticatedUsersTrophiRouteWithChildren
   AuthenticatedUsersIndexRoute: typeof AuthenticatedUsersIndexRoute
+  AuthenticatedUsersTrophiUserIdRoute: typeof AuthenticatedUsersTrophiUserIdRoute
+  AuthenticatedUsersTrophiIndexRoute: typeof AuthenticatedUsersTrophiIndexRoute
 }
 
 const AuthenticatedUsersRouteChildren: AuthenticatedUsersRouteChildren = {
   AuthenticatedUsersClientUsersRoute: AuthenticatedUsersClientUsersRoute,
-  AuthenticatedUsersTrophiRoute: AuthenticatedUsersTrophiRouteWithChildren,
   AuthenticatedUsersIndexRoute: AuthenticatedUsersIndexRoute,
+  AuthenticatedUsersTrophiUserIdRoute: AuthenticatedUsersTrophiUserIdRoute,
+  AuthenticatedUsersTrophiIndexRoute: AuthenticatedUsersTrophiIndexRoute,
 }
 
 const AuthenticatedUsersRouteWithChildren =
