@@ -44,6 +44,8 @@ export function Step1ContractBundle({ businessId, canEdit, onGenerated }: Props)
   const getBundle = useServerFn(getContractBundleFn);
   const generate = useServerFn(generateContractBundleFn);
   const voidRegen = useServerFn(voidAndRegenerateContractBundleFn);
+  const reconcile = useServerFn(reconcileContractBundleFn);
+
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['contract-bundle', businessId],
