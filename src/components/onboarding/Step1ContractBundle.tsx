@@ -3,7 +3,9 @@ import { useServerFn } from '@tanstack/react-start';
 import { toast } from 'sonner';
 import { FileText, AlertCircle, CheckCircle2, ExternalLink, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { getContractBundleFn, generateContractBundleFn, voidAndRegenerateContractBundleFn } from '@/lib/contracts.functions';
+import { getContractBundleFn, generateContractBundleFn, voidAndRegenerateContractBundleFn, reconcileContractBundleFn } from '@/lib/contracts.functions';
+import { RefreshCw } from 'lucide-react';
+
 
 interface Props {
   businessId: string;
