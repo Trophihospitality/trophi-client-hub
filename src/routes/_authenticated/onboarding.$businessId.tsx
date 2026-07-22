@@ -129,6 +129,9 @@ function OnboardingDetailPage() {
               }
             />
           )}
+          {data.currentStep >= 4 && data.status !== 'live' && (
+            <CountersignPanel businessId={data.businessId} />
+          )}
           <div className="rounded-xl border bg-card">
             <div className="border-b border-border px-4 py-3 text-sm font-semibold">Step checklist</div>
             <ul className="divide-y divide-border">
