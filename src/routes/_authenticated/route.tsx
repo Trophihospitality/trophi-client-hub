@@ -4,6 +4,7 @@ import { Users, ClipboardCheck, BarChart3, Wrench, Globe, LogOut, ShieldCheck, F
 
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/store/userStore';
+import { AvatarCircle } from '@/components/ui/avatar-circle';
 import trophiMarkAsset from '@/assets/trophi-mark.png.asset.json';
 const trophiMark = trophiMarkAsset.url;
 
