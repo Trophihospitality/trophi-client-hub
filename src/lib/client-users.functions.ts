@@ -127,10 +127,11 @@ export const listClientUsersForBusinessFn = createServerFn({ method: 'GET' })
 
 const PermSchema = z.enum(['admin_full', 'leadership', 'manager']);
 
-function buildInviteRedirect(origin?: string | null): string | undefined {
-  const base = (origin && /^https?:\/\//.test(origin)) ? origin.replace(/\/$/, '') : null;
-  return base ? `${base}/accept-invite` : undefined;
-}
+// Invite emails MUST always link to the production app URL. Never derive
+// from window.location.origin — the editor preview / sandbox / share-preview
+// hosts route through Lovable's platform auth bridge and break the invite.
+import { ACCEPT_INVITE_URL } from './app-urls';
+
 
 export const createClientUserFn = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
