@@ -234,3 +234,61 @@ function OnboardingDetailPage() {
     </div>
   );
 }
+
+function PortalAccessCard({ businessId }: { businessId: string }) {
+  const qc = useQueryClient();
+  const listFn = useServerFn(listClientUsersForBusinessFn);
+  const resend = useServerFn(resendClientInviteFn);
+  const { data: users = [], isLoading } = useQuery({
+    queryKey: ['client-users-for-business', businessId],
+    queryFn: () => listFn({ data: { businessId } }),
+  });
+  const resendM = useMutation({
+    mutationFn: (id: string) => resend({ data: { id } }),
+    onSuccess: (r: any) => {
+      qc.invalidateQueries({ queryKey: ['client-users-for-business', businessId] });
+      qc.invalidateQueries({ queryKey: ['client-users'] });
+      toast.success(`Invite sent to ${r?.sentTo ?? 'user'}`);
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Failed'),
+  });
+
+  return (
+    <div className="rounded-xl border bg-card">
+      <div className="border-b border-border px-4 py-3 text-sm font-semibold flex items-center justify-between">
+        <span>Client portal access <span className="text-xs font-normal text-muted-foreground">· Step 3</span></span>
+      </div>
+      <ul className="divide-y divide-border">
+        {isLoading && <li className="px-4 py-3 text-sm text-muted-foreground">Loading…</li>}
+        {!isLoading && users.length === 0 && (
+          <li className="px-4 py-3 text-sm text-muted-foreground">
+            No portal users yet. Add one from the Client Users admin page.
+          </li>
+        )}
+        {users.map((u) => {
+          const canResend = u.inviteStatus === 'invited' || u.inviteStatus === 'expired' || u.inviteStatus === 'never_sent';
+          return (
+            <li key={u.id} className="px-4 py-3 text-sm">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-medium">{u.firstName} {u.lastName}</div>
+                  <div className="text-xs text-muted-foreground truncate">{u.email}</div>
+                  <div className="mt-1"><InviteStatusCell user={u} /></div>
+                </div>
+                {canResend && (
+                  <button
+                    onClick={() => resendM.mutate(u.id)}
+                    disabled={resendM.isPending}
+                    className="shrink-0 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    <RefreshCcw className="h-3.5 w-3.5" /> {u.inviteStatus === 'never_sent' ? 'Send invite' : 'Resend'}
+                  </button>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
