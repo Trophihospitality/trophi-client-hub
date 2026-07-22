@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { Download, Info, X } from 'lucide-react';
 import { getReportDataFn, type ReportData } from '@/lib/reports.functions';
-import { listAwardsFn, grantAwardFn } from '@/lib/awards.functions';
+import { listAwardsFn, grantAwardFn, type Award } from '@/lib/awards.functions';
 import { useAuth } from '@/store/userStore';
 import { JOURNEY_STATUSES } from '@/lib/statusConfig';
 import { downloadCsv } from '@/lib/csv';
