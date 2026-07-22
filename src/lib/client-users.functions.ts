@@ -296,38 +296,53 @@ export const resendClientInviteFn = createServerFn({ method: 'POST' })
     }
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
 
-    // Best-effort: delete any prior unconfirmed auth user for the current email so
-    // the fresh invite issues a brand-new token (invalidating any old link).
+    // Delete any prior auth user for this email that hasn't confirmed yet so
+    // (a) the fresh invite issues a brand-new token (invalidating old links)
+    // and (b) GoTrue doesn't reject with 422 email_exists.
+    const priorIds: string[] = [];
     try {
       const { data: existing } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
       const priorList = (existing?.users ?? []).filter(
         (u: any) => u.email?.toLowerCase() === row.email.toLowerCase() && !u.email_confirmed_at && !u.last_sign_in_at,
       );
       for (const u of priorList) {
-        try { await supabaseAdmin.auth.admin.deleteUser(u.id); } catch { /* ignore */ }
+        try {
+          await supabaseAdmin.auth.admin.deleteUser(u.id);
+          priorIds.push(u.id);
+        } catch { /* ignore */ }
       }
     } catch { /* ignore - not critical */ }
 
     const nowIso = new Date().toISOString();
-    try {
-      await supabaseAdmin.auth.admin.inviteUserByEmail(row.email, {
-        data: { name: `${row.first_name} ${row.last_name}`.trim(), client_user: true, business_id: row.business_id },
-      });
-    } catch (e: any) {
-      const msg = e?.message || 'Failed to resend invite';
+    const recordFailure = async (msg: string) => {
       await supabaseAdmin.from('client_users')
         .update({ invite_last_error: msg, invite_last_attempt_at: nowIso } as any)
         .eq('id', data.id);
       await writeAudit(supabaseAdmin, {
         actorId: userId, actorEmail: (claims as any)?.email ?? null,
         action: 'client_user.invite_resend', entityType: 'client_user', entityId: data.id,
-        after: { sent_to: row.email }, metadata: { error: msg }, success: false,
+        after: { sent_to: row.email }, metadata: { error: msg, prior_ids_deleted: priorIds }, success: false,
       });
       await writeClientActivity(supabaseAdmin, {
         businessId: row.business_id, type: 'info_updated',
         description: `Portal invite resend to ${row.email} FAILED: ${msg}`,
         actor: (claims as any)?.email ?? 'system', actorId: userId,
       });
+    };
+
+    let inviteResp: any;
+    try {
+      inviteResp = await supabaseAdmin.auth.admin.inviteUserByEmail(row.email, {
+        data: { name: `${row.first_name} ${row.last_name}`.trim(), client_user: true, business_id: row.business_id },
+      });
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to resend invite';
+      await recordFailure(msg);
+      throw new Error(msg);
+    }
+    if (inviteResp?.error) {
+      const msg = inviteResp.error.message || `Invite failed (${inviteResp.error.status ?? 'unknown'})`;
+      await recordFailure(msg);
       throw new Error(msg);
     }
     await supabase.from('client_users')
