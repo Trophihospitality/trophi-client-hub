@@ -299,14 +299,15 @@ export const resendClientInviteFn = createServerFn({ method: 'POST' })
     }
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
 
-    // Delete any prior auth user for this email that hasn't confirmed yet so
-    // (a) the fresh invite issues a brand-new token (invalidating old links)
-    // and (b) GoTrue doesn't reject with 422 email_exists.
+    // Since this client_users row has not been accepted (user_id is null),
+    // ANY auth.users record for this email is a stale artifact from a prior
+    // invite attempt and must be removed so the fresh invite issues a new
+    // token instead of failing with 422 email_exists.
     const priorIds: string[] = [];
     try {
       const { data: existing } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
       const priorList = (existing?.users ?? []).filter(
-        (u: any) => u.email?.toLowerCase() === row.email.toLowerCase() && !u.email_confirmed_at && !u.last_sign_in_at,
+        (u: any) => u.email?.toLowerCase() === row.email.toLowerCase(),
       );
       for (const u of priorList) {
         try {
