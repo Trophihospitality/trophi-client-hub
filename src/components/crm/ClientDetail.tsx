@@ -576,3 +576,19 @@ export default function ClientDetail() {
     </div>
   );
 }
+
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
+        active
+          ? 'border-[hsl(var(--trophi-gold))] text-foreground'
+          : 'border-transparent text-muted-foreground hover:text-foreground'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
