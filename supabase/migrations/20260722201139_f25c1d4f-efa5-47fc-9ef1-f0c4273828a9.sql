@@ -1,0 +1,1 @@
+GRANT EXECUTE ON FUNCTION public.gen_business_id() TO authenticated;
