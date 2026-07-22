@@ -252,15 +252,26 @@ function SummaryTab({ user, mentor, users, canEdit }: { user: AppUser; mentor: A
                 </select>
               </F>
               <F label="Role started"><I type="date" value={form.currentRoleStartedAt} onChange={v => setForm({ ...form, currentRoleStartedAt: v })} /></F>
-              <F label="Team"><I value={form.team} onChange={v => setForm({ ...form, team: v })} /></F>
-              <F label="Mentor">
-                <select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.mentorId} onChange={e => setForm({ ...form, mentorId: e.target.value })}>
-                  <option value="">None</option>
-                  {users.filter(u => u.id !== user.id).map(u => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
-                  ))}
+              <F label="Team">
+                <select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.team} onChange={e => setForm({ ...form, team: e.target.value })}>
+                  <option value="TBD">TBD</option>
+                  <option value="Other">Other</option>
                 </select>
               </F>
+              <F label="Mentor">
+                <select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.mentorChoice} onChange={e => setForm({ ...form, mentorChoice: e.target.value })}>
+                  <option value="open">Open</option>
+                  {spiroId && <option value={spiroId}>Spiro Douvris</option>}
+                </select>
+              </F>
+              {roleChanged && (
+                <F label="Trainer for new role *">
+                  <select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.trainerId} onChange={e => setForm({ ...form, trainerId: e.target.value })}>
+                    <option value="" disabled>Select trainer…</option>
+                    {spiroId && <option value={spiroId}>Spiro Douvris</option>}
+                  </select>
+                </F>
+              )}
               <F label="Status">
                 <select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.isActive ? 'yes' : 'no'} onChange={e => setForm({ ...form, isActive: e.target.value === 'yes' })}>
                   <option value="yes">Active</option>
