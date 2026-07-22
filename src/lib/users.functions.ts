@@ -236,7 +236,9 @@ export const createTrophiUserFn = createServerFn({ method: 'POST' })
     const newUserId = invite.user?.id;
     if (!newUserId) throw new Error('Invite returned no user id');
 
+    const today = new Date().toISOString().slice(0, 10);
     const nowIso = new Date().toISOString();
+
     const { error: updErr } = await supabaseAdmin.from('profiles').update({
       name,
       first_name: data.firstName,
