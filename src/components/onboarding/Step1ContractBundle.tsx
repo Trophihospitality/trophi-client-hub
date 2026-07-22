@@ -195,25 +195,43 @@ export function Step1ContractBundle({ businessId, canEdit, onGenerated }: Props)
         </ul>
       </div>
 
-      <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
         <div className="text-xs text-muted-foreground">
           {allExist
-            ? 'All three documents exist in PandaDoc. Review, then mark Step 1 complete above.'
+            ? 'All three documents exist in PandaDoc. Use "Void & regenerate" if signer email changed.'
             : 'Generates draft documents in PandaDoc from the templates. No email is sent yet.'}
         </div>
-        <Button
-          size="sm"
-          disabled={!canEdit || !data.ready || gen.isPending}
-          onClick={() => gen.mutate()}
-        >
-          {gen.isPending ? (
-            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating…</>
-          ) : allExist ? (
-            'Regenerate missing / errored'
-          ) : (
-            'Generate contract bundle'
+        <div className="flex items-center gap-2">
+          {allExist && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!canEdit || !data.ready || regen.isPending || gen.isPending}
+              onClick={() => {
+                if (confirm('This will delete all current PandaDoc drafts for this client and create fresh ones using the CURRENT contact email. Continue?')) {
+                  regen.mutate();
+                }
+              }}
+            >
+              {regen.isPending ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Voiding & regenerating…</>
+              ) : 'Void & regenerate'}
+            </Button>
           )}
-        </Button>
+          <Button
+            size="sm"
+            disabled={!canEdit || !data.ready || gen.isPending || regen.isPending}
+            onClick={() => gen.mutate()}
+          >
+            {gen.isPending ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating…</>
+            ) : allExist ? (
+              'Regenerate missing / errored'
+            ) : (
+              'Generate contract bundle'
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   );
