@@ -293,6 +293,7 @@ function AddClientUserDialog({ onClose, onSaved }: { onClose: () => void; onSave
       email: form.email, phone: form.phone || null,
       permissionLevel: form.permissionLevel, locationIds: form.locationIds,
       sendInvite: form.sendInvite,
+      origin: window.location.origin,
     } as any }),
     onSuccess: () => { toast.success('Client user created'); onSaved(); onClose(); },
     onError: (e: any) => toast.error(e?.message ?? 'Failed'),
