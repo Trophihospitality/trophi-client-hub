@@ -1,9 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQueryClient, useMutation, useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { Download, FileText, FolderClosed, Lock } from 'lucide-react';
+import { Download, FileText, FolderClosed, Lock, RefreshCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  listClientDocumentsFn, getDocumentSignedUrlFn,
+  listClientDocumentsFn, getDocumentSignedUrlFn, syncSignedPdfsFn,
   type DocumentContractItem, type DocumentFileItem,
 } from '@/lib/documents.functions';
 
