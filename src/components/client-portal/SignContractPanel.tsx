@@ -69,12 +69,23 @@ export function SignContractPanel({ businessId }: Props) {
               {c.completed
                 ? <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
                 : <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />}
-              <span className="truncate text-sm font-medium">{c.label}</span>
+              <div className="min-w-0">
+                <div className="truncate text-sm font-medium">{c.label}</div>
+                {c.errored && (
+                  <div className="mt-0.5 text-[11px] text-red-600 dark:text-red-400">
+                    Not ready to sign — Trophi is fixing it{c.blankFields.length ? ` (missing: ${c.blankFields.join(', ')})` : ''}.
+                  </div>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-2">
               {c.completed ? (
                 <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
                   Signed
+                </span>
+              ) : c.errored ? (
+                <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] font-medium text-red-700 dark:text-red-300">
+                  Unavailable
                 </span>
               ) : c.pandadocDocumentId ? (
                 <Button
@@ -94,6 +105,12 @@ export function SignContractPanel({ businessId }: Props) {
           </li>
         ))}
       </ul>
+
+      {data.anyErrored && (
+        <div className="border-t bg-red-500/5 px-4 py-3 text-xs text-red-700 dark:text-red-300">
+          One or more documents are not ready. Your Trophi account manager has been notified — you do not need to do anything.
+        </div>
+      )}
 
       {data.allComplete && (
         <div className="border-t bg-emerald-500/5 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">
