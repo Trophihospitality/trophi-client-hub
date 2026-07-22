@@ -129,12 +129,12 @@ function ContractsCard({
   onOpen: (path: string) => void;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-card">
-      <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <div className="flex items-center gap-2 text-sm font-semibold text-trophi-ink">
-          <FileText className="h-4 w-4 text-[hsl(var(--trophi-gold))]" /> Contracts
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="flex items-center justify-between bg-[hsl(var(--trophi-ink))] px-4 py-3">
+        <div className="flex items-center gap-2 text-sm font-semibold text-[hsl(var(--trophi-cream))]">
+          <FileText className="h-4 w-4 text-[hsl(var(--trophi-gold-light))]" /> Contracts
         </div>
-        <div className="text-[11px] font-mono text-muted-foreground">{businessId}</div>
+        <div className="text-[11px] font-mono text-[hsl(var(--trophi-gold-light))]">{businessId}</div>
       </div>
       {items.length === 0 ? (
         <div className="p-4 text-sm text-muted-foreground">
@@ -200,14 +200,14 @@ function FilesCard({
   onOpen: (path: string) => void; emptyHint: string; restricted?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-card">
-      <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <div className="flex items-center gap-2 text-sm font-semibold text-trophi-ink">
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="flex items-center justify-between bg-[hsl(var(--trophi-ink))] px-4 py-3">
+        <div className="flex items-center gap-2 text-sm font-semibold text-[hsl(var(--trophi-cream))]">
           {restricted
-            ? <Lock className="h-4 w-4 text-muted-foreground" />
-            : <FolderClosed className="h-4 w-4 text-muted-foreground" />}
+            ? <Lock className="h-4 w-4 text-[hsl(var(--trophi-gold-light))]" />
+            : <FolderClosed className="h-4 w-4 text-[hsl(var(--trophi-gold-light))]" />}
           {title}
-          <span className="text-[11px] font-mono text-muted-foreground">/{folder}/</span>
+          <span className="text-[11px] font-mono text-[hsl(var(--trophi-gold-light))]">/{folder}/</span>
         </div>
       </div>
       {items.length === 0 ? (
