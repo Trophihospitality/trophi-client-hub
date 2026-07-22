@@ -446,6 +446,7 @@ function HistoryTab({ user, users }: { user: AppUser; users: AppUser[] }) {
               <th className="px-2 py-2">Started</th>
               <th className="px-2 py-2">Ended</th>
               <th className="px-2 py-2">Time in role</th>
+              <th className="px-2 py-2">Trainer</th>
               <th className="px-2 py-2">Changed by</th>
             </tr>
           </thead>
@@ -459,6 +460,7 @@ function HistoryTab({ user, users }: { user: AppUser; users: AppUser[] }) {
                   <td className="px-2 py-3 text-muted-foreground">{fmtDate(r.startedOn)}</td>
                   <td className="px-2 py-3 text-muted-foreground">{r.endedOn ? fmtDate(r.endedOn) : 'Present'}</td>
                   <td className="px-2 py-3 text-muted-foreground">{days}d</td>
+                  <td className="px-2 py-3 text-muted-foreground">{r.trainerId ? nameFor(r.trainerId) : '—'}</td>
                   <td className="px-2 py-3 text-muted-foreground">{nameFor(r.changedBy)}</td>
                 </tr>
               );
