@@ -410,6 +410,25 @@ export const completeStepFn = createServerFn({ method: 'POST' })
       }
     }
 
+    // ------------------------------------------------------------------
+    // Auto POC portal invite: fires on ANY Step 1 → complete transition.
+    // Path-agnostic by design (normal generation, reconciliation, manual
+    // admin completion, any future flow that ends up in completeStepFn).
+    // Idempotent: safe to call repeatedly. Failures are recorded on the
+    // client_users row and audit; they do NOT roll back the step.
+    // ------------------------------------------------------------------
+    if (data.stepNumber === 1) {
+      try {
+        const { ensurePocInviteInternal } = await import('./client-users.functions');
+        const result = await ensurePocInviteInternal(supabaseAdmin, data.businessId, userId);
+        if (!result.ok && result.error) {
+          console.error(`[onboarding] Step 1 auto POC invite failed for ${data.businessId}:`, result.error);
+        }
+      } catch (err) {
+        console.error(`[onboarding] Step 1 auto POC invite crashed for ${data.businessId}:`, err);
+      }
+    }
+
     return { ok: true, nextStep };
   });
 
