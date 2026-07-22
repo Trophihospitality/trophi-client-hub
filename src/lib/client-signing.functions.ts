@@ -95,10 +95,14 @@ export const createSigningSessionFn = createServerFn({ method: 'POST' })
     const { pandadoc } = await import('@/lib/pandadoc.server');
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
 
-    // A session requires the doc be in document.sent state (or later).
-    // If still a draft, silently send it — no PandaDoc email is triggered.
-    const current = String(row.status ?? '');
-    if (current === 'document.draft' || current === 'draft') {
+    // A session requires document.sent state (or later). Docs may still be
+    // in document.uploaded (processing) or document.draft — silent-send in
+    // both cases so no PandaDoc email is triggered.
+    let current = String(row.status ?? '');
+    if (current === 'document.uploaded' || current === 'uploaded') {
+      current = await pandadoc.waitForDraft(row.pandadoc_document_id);
+    }
+    if (current === 'document.draft' || current === 'draft' || current === 'document.uploaded') {
       await pandadoc.sendDocument(row.pandadoc_document_id, {
         subject: 'Trophi Hospitality — in-portal signing',
         message: 'Signing happens inside the Trophi client portal. You should not receive this email.',
