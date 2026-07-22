@@ -27,10 +27,15 @@ const NAV = [
 ] as const;
 
 const ADMIN_NAV = [
-  { to: '/users', label: 'User Management', icon: ShieldCheck },
   { to: '/audit', label: 'Audit Log', icon: ScrollText },
   { to: '/settings/pandadoc-templates', label: 'PandaDoc Templates', icon: FileText },
 ] as const;
+
+const USER_MGMT_CHILDREN = [
+  { to: '/users/trophi', label: 'Trophi Users' },
+  { to: '/users/client', label: 'Client Users' },
+] as const;
+
 
 function TrophiMark() {
   return (
