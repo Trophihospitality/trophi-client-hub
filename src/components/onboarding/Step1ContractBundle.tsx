@@ -57,11 +57,13 @@ export function Step1ContractBundle({ businessId, canEdit, onGenerated }: Props)
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ['contract-bundle', businessId] });
       qc.invalidateQueries({ queryKey: ['client-contracts', businessId] });
-      if (r.errored.length > 0) {
-        toast.error(`Created ${r.created.length}, but ${r.errored.length} came back with blank fields — see error below.`);
-      } else {
-        toast.success(`Bundle generated (${r.created.length} new, ${r.skipped.length} existing).`);
-      }
+      const parts: string[] = [];
+      if (r.created.length) parts.push(`created ${r.created.length} (${r.created.join(', ')})`);
+      if (r.skipped.length) parts.push(`reused ${r.skipped.length} (${r.skipped.join(', ')})`);
+      if (r.errored.length) parts.push(`errored ${r.errored.length} (${r.errored.join(', ')})`);
+      const summary = parts.join(' · ') || 'no changes';
+      if (r.errored.length > 0) toast.error(`Bundle: ${summary}`);
+      else toast.success(`Bundle: ${summary}`);
       onGenerated?.();
     },
     onError: (e: any) => toast.error(e?.message ?? 'Could not generate bundle'),
@@ -72,11 +74,12 @@ export function Step1ContractBundle({ businessId, canEdit, onGenerated }: Props)
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ['contract-bundle', businessId] });
       qc.invalidateQueries({ queryKey: ['client-contracts', businessId] });
-      if (r.errored.length > 0) {
-        toast.error(`Regenerated ${r.recreated.length}, but ${r.errored.length} came back with blank fields — see error below.`);
-      } else {
-        toast.success(`Voided ${r.voided} and recreated ${r.recreated.length} with current signer email.`);
-      }
+      const parts: string[] = [`voided ${r.voided}`];
+      if (r.recreated.length) parts.push(`recreated ${r.recreated.length} (${r.recreated.join(', ')})`);
+      if (r.errored.length) parts.push(`errored ${r.errored.length} (${r.errored.join(', ')})`);
+      const summary = parts.join(' · ');
+      if (r.errored.length > 0) toast.error(`Regenerate: ${summary}`);
+      else toast.success(`Regenerate: ${summary}`);
       onGenerated?.();
     },
     onError: (e: any) => toast.error(e?.message ?? 'Could not void & regenerate'),
@@ -87,18 +90,25 @@ export function Step1ContractBundle({ businessId, canEdit, onGenerated }: Props)
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ['contract-bundle', businessId] });
       qc.invalidateQueries({ queryKey: ['client-contracts', businessId] });
-      const cleared = r.reconciled.filter((x) => x.cleared).length;
-      const sent = r.reconciled.filter((x) => x.sent).length;
-      const stillBlank = r.reconciled.filter((x) => x.stillBlank.length > 0).length;
-      if (stillBlank > 0) {
-        toast.error(`Refreshed ${r.reconciled.length} — ${stillBlank} still have blank fields.`);
-      } else {
-        toast.success(`Refreshed status for ${r.reconciled.length} docs (${cleared} cleared stale errors, ${sent} silent-sent).`);
-      }
+      const created = r.reconciled.filter((x) => x.created);
+      const cleared = r.reconciled.filter((x) => x.cleared && !x.created);
+      const sent = r.reconciled.filter((x) => x.sent && !x.created);
+      const stillBlank = r.reconciled.filter((x) => x.stillBlank.length > 0);
+      const failed = r.reconciled.filter((x) => x.note && !x.created && x.stillBlank.length === 0 && x.status === 'error');
+      const parts: string[] = [];
+      if (created.length) parts.push(`created ${created.length} (${created.map((x) => x.kind).join(', ')})`);
+      if (cleared.length) parts.push(`cleared stale errors on ${cleared.length}`);
+      if (sent.length) parts.push(`silent-sent ${sent.length}`);
+      if (stillBlank.length) parts.push(`${stillBlank.length} still blank`);
+      if (failed.length) parts.push(`${failed.length} failed`);
+      const summary = parts.length ? parts.join(' · ') : 'no changes needed';
+      if (stillBlank.length > 0 || failed.length > 0) toast.error(`Refresh: ${summary}`);
+      else toast.success(`Refresh: ${summary}`);
       onGenerated?.();
     },
     onError: (e: any) => toast.error(e?.message ?? 'Could not refresh status'),
   });
+
 
 
   if (isLoading) {
