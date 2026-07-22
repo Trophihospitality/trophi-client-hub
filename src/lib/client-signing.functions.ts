@@ -55,9 +55,31 @@ async function fetchRecipientState(pandadocDocId: string) {
   return {
     clientSigned: signed(client) || status === 'document.completed',
     staffSigned: signed(staff) || status === 'document.completed',
+    clientEmail: (client?.email as string | undefined) ?? null,
     staffEmail: (staff?.email as string | undefined) ?? null,
     status,
   };
+}
+
+function emailsMatch(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+async function markContractErrored(
+  supabaseAdmin: any,
+  businessId: string,
+  kind: BundleKind,
+  currentMetadata: any,
+  errorMessage: string,
+  extra: Record<string, unknown> = {},
+) {
+  const meta = { ...(currentMetadata ?? {}), ...extra, error: errorMessage };
+  await supabaseAdmin.from('client_contracts').update({
+    status: 'error',
+    metadata: meta,
+    updated_at: new Date().toISOString(),
+  }).eq('business_id', businessId).eq('kind', kind);
 }
 
 export const getClientContractsFn = createServerFn({ method: 'GET' })
