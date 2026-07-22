@@ -71,7 +71,10 @@ async function handleEvent(supabaseAdmin: any, ev: any) {
       const { archiveCompletedContract } = await import('@/lib/contract-archive.server');
       await archiveCompletedContract({
         id: row.id, business_id: row.business_id, kind: row.kind,
-        pandadoc_document_id: docId, signed_pdf_path: null,
+        pandadoc_document_id: docId,
+        signed_pdf_path: (row as any).signed_pdf_path ?? null,
+        metadata: (row as any).metadata ?? {},
+        location_ids: (row as any).location_ids ?? null,
       });
     } catch (err) {
       console.error(`[pandadoc webhook] archive failed for ${docId}:`, err);
