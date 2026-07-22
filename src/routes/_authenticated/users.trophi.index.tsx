@@ -268,6 +268,18 @@ function AddTrophiUserDialog({ users, onClose, onSaved }: { users: AppUser[]; on
           </button>
         </div>
       </div>
+
+      {cropFile && (
+        <AvatarCropDialog
+          file={cropFile}
+          onCancel={() => setCropFile(null)}
+          onConfirm={(blob, url) => {
+            setPhotoBlob(blob);
+            setPhotoPreview(url);
+            setCropFile(null);
+          }}
+        />
+      )}
     </div>
   );
 }
