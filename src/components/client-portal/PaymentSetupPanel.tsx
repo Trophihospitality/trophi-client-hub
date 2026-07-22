@@ -61,14 +61,23 @@ export function PaymentSetupPanel({ businessId }: Props) {
     onError: (e: any) => toast.error(e?.message ?? 'Could not start payment capture'),
   });
 
-  const generateM = useMutation({
-    mutationFn: () => generateAuth({ data: { businessId } }),
-    onSuccess: (r: any) => {
-      if (r?.error) toast.error(r.error);
-      else toast.success('Authorization ready to sign');
+  // Self-healing "Continue to authorization": generate is idempotent
+  // (intent='ensure' server-side reuses any live doc), and on success we
+  // immediately open the signing session so the client never has to click
+  // twice. Transient PandaDoc failures surface as a friendly retry state
+  // (see the render block) — no staff involvement required.
+  const generateAndSign = useMutation({
+    mutationFn: async () => {
+      const gen = await generateAuth({ data: { businessId } });
+      if ((gen as any)?.error) throw new Error((gen as any).error);
+      const session = await createAuthSession({ data: { businessId } });
+      return session;
+    },
+    onSuccess: (r) => {
+      setAuthSessionUrl(r.sessionUrl);
       qc.invalidateQueries({ queryKey: ['payment-auth-status', businessId] });
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Could not generate'),
+    // Intentionally NO toast on error — the inline retry banner handles it.
   });
 
   const openSignSession = useMutation({
