@@ -41,6 +41,7 @@ export function Step1ContractBundle({ businessId, canEdit, onGenerated }: Props)
   const qc = useQueryClient();
   const getBundle = useServerFn(getContractBundleFn);
   const generate = useServerFn(generateContractBundleFn);
+  const voidRegen = useServerFn(voidAndRegenerateContractBundleFn);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['contract-bundle', businessId],
@@ -55,6 +56,16 @@ export function Step1ContractBundle({ businessId, canEdit, onGenerated }: Props)
       onGenerated?.();
     },
     onError: (e: any) => toast.error(e?.message ?? 'Could not generate bundle'),
+  });
+
+  const regen = useMutation({
+    mutationFn: () => voidRegen({ data: { businessId } }),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ['contract-bundle', businessId] });
+      toast.success(`Voided ${r.voided} and recreated ${r.recreated.length} with current signer email.`);
+      onGenerated?.();
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Could not void & regenerate'),
   });
 
   if (isLoading) {
