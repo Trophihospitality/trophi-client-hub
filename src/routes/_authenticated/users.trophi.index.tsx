@@ -101,39 +101,19 @@ function TrophiUsersPage() {
               <th className="px-4 py-3">Role</th>
               <th className="px-4 py-3">Team</th>
               <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Invite</th>
+              {isSpiro && <th className="px-4 py-3 text-right">Actions</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {isLoading && <tr><td className="px-4 py-6 text-muted-foreground" colSpan={8}>Loading…</td></tr>}
+            {isLoading && <tr><td className="px-4 py-6 text-muted-foreground" colSpan={isSpiro ? 10 : 9}>Loading…</td></tr>}
             {filtered.map((u) => (
-              <tr
-                key={u.id}
-                className="hover:bg-muted/20 cursor-pointer"
-                onClick={() => navigate({ to: '/users/trophi/$userId', params: { userId: u.id } })}
-              >
-                <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                  {u.employeeId !== null ? String(u.employeeId).padStart(2, '0') : '—'}
-                </td>
-                <td className="px-4 py-3">
-                  <AvatarCircle name={u.name} url={u.avatarUrl ?? null} size={32} />
-                </td>
-                <td className="px-4 py-3 font-medium">{u.name}</td>
-                <td className="px-4 py-3 text-muted-foreground">{u.email}</td>
-                <td className="px-4 py-3 text-muted-foreground">{u.phone ? formatPhone(u.phone) : '—'}</td>
-                <td className="px-4 py-3 capitalize text-muted-foreground">{u.role.replace(/_/g, ' ')}</td>
-                <td className="px-4 py-3 text-muted-foreground">{u.team ?? '—'}</td>
-                <td className="px-4 py-3">
-                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    u.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'
-                  }`}>
-                    {u.isActive ? 'Active' : 'Inactive'}
-                  </span>
-                </td>
-              </tr>
+              <TrophiUserRow key={u.id} u={u} isSpiro={isSpiro} onNavigate={() => navigate({ to: '/users/trophi/$userId', params: { userId: u.id } })} />
             ))}
             {!isLoading && filtered.length === 0 && (
-              <tr><td className="px-4 py-6 text-muted-foreground text-center" colSpan={8}>No users found</td></tr>
+              <tr><td className="px-4 py-6 text-muted-foreground text-center" colSpan={isSpiro ? 10 : 9}>No users found</td></tr>
             )}
+
           </tbody>
         </table>
       </div>
