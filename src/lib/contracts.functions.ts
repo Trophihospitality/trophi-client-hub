@@ -22,14 +22,13 @@ const KIND_LABELS: Record<BundleKind, string> = {
   client_authorization: 'Client Authorization',
 };
 
-// Merge fields every bundle document must have populated after creation.
-// ActiveLocationsList / PackageType / MonthlyBudgetPerLocation live on the
-// Order Form template only — verified per-kind below.
-const REQUIRED_FIELDS_ALL: string[] = ['Company', 'ContactName', 'ContactRole', 'ContactEmail', 'BusinessId'];
+// Required merge fields per template — must exactly match the field
+// NAMES defined in the PandaDoc template (case-sensitive). If a template
+// changes, update this map.
 const REQUIRED_FIELDS_BY_KIND: Record<BundleKind, string[]> = {
-  msa: REQUIRED_FIELDS_ALL,
-  order_form: [...REQUIRED_FIELDS_ALL, 'PackageType', 'MonthlyBudgetPerLocation', 'ActiveLocationsList'],
-  client_authorization: REQUIRED_FIELDS_ALL,
+  msa: ['Company', 'Brands', 'ContactName', 'ContactRole', 'ContactEmail', 'BusinessId'],
+  order_form: ['Company', 'PackageType', 'MonthlyBudgetPerLocation', 'ActiveLocationsList', 'BusinessId'],
+  client_authorization: ['Company', 'ContactName', 'ContactRole', 'BusinessId'],
 };
 
 export interface ContractRow {
