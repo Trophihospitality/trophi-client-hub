@@ -197,8 +197,12 @@ export type Database = {
           business_id: string
           created_at: string
           created_by: string | null
+          document_name: string | null
+          executed_at: string | null
+          file_size: number | null
           id: string
           kind: string
+          location_ids: string[] | null
           metadata: Json
           pandadoc_document_id: string | null
           signed_pdf_path: string | null
@@ -209,8 +213,12 @@ export type Database = {
           business_id: string
           created_at?: string
           created_by?: string | null
+          document_name?: string | null
+          executed_at?: string | null
+          file_size?: number | null
           id?: string
           kind: string
+          location_ids?: string[] | null
           metadata?: Json
           pandadoc_document_id?: string | null
           signed_pdf_path?: string | null
@@ -221,8 +229,12 @@ export type Database = {
           business_id?: string
           created_at?: string
           created_by?: string | null
+          document_name?: string | null
+          executed_at?: string | null
+          file_size?: number | null
           id?: string
           kind?: string
+          location_ids?: string[] | null
           metadata?: Json
           pandadoc_document_id?: string | null
           signed_pdf_path?: string | null
