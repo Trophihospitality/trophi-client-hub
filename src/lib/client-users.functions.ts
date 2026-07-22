@@ -164,6 +164,7 @@ export const createClientUserFn = createServerFn({ method: 'POST' })
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
 
     let inviteSent = false;
+    let inviteError: string | null = null;
     if (data.sendInvite) {
       try {
         await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
@@ -174,10 +175,18 @@ export const createClientUserFn = createServerFn({ method: 'POST' })
           },
         });
         inviteSent = true;
-      } catch (e) {
-        // Non-fatal; row is still created. Clear invite fields so UI shows never_sent.
         await supabaseAdmin.from('client_users')
-          .update({ invited_at: null, invite_sent_to: null } as any)
+          .update({ invite_last_error: null, invite_last_attempt_at: new Date().toISOString() } as any)
+          .eq('id', inserted.id);
+      } catch (e: any) {
+        inviteError = e?.message || 'Failed to send invite';
+        await supabaseAdmin.from('client_users')
+          .update({
+            invited_at: null,
+            invite_sent_to: null,
+            invite_last_error: inviteError,
+            invite_last_attempt_at: new Date().toISOString(),
+          } as any)
           .eq('id', inserted.id);
       }
     }
@@ -188,15 +197,23 @@ export const createClientUserFn = createServerFn({ method: 'POST' })
         description: `Portal invite sent to ${data.email} (${data.firstName} ${data.lastName})`,
         actor: (claims as any)?.email ?? 'system', actorId: userId,
       });
+    } else if (inviteError) {
+      await writeClientActivity(supabaseAdmin, {
+        businessId: data.businessId, type: 'info_updated',
+        description: `Portal invite to ${data.email} FAILED: ${inviteError}`,
+        actor: (claims as any)?.email ?? 'system', actorId: userId,
+      });
     }
 
     await writeAudit(supabaseAdmin, {
       actorId: userId, actorEmail: (claims as any)?.email ?? null,
       action: 'client_user.create', entityType: 'client_user', entityId: inserted.id,
       after: { email: data.email, business_id: data.businessId, permission: data.permissionLevel, invite_sent: inviteSent },
+      metadata: inviteError ? { invite_error: inviteError } : null,
+      success: !inviteError,
     });
 
-    return { ok: true, id: inserted.id };
+    return { ok: true, id: inserted.id, inviteSent, inviteError };
   });
 
 export const updateClientUserFn = createServerFn({ method: 'POST' })
