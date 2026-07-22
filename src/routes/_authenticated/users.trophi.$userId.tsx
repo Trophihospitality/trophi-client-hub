@@ -634,15 +634,49 @@ function ActivityTab({ user }: { user: AppUser }) {
 function SalesActivity({ user, data }: { user: AppUser; data: any }) {
   const mine = data.clients.filter((c: any) => c.salesPersonId === user.id);
   const signed = mine.filter((c: any) => c.signedAt).sort((a: any, b: any) => (b.signedAt > a.signedAt ? 1 : -1));
-  const lifetime = signed.reduce((s: number, c: any) => s + (c.budget ?? 0), 0);
+  const brandMonthly = (c: any) => (c.budget ?? 0) * (c.signedActiveLocations ?? c.activeLocations ?? 0);
+  const signedLocs = (c: any) => c.signedActiveLocations ?? c.activeLocations ?? 0;
+
+  // Quarter / year / lifetime rollups based on signed_at
+  const now = new Date();
+  const quarter = Math.floor(now.getUTCMonth() / 3); // 0..3
+  const qStart = new Date(Date.UTC(now.getUTCFullYear(), quarter * 3, 1)).getTime();
+  const yStart = new Date(Date.UTC(now.getUTCFullYear(), 0, 1)).getTime();
+  const bucket = signed.reduce(
+    (acc: { qSum: number; qCount: number; ySum: number; yCount: number; lSum: number }, c: any) => {
+      const t = new Date(c.signedAt).getTime();
+      const v = brandMonthly(c);
+      acc.lSum += v;
+      if (t >= yStart) { acc.ySum += v; acc.yCount += 1; }
+      if (t >= qStart) { acc.qSum += v; acc.qCount += 1; }
+      return acc;
+    },
+    { qSum: 0, qCount: 0, ySum: 0, yCount: 0, lSum: 0 }
+  );
   const last20 = signed.slice(0, 20);
+
+  const dealsWord = (n: number) => `${n} deal${n === 1 ? '' : 's'}`;
 
   return (
     <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
         <h2 className="font-display text-lg font-semibold">Sales — recent signed deals</h2>
-        <div className="text-sm text-muted-foreground">
-          Lifetime signed: <span className="font-medium text-foreground">{fmtMoney(lifetime)}</span> · {signed.length} deal{signed.length === 1 ? '' : 's'}
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+        <div className="rounded-lg bg-muted/30 p-3">
+          <div className="text-[11px] uppercase tracking-wider text-muted-foreground">This Quarter</div>
+          <div className="mt-1 font-display text-xl font-semibold">{fmtMoney(bucket.qSum)}</div>
+          <div className="text-xs text-muted-foreground">{dealsWord(bucket.qCount)}</div>
+        </div>
+        <div className="rounded-lg bg-muted/30 p-3">
+          <div className="text-[11px] uppercase tracking-wider text-muted-foreground">This Year</div>
+          <div className="mt-1 font-display text-xl font-semibold">{fmtMoney(bucket.ySum)}</div>
+          <div className="text-xs text-muted-foreground">{dealsWord(bucket.yCount)}</div>
+        </div>
+        <div className="rounded-lg bg-muted/30 p-3">
+          <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Lifetime</div>
+          <div className="mt-1 font-display text-xl font-semibold">{fmtMoney(bucket.lSum)}</div>
+          <div className="text-xs text-muted-foreground">{dealsWord(signed.length)}</div>
         </div>
       </div>
       {last20.length === 0 ? (
@@ -653,8 +687,10 @@ function SalesActivity({ user, data }: { user: AppUser; data: any }) {
             <tr>
               <th className="px-2 py-2">Company</th>
               <th className="px-2 py-2">Business ID</th>
+              <th className="px-2 py-2 text-right"># Locations</th>
               <th className="px-2 py-2">Signed</th>
-              <th className="px-2 py-2 text-right">Monthly $</th>
+              <th className="px-2 py-2 text-right">Monthly $ / Location</th>
+              <th className="px-2 py-2 text-right">Brand Monthly Total</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -662,8 +698,10 @@ function SalesActivity({ user, data }: { user: AppUser; data: any }) {
               <tr key={c.businessId}>
                 <td className="px-2 py-3 font-medium">{c.company}</td>
                 <td className="px-2 py-3 text-xs font-mono text-muted-foreground">{c.businessId}</td>
+                <td className="px-2 py-3 text-right text-muted-foreground">{signedLocs(c)}</td>
                 <td className="px-2 py-3 text-muted-foreground">{fmtDate(c.signedAt)}</td>
-                <td className="px-2 py-3 text-right">{fmtMoney(c.budget)}</td>
+                <td className="px-2 py-3 text-right text-muted-foreground">{fmtMoney(c.budget)}</td>
+                <td className="px-2 py-3 text-right font-semibold">{fmtMoney(brandMonthly(c))}</td>
               </tr>
             ))}
           </tbody>
