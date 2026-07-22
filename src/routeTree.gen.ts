@@ -18,6 +18,7 @@ import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedLeaderboardsRouteImport } from './routes/_authenticated/leaderboards'
 import { Route as AuthenticatedClientPortalRouteImport } from './routes/_authenticated/client-portal'
+import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
 import { Route as AuthenticatedAccountsRouteImport } from './routes/_authenticated/accounts'
 import { Route as AuthenticatedOnboardingIndexRouteImport } from './routes/_authenticated/onboarding.index'
 import { Route as AuthenticatedCrmIndexRouteImport } from './routes/_authenticated/crm.index'
@@ -74,6 +75,11 @@ const AuthenticatedClientPortalRoute =
     path: '/client-portal',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAuditRoute = AuthenticatedAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAccountsRoute = AuthenticatedAccountsRouteImport.update({
   id: '/accounts',
   path: '/accounts',
@@ -131,6 +137,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/accounts': typeof AuthenticatedAccountsRoute
+  '/audit': typeof AuthenticatedAuditRoute
   '/client-portal': typeof AuthenticatedClientPortalRoute
   '/leaderboards': typeof AuthenticatedLeaderboardsRoute
   '/onboarding': typeof AuthenticatedOnboardingRouteWithChildren
@@ -150,6 +157,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/accounts': typeof AuthenticatedAccountsRoute
+  '/audit': typeof AuthenticatedAuditRoute
   '/client-portal': typeof AuthenticatedClientPortalRoute
   '/leaderboards': typeof AuthenticatedLeaderboardsRoute
   '/reports': typeof AuthenticatedReportsRoute
@@ -170,6 +178,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/_authenticated/accounts': typeof AuthenticatedAccountsRoute
+  '/_authenticated/audit': typeof AuthenticatedAuditRoute
   '/_authenticated/client-portal': typeof AuthenticatedClientPortalRoute
   '/_authenticated/leaderboards': typeof AuthenticatedLeaderboardsRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRouteWithChildren
@@ -191,6 +200,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/accounts'
+    | '/audit'
     | '/client-portal'
     | '/leaderboards'
     | '/onboarding'
@@ -210,6 +220,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/accounts'
+    | '/audit'
     | '/client-portal'
     | '/leaderboards'
     | '/reports'
@@ -229,6 +240,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/accounts'
+    | '/_authenticated/audit'
     | '/_authenticated/client-portal'
     | '/_authenticated/leaderboards'
     | '/_authenticated/onboarding'
@@ -319,6 +331,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClientPortalRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/audit': {
+      id: '/_authenticated/audit'
+      path: '/audit'
+      fullPath: '/audit'
+      preLoaderRoute: typeof AuthenticatedAuditRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/accounts': {
       id: '/_authenticated/accounts'
       path: '/accounts'
@@ -404,6 +423,7 @@ const AuthenticatedOnboardingRouteWithChildren =
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAccountsRoute: typeof AuthenticatedAccountsRoute
+  AuthenticatedAuditRoute: typeof AuthenticatedAuditRoute
   AuthenticatedClientPortalRoute: typeof AuthenticatedClientPortalRoute
   AuthenticatedLeaderboardsRoute: typeof AuthenticatedLeaderboardsRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRouteWithChildren
@@ -417,6 +437,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAccountsRoute: AuthenticatedAccountsRoute,
+  AuthenticatedAuditRoute: AuthenticatedAuditRoute,
   AuthenticatedClientPortalRoute: AuthenticatedClientPortalRoute,
   AuthenticatedLeaderboardsRoute: AuthenticatedLeaderboardsRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRouteWithChildren,
