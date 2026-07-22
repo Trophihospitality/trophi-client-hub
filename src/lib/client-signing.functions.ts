@@ -40,21 +40,24 @@ export interface ClientContractRow {
 }
 
 async function fetchRecipientState(pandadocDocId: string) {
-  try {
-    const { pandadoc } = await import('@/lib/pandadoc.server');
-    const details: any = await pandadoc.getDocument(pandadocDocId);
-    const recips: any[] = details?.recipients ?? [];
-    const client = recips.find((r) => (r.role ?? '').toLowerCase() === 'client');
-    const staff = recips.find((r) => (r.role ?? '').toLowerCase() === 'trophi');
-    return {
-      clientSigned: !!client?.has_completed,
-      staffSigned: !!staff?.has_completed,
-      staffEmail: (staff?.email as string | undefined) ?? null,
-      status: String(details?.status ?? ''),
-    };
-  } catch {
-    return { clientSigned: false, staffSigned: false, staffEmail: null as string | null, status: null as string | null };
-  }
+  const { pandadoc } = await import('@/lib/pandadoc.server');
+  const details: any = await pandadoc.getDocument(pandadocDocId);
+  const recips: any[] = details?.recipients ?? [];
+  const byRole = (role: string) => recips.find((r) => {
+    const roles = Array.isArray(r.roles) ? r.roles : [];
+    return String(r.role ?? '').toLowerCase() === role ||
+      roles.some((v: any) => String(v).toLowerCase() === role);
+  });
+  const client = byRole('client');
+  const staff = byRole('trophi');
+  const signed = (r: any) => r?.has_completed === true || r?.completed === true || !!r?.signature_date;
+  const status = String(details?.status ?? '');
+  return {
+    clientSigned: signed(client) || status === 'document.completed',
+    staffSigned: signed(staff) || status === 'document.completed',
+    staffEmail: (staff?.email as string | undefined) ?? null,
+    status,
+  };
 }
 
 export const getClientContractsFn = createServerFn({ method: 'GET' })
@@ -86,7 +89,12 @@ export const getClientContractsFn = createServerFn({ method: 'GET' })
       const errored = status === 'error' || blankFields.length > 0;
       const completedByStatus = status === 'document.completed' || status === 'completed';
       const rec = !errored && r?.pandadoc_document_id
-        ? await fetchRecipientState(r.pandadoc_document_id)
+        ? await fetchRecipientState(r.pandadoc_document_id).catch(() => ({
+            clientSigned: completedByStatus,
+            staffSigned: completedByStatus,
+            staffEmail: null as string | null,
+            status: status || null,
+          }))
         : { clientSigned: completedByStatus, staffSigned: completedByStatus, staffEmail: null as string | null, status: null as string | null };
       return {
         kind,
@@ -173,7 +181,9 @@ export const createSigningSessionFn = createServerFn({ method: 'POST' })
 
     // Block if client already signed but not yet fully executed — they'd just
     // see a completed document, but be explicit for UX.
-    const rec = await fetchRecipientState(row.pandadoc_document_id);
+    const rec = await fetchRecipientState(row.pandadoc_document_id).catch((err) => {
+      throw new Error(`Could not confirm PandaDoc signing status. Please retry in a few seconds. ${err?.message ?? ''}`.trim());
+    });
     if (rec.clientSigned && !rec.staffSigned) {
       throw new Error('You have already signed this document. Awaiting Trophi countersignature.');
     }
@@ -203,7 +213,9 @@ export const createCountersignSessionFn = createServerFn({ method: 'POST' })
       .eq('business_id', data.businessId).eq('kind', data.kind).maybeSingle();
     if (!row?.pandadoc_document_id) throw new Error('Document has not been generated yet');
 
-    const rec = await fetchRecipientState(row.pandadoc_document_id);
+    const rec = await fetchRecipientState(row.pandadoc_document_id).catch((err) => {
+      throw new Error(`Could not confirm PandaDoc signing status. Please retry in a few seconds. ${err?.message ?? ''}`.trim());
+    });
     if (!rec.clientSigned) {
       throw new Error('The client has not signed yet — countersignature not available.');
     }

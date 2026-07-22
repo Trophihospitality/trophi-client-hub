@@ -9,7 +9,14 @@ function apiKey(): string {
   return key;
 }
 
-async function request<T = any>(path: string, init: RequestInit = {}): Promise<T> {
+function retryDelayMs(body: any, attempt: number): number {
+  const detail = String(body?.detail ?? body?.message ?? '');
+  const seconds = Number(detail.match(/available in (\d+) seconds/i)?.[1]);
+  if (Number.isFinite(seconds) && seconds > 0) return Math.min(seconds * 1000 + 250, 6000);
+  return 750 * (attempt + 1);
+}
+
+async function request<T = any>(path: string, init: RequestInit = {}, attempt = 0): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
     headers: {
@@ -22,6 +29,10 @@ async function request<T = any>(path: string, init: RequestInit = {}): Promise<T
   const text = await res.text();
   let body: any = null;
   try { body = text ? JSON.parse(text) : null; } catch { body = { raw: text }; }
+  if (res.status === 429 && attempt < 3) {
+    await new Promise((r) => setTimeout(r, retryDelayMs(body, attempt)));
+    return request<T>(path, init, attempt + 1);
+  }
   if (!res.ok) {
     const msg = body?.detail || body?.message || body?.error || res.statusText;
     throw new Error(`PandaDoc ${res.status}: ${msg}`);
