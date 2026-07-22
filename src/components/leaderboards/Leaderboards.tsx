@@ -115,19 +115,23 @@ function buildCrmRows(
     }
   }
 
-  const bucketValue = (biz: Set<string>) => {
+  const bucketValue = (biz: Set<string>, useSignedSnapshot: boolean) => {
     let value = 0;
     for (const id of biz) {
       const c = clientsByBiz.get(id);
-      if (c) value += (c.budget ?? 0) * c.activeLocations;
+      if (!c) continue;
+      const locs = useSignedSnapshot
+        ? (c.signedActiveLocations ?? c.activeLocations)
+        : c.activeLocations;
+      value += (c.budget ?? 0) * locs;
     }
     return value;
   };
 
   const personRows: CrmLbRow[] = filteredPeople.map((p) => {
     const a = perPerson.get(p.id) ?? { leads: new Set<string>(), approved: new Set<string>(), signed: new Set<string>(), a2sDays: [] };
-    const signedValue = bucketValue(a.signed);
-    const approvedValue = bucketValue(a.approved);
+    const signedValue = bucketValue(a.signed, true);
+    const approvedValue = bucketValue(a.approved, false);
     return {
       key: p.id,
       personId: p.id,
