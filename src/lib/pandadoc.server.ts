@@ -82,8 +82,21 @@ export const pandadoc = {
     });
   },
 
-  async getDocument(id: string): Promise<PandaDocDocument & { recipients?: any[] }> {
+  async getDocument(id: string): Promise<PandaDocDocument & { recipients?: any[]; metadata?: Record<string, any> }> {
     return request(`/documents/${id}/details`);
+  },
+
+  // Downloads the final signed PDF. Only works when status is document.completed.
+  async downloadDocumentPdf(id: string): Promise<{ bytes: Uint8Array; contentType: string }> {
+    const res = await fetch(`${BASE}/documents/${id}/download`, {
+      headers: { Authorization: `API-Key ${apiKey()}`, Accept: 'application/pdf' },
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`PandaDoc download ${id} → ${res.status}: ${text.slice(0, 200)}`);
+    }
+    const buf = new Uint8Array(await res.arrayBuffer());
+    return { bytes: buf, contentType: res.headers.get('content-type') || 'application/pdf' };
   },
 
   async listByMetadata(metadata: Record<string, string>): Promise<PandaDocDocument[]> {
