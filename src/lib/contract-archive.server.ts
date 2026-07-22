@@ -32,6 +32,8 @@ export async function archiveCompletedContract(row: {
   kind: string;
   pandadoc_document_id: string | null;
   signed_pdf_path: string | null;
+  metadata?: any;
+  location_ids?: string[] | null;
 }): Promise<ArchiveResult> {
   if (!row.pandadoc_document_id) {
     throw new Error(`Contract ${row.id} has no pandadoc_document_id`);
