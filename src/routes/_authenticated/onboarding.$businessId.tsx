@@ -220,6 +220,13 @@ function OnboardingDetailPage() {
           <PortalAccessCard businessId={data.businessId} />
 
           <div className="rounded-xl border bg-card">
+            <div className="border-b border-border px-4 py-3 text-sm font-semibold">Documents</div>
+            <div className="p-4">
+              <DocumentsSection businessId={data.businessId} mode="staff" />
+            </div>
+          </div>
+
+          <div className="rounded-xl border bg-card">
 
             <div className="border-b border-border px-4 py-3 text-sm font-semibold">Activity</div>
             <ul className="divide-y divide-border max-h-96 overflow-y-auto">
