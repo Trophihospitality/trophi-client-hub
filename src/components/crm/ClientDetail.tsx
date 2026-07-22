@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { AddLocationDialog } from '@/components/crm/AddLocationDialog';
+import { DocumentsSection } from '@/components/documents/DocumentsSection';
 
 // ============================================================
 // CLIENT DETAIL
@@ -85,7 +86,7 @@ export default function ClientDetail() {
   const [newNote, setNewNote] = useState('');
   const [logOpen, setLogOpen] = useState(false);
   const [addLocOpen, setAddLocOpen] = useState(false);
-  const [tab, setTab] = useState<'summary' | 'contact' | 'attachments' | 'activity'>('summary');
+  const [tab, setTab] = useState<'summary' | 'contact' | 'documents' | 'attachments' | 'activity'>('summary');
 
 
   const { currentUser, isAdmin, isManager, canEdit } = useUser();
@@ -288,6 +289,7 @@ export default function ClientDetail() {
       <div className="flex gap-1 border-b border-border">
         <TabButton active={tab === 'summary'} onClick={() => setTab('summary')}>Client Summary</TabButton>
         <TabButton active={tab === 'contact'} onClick={() => setTab('contact')}>Contact Log</TabButton>
+        <TabButton active={tab === 'documents'} onClick={() => setTab('documents')}>Documents</TabButton>
         <TabButton active={tab === 'attachments'} onClick={() => setTab('attachments')}>Attachments</TabButton>
         <TabButton active={tab === 'activity'} onClick={() => setTab('activity')}>Activity</TabButton>
       </div>
@@ -554,6 +556,10 @@ export default function ClientDetail() {
             ))}
           </div>
         </section>
+      )}
+
+      {tab === 'documents' && (
+        <DocumentsSection businessId={client.businessId} mode="staff" />
       )}
 
       {tab === 'attachments' && (

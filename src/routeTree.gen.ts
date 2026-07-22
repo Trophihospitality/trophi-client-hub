@@ -19,6 +19,7 @@ import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedLeaderboardsRouteImport } from './routes/_authenticated/leaderboards'
 import { Route as AuthenticatedClientPortalRouteImport } from './routes/_authenticated/client-portal'
+import { Route as AuthenticatedClientDocumentsRouteImport } from './routes/_authenticated/client-documents'
 import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
 import { Route as AuthenticatedAccountsRouteImport } from './routes/_authenticated/accounts'
 import { Route as AuthenticatedUsersIndexRouteImport } from './routes/_authenticated/users.index'
@@ -36,6 +37,7 @@ import { Route as LovableEmailAuthPreviewRouteImport } from './routes/lovable/em
 import { Route as ApiPublicHooksTestOnboardingEmailRouteImport } from './routes/api/public/hooks/test-onboarding-email'
 import { Route as ApiPublicHooksPandadocRouteImport } from './routes/api/public/hooks/pandadoc'
 import { Route as ApiPublicHooksOnboardingRemindersRouteImport } from './routes/api/public/hooks/onboarding-reminders'
+import { Route as ApiPublicHooksBackfillContractsRouteImport } from './routes/api/public/hooks/backfill-contracts'
 import { Route as AuthenticatedUsersTrophiUserIdRouteImport } from './routes/_authenticated/users.trophi.$userId'
 
 const AuthRoute = AuthRouteImport.update({
@@ -87,6 +89,12 @@ const AuthenticatedClientPortalRoute =
   AuthenticatedClientPortalRouteImport.update({
     id: '/client-portal',
     path: '/client-portal',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedClientDocumentsRoute =
+  AuthenticatedClientDocumentsRouteImport.update({
+    id: '/client-documents',
+    path: '/client-documents',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAuditRoute = AuthenticatedAuditRouteImport.update({
@@ -184,6 +192,12 @@ const ApiPublicHooksOnboardingRemindersRoute =
     path: '/api/public/hooks/onboarding-reminders',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksBackfillContractsRoute =
+  ApiPublicHooksBackfillContractsRouteImport.update({
+    id: '/api/public/hooks/backfill-contracts',
+    path: '/api/public/hooks/backfill-contracts',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AuthenticatedUsersTrophiUserIdRoute =
   AuthenticatedUsersTrophiUserIdRouteImport.update({
     id: '/$userId',
@@ -197,6 +211,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/accounts': typeof AuthenticatedAccountsRoute
   '/audit': typeof AuthenticatedAuditRoute
+  '/client-documents': typeof AuthenticatedClientDocumentsRoute
   '/client-portal': typeof AuthenticatedClientPortalRoute
   '/leaderboards': typeof AuthenticatedLeaderboardsRoute
   '/onboarding': typeof AuthenticatedOnboardingRouteWithChildren
@@ -212,6 +227,7 @@ export interface FileRoutesByFullPath {
   '/onboarding/': typeof AuthenticatedOnboardingIndexRoute
   '/users/': typeof AuthenticatedUsersIndexRoute
   '/users/trophi/$userId': typeof AuthenticatedUsersTrophiUserIdRoute
+  '/api/public/hooks/backfill-contracts': typeof ApiPublicHooksBackfillContractsRoute
   '/api/public/hooks/onboarding-reminders': typeof ApiPublicHooksOnboardingRemindersRoute
   '/api/public/hooks/pandadoc': typeof ApiPublicHooksPandadocRoute
   '/api/public/hooks/test-onboarding-email': typeof ApiPublicHooksTestOnboardingEmailRoute
@@ -226,6 +242,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/accounts': typeof AuthenticatedAccountsRoute
   '/audit': typeof AuthenticatedAuditRoute
+  '/client-documents': typeof AuthenticatedClientDocumentsRoute
   '/client-portal': typeof AuthenticatedClientPortalRoute
   '/leaderboards': typeof AuthenticatedLeaderboardsRoute
   '/reports': typeof AuthenticatedReportsRoute
@@ -238,6 +255,7 @@ export interface FileRoutesByTo {
   '/onboarding': typeof AuthenticatedOnboardingIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
   '/users/trophi/$userId': typeof AuthenticatedUsersTrophiUserIdRoute
+  '/api/public/hooks/backfill-contracts': typeof ApiPublicHooksBackfillContractsRoute
   '/api/public/hooks/onboarding-reminders': typeof ApiPublicHooksOnboardingRemindersRoute
   '/api/public/hooks/pandadoc': typeof ApiPublicHooksPandadocRoute
   '/api/public/hooks/test-onboarding-email': typeof ApiPublicHooksTestOnboardingEmailRoute
@@ -254,6 +272,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/accounts': typeof AuthenticatedAccountsRoute
   '/_authenticated/audit': typeof AuthenticatedAuditRoute
+  '/_authenticated/client-documents': typeof AuthenticatedClientDocumentsRoute
   '/_authenticated/client-portal': typeof AuthenticatedClientPortalRoute
   '/_authenticated/leaderboards': typeof AuthenticatedLeaderboardsRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRouteWithChildren
@@ -269,6 +288,7 @@ export interface FileRoutesById {
   '/_authenticated/onboarding/': typeof AuthenticatedOnboardingIndexRoute
   '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
   '/_authenticated/users/trophi/$userId': typeof AuthenticatedUsersTrophiUserIdRoute
+  '/api/public/hooks/backfill-contracts': typeof ApiPublicHooksBackfillContractsRoute
   '/api/public/hooks/onboarding-reminders': typeof ApiPublicHooksOnboardingRemindersRoute
   '/api/public/hooks/pandadoc': typeof ApiPublicHooksPandadocRoute
   '/api/public/hooks/test-onboarding-email': typeof ApiPublicHooksTestOnboardingEmailRoute
@@ -285,6 +305,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/accounts'
     | '/audit'
+    | '/client-documents'
     | '/client-portal'
     | '/leaderboards'
     | '/onboarding'
@@ -300,6 +321,7 @@ export interface FileRouteTypes {
     | '/onboarding/'
     | '/users/'
     | '/users/trophi/$userId'
+    | '/api/public/hooks/backfill-contracts'
     | '/api/public/hooks/onboarding-reminders'
     | '/api/public/hooks/pandadoc'
     | '/api/public/hooks/test-onboarding-email'
@@ -314,6 +336,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/accounts'
     | '/audit'
+    | '/client-documents'
     | '/client-portal'
     | '/leaderboards'
     | '/reports'
@@ -326,6 +349,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/users'
     | '/users/trophi/$userId'
+    | '/api/public/hooks/backfill-contracts'
     | '/api/public/hooks/onboarding-reminders'
     | '/api/public/hooks/pandadoc'
     | '/api/public/hooks/test-onboarding-email'
@@ -341,6 +365,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/accounts'
     | '/_authenticated/audit'
+    | '/_authenticated/client-documents'
     | '/_authenticated/client-portal'
     | '/_authenticated/leaderboards'
     | '/_authenticated/onboarding'
@@ -356,6 +381,7 @@ export interface FileRouteTypes {
     | '/_authenticated/onboarding/'
     | '/_authenticated/users/'
     | '/_authenticated/users/trophi/$userId'
+    | '/api/public/hooks/backfill-contracts'
     | '/api/public/hooks/onboarding-reminders'
     | '/api/public/hooks/pandadoc'
     | '/api/public/hooks/test-onboarding-email'
@@ -370,6 +396,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AcceptInviteRoute: typeof AcceptInviteRoute
   AuthRoute: typeof AuthRoute
+  ApiPublicHooksBackfillContractsRoute: typeof ApiPublicHooksBackfillContractsRoute
   ApiPublicHooksOnboardingRemindersRoute: typeof ApiPublicHooksOnboardingRemindersRoute
   ApiPublicHooksPandadocRoute: typeof ApiPublicHooksPandadocRoute
   ApiPublicHooksTestOnboardingEmailRoute: typeof ApiPublicHooksTestOnboardingEmailRoute
@@ -448,6 +475,13 @@ declare module '@tanstack/react-router' {
       path: '/client-portal'
       fullPath: '/client-portal'
       preLoaderRoute: typeof AuthenticatedClientPortalRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/client-documents': {
+      id: '/_authenticated/client-documents'
+      path: '/client-documents'
+      fullPath: '/client-documents'
+      preLoaderRoute: typeof AuthenticatedClientDocumentsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/audit': {
@@ -569,6 +603,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksOnboardingRemindersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/backfill-contracts': {
+      id: '/api/public/hooks/backfill-contracts'
+      path: '/api/public/hooks/backfill-contracts'
+      fullPath: '/api/public/hooks/backfill-contracts'
+      preLoaderRoute: typeof ApiPublicHooksBackfillContractsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/users/trophi/$userId': {
       id: '/_authenticated/users/trophi/$userId'
       path: '/$userId'
@@ -630,6 +671,7 @@ const AuthenticatedUsersRouteWithChildren =
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAccountsRoute: typeof AuthenticatedAccountsRoute
   AuthenticatedAuditRoute: typeof AuthenticatedAuditRoute
+  AuthenticatedClientDocumentsRoute: typeof AuthenticatedClientDocumentsRoute
   AuthenticatedClientPortalRoute: typeof AuthenticatedClientPortalRoute
   AuthenticatedLeaderboardsRoute: typeof AuthenticatedLeaderboardsRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRouteWithChildren
@@ -644,6 +686,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAccountsRoute: AuthenticatedAccountsRoute,
   AuthenticatedAuditRoute: AuthenticatedAuditRoute,
+  AuthenticatedClientDocumentsRoute: AuthenticatedClientDocumentsRoute,
   AuthenticatedClientPortalRoute: AuthenticatedClientPortalRoute,
   AuthenticatedLeaderboardsRoute: AuthenticatedLeaderboardsRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRouteWithChildren,
@@ -664,6 +707,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AcceptInviteRoute: AcceptInviteRoute,
   AuthRoute: AuthRoute,
+  ApiPublicHooksBackfillContractsRoute: ApiPublicHooksBackfillContractsRoute,
   ApiPublicHooksOnboardingRemindersRoute:
     ApiPublicHooksOnboardingRemindersRoute,
   ApiPublicHooksPandadocRoute: ApiPublicHooksPandadocRoute,

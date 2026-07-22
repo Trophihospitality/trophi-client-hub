@@ -36,13 +36,13 @@ async function handleEvent(supabaseAdmin: any, ev: any) {
   // Match by pandadoc_document_id first (authoritative), fall back to metadata.
   const { data: rows } = await supabaseAdmin
     .from('client_contracts')
-    .select('id, business_id, kind, status')
+    .select('id, business_id, kind, status, metadata, location_ids, signed_pdf_path')
     .eq('pandadoc_document_id', docId)
     .limit(1);
   const row = rows?.[0]
     ?? (businessId && kind
       ? (await supabaseAdmin.from('client_contracts')
-          .select('id, business_id, kind, status')
+          .select('id, business_id, kind, status, metadata, location_ids, signed_pdf_path')
           .eq('business_id', businessId).eq('kind', kind).limit(1)).data?.[0]
       : null);
 
@@ -63,6 +63,24 @@ async function handleEvent(supabaseAdmin: any, ev: any) {
     description: `Contract "${row.kind}" → ${status}`,
     actor: 'PandaDoc',
   });
+
+  // Archive the signed PDF into the contracts storage bucket, stamp
+  // executed_at / location_ids / signed_pdf_path on the row.
+  if (status === 'document.completed') {
+    try {
+      const { archiveCompletedContract } = await import('@/lib/contract-archive.server');
+      await archiveCompletedContract({
+        id: row.id, business_id: row.business_id, kind: row.kind,
+        pandadoc_document_id: docId,
+        signed_pdf_path: (row as any).signed_pdf_path ?? null,
+        metadata: (row as any).metadata ?? {},
+        location_ids: (row as any).location_ids ?? null,
+      });
+    } catch (err) {
+      console.error(`[pandadoc webhook] archive failed for ${docId}:`, err);
+    }
+  }
+
 
   // If this event completed the doc AND all three bundle docs are complete,
   // auto-advance Step 4 (which flips CRM to Signed via existing logic).

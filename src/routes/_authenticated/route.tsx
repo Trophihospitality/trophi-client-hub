@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, redirect, Link, useRouterState } from '@tanstack/react-router';
 import { useState } from 'react';
-import { Users, ClipboardCheck, BarChart3, Wrench, Globe, LogOut, ShieldCheck, FileText, LineChart, Trophy, ScrollText, ChevronDown, ChevronRight } from 'lucide-react';
+import { Users, ClipboardCheck, BarChart3, Wrench, Globe, LogOut, ShieldCheck, FileText, LineChart, Trophy, ScrollText, ChevronDown, ChevronRight, FolderClosed } from 'lucide-react';
 
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/store/userStore';
@@ -93,6 +93,7 @@ function UserMgmtGroup({ pathname }: { pathname: string }) {
 
 const CLIENT_NAV = [
   { to: '/client-portal', label: 'Client Portal', icon: Globe },
+  { to: '/client-documents', label: 'Documents', icon: FolderClosed },
   { to: '/support', label: 'Tech / Support', icon: Wrench },
 ] as const;
 
