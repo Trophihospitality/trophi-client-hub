@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_log: {
+        Row: {
+          action: string
+          actor_email: string | null
+          actor_id: string | null
+          actor_type: Database["public"]["Enums"]["audit_actor_type"]
+          after: Json | null
+          before: Json | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          success: boolean
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          actor_email?: string | null
+          actor_id?: string | null
+          actor_type?: Database["public"]["Enums"]["audit_actor_type"]
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          success?: boolean
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          actor_email?: string | null
+          actor_id?: string | null
+          actor_type?: Database["public"]["Enums"]["audit_actor_type"]
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          success?: boolean
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       awards: {
         Row: {
           awarded_at: string
@@ -283,6 +334,71 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "client_status_history_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["business_id"]
+          },
+        ]
+      }
+      client_users: {
+        Row: {
+          activated_at: string | null
+          business_id: string
+          created_at: string
+          deactivated_at: string | null
+          email: string
+          first_name: string
+          id: string
+          invited_at: string | null
+          invited_by: string | null
+          last_name: string
+          location_ids: string[]
+          permission_level: Database["public"]["Enums"]["client_permission_level"]
+          phone: string | null
+          status: Database["public"]["Enums"]["client_user_status"]
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          activated_at?: string | null
+          business_id: string
+          created_at?: string
+          deactivated_at?: string | null
+          email: string
+          first_name: string
+          id?: string
+          invited_at?: string | null
+          invited_by?: string | null
+          last_name: string
+          location_ids?: string[]
+          permission_level?: Database["public"]["Enums"]["client_permission_level"]
+          phone?: string | null
+          status?: Database["public"]["Enums"]["client_user_status"]
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          activated_at?: string | null
+          business_id?: string
+          created_at?: string
+          deactivated_at?: string | null
+          email?: string
+          first_name?: string
+          id?: string
+          invited_at?: string | null
+          invited_by?: string | null
+          last_name?: string
+          location_ids?: string[]
+          permission_level?: Database["public"]["Enums"]["client_permission_level"]
+          phone?: string | null
+          status?: Database["public"]["Enums"]["client_user_status"]
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_users_business_id_fkey"
             columns: ["business_id"]
             isOneToOne: false
             referencedRelation: "clients"
@@ -812,26 +928,91 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
+          current_role_started_at: string | null
           email: string
+          employee_id: number | null
+          first_name: string | null
+          hire_date: string | null
+          hire_role: Database["public"]["Enums"]["app_role"] | null
+          is_active: boolean
+          last_name: string | null
+          mentor_id: string | null
           name: string
+          phone: string | null
           team: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           created_at?: string
+          current_role_started_at?: string | null
           email: string
+          employee_id?: number | null
+          first_name?: string | null
+          hire_date?: string | null
+          hire_role?: Database["public"]["Enums"]["app_role"] | null
+          is_active?: boolean
+          last_name?: string | null
+          mentor_id?: string | null
           name: string
+          phone?: string | null
           team?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           created_at?: string
+          current_role_started_at?: string | null
           email?: string
+          employee_id?: number | null
+          first_name?: string | null
+          hire_date?: string | null
+          hire_role?: Database["public"]["Enums"]["app_role"] | null
+          is_active?: boolean
+          last_name?: string | null
+          mentor_id?: string | null
           name?: string
+          phone?: string | null
           team?: string | null
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      role_history: {
+        Row: {
+          changed_by: string | null
+          created_at: string
+          ended_on: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          started_on: string
+          user_id: string
+        }
+        Insert: {
+          changed_by?: string | null
+          created_at?: string
+          ended_on?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          started_on: string
+          user_id: string
+        }
+        Update: {
+          changed_by?: string | null
+          created_at?: string
+          ended_on?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          started_on?: string
           user_id?: string
         }
         Relationships: []
@@ -876,6 +1057,7 @@ export type Database = {
       }
       is_client_admin_for: { Args: { _business_id: string }; Returns: boolean }
       is_privileged: { Args: { _user_id: string }; Returns: boolean }
+      is_spiro: { Args: { _user_id: string }; Returns: boolean }
       is_trophi_staff_for: { Args: { _business_id: string }; Returns: boolean }
       sync_client_next_follow_up: {
         Args: { _business_id: string }
@@ -890,6 +1072,9 @@ export type Database = {
         | "onboarding_specialist"
         | "account_manager"
         | "client_admin"
+      audit_actor_type: "trophi" | "client" | "system" | "anonymous"
+      client_permission_level: "admin_full" | "leadership_mid" | "manager_view"
+      client_user_status: "invited" | "active" | "inactive"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1025,6 +1210,9 @@ export const Constants = {
         "account_manager",
         "client_admin",
       ],
+      audit_actor_type: ["trophi", "client", "system", "anonymous"],
+      client_permission_level: ["admin_full", "leadership_mid", "manager_view"],
+      client_user_status: ["invited", "active", "inactive"],
     },
   },
 } as const
