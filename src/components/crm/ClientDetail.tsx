@@ -53,6 +53,13 @@ export default function ClientDetail() {
   const navigate = useNavigate();
   const { getClient, updateClient, changeStatus, addNote, setLocationStatus } = useCrm();
   const client = getClient(businessId ?? '');
+  const getPocSync = useServerFn(getPocSyncStatusFn);
+  const { data: pocSync } = useQuery({
+    queryKey: ['poc-sync', businessId],
+    queryFn: () => getPocSync({ data: { businessId } }),
+    enabled: !!businessId,
+  });
+
 
   // Editable draft of client info
   const [draft, setDraft] = useState(() =>
