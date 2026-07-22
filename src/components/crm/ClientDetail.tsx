@@ -85,7 +85,7 @@ export default function ClientDetail() {
   const [newNote, setNewNote] = useState('');
   const [logOpen, setLogOpen] = useState(false);
   const [addLocOpen, setAddLocOpen] = useState(false);
-  const [tab, setTab] = useState<'summary' | 'contact' | 'attachments' | 'activity'>('summary');
+  const [tab, setTab] = useState<'summary' | 'contact' | 'documents' | 'attachments' | 'activity'>('summary');
 
 
   const { currentUser, isAdmin, isManager, canEdit } = useUser();
