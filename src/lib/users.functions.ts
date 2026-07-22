@@ -25,7 +25,14 @@ export interface AppUser {
   isActive: boolean;
   avatarPath: string | null;
   avatarUrl: string | null;
+  // Invite / auth-access state
+  invitedAt: string | null;
+  inviteLastError: string | null;
+  inviteLastAttemptAt: string | null;
+  hasAcceptedInvite: boolean;
+  authUserExists: boolean;
 }
+
 
 function highestRole(rows: { role: string }[]): AppRole {
   let best: AppRole = 'sales_rep';
