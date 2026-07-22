@@ -300,6 +300,15 @@ export interface RoleHistoryEntry {
   endedOn: string | null;
 }
 
+export interface RoleHistoryEntry {
+  id: string;
+  role: AppRole;
+  startedOn: string;
+  endedOn: string | null;
+  trainerId: string | null;
+  changedBy: string | null;
+}
+
 export const listRoleHistoryFn = createServerFn({ method: 'GET' })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ targetUserId: z.string().uuid() }).parse(d))
@@ -308,12 +317,13 @@ export const listRoleHistoryFn = createServerFn({ method: 'GET' })
     await assertAdmin(supabase, userId);
     const { data: rows, error } = await supabase
       .from('role_history')
-      .select('id, role, started_on, ended_on')
+      .select('id, role, started_on, ended_on, trainer_id, changed_by')
       .eq('user_id', data.targetUserId)
       .order('started_on', { ascending: false });
     if (error) throw error;
     return (rows ?? []).map((r: any) => ({
       id: r.id, role: r.role, startedOn: r.started_on, endedOn: r.ended_on,
+      trainerId: r.trainer_id ?? null, changedBy: r.changed_by ?? null,
     }));
   });
 
@@ -324,8 +334,8 @@ export const updateTrophiUserFn = createServerFn({ method: 'POST' })
       targetUserId: z.string().uuid(),
       firstName: z.string().trim().min(1).max(80).optional(),
       lastName: z.string().trim().min(1).max(80).optional(),
-      phone: z.string().trim().max(40).nullable().optional(),
-      team: z.string().trim().max(80).nullable().optional(),
+      phone: z.string().trim().min(1).max(40).optional(),
+      team: z.string().trim().min(1).max(80).optional(),
       hireDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
       hireRole: AssignableRole.nullable().optional(),
       mentorId: z.string().uuid().nullable().optional(),
@@ -347,15 +357,24 @@ export const updateTrophiUserFn = createServerFn({ method: 'POST' })
       const ln = data.lastName ?? before?.last_name ?? '';
       patch.name = `${fn} ${ln}`.trim();
     }
-    if (data.phone !== undefined) patch.phone = data.phone || null;
-    if (data.team !== undefined) patch.team = data.team || null;
+    if (data.phone !== undefined) patch.phone = data.phone;
+    if (data.team !== undefined) patch.team = data.team;
     if (data.hireDate !== undefined) patch.hire_date = data.hireDate;
     if (data.hireRole !== undefined) patch.hire_role = data.hireRole;
-    if (data.mentorId !== undefined) patch.mentor_id = data.mentorId;
     if (data.currentRoleStartedAt !== undefined) patch.current_role_started_at = data.currentRoleStartedAt;
+    if (data.mentorId !== undefined) {
+      const prevMentor = before?.mentor_id ?? null;
+      if (prevMentor !== data.mentorId) {
+        patch.mentor_id = data.mentorId;
+        patch.mentor_status = 'assigned';
+        patch.mentor_assigned_at = new Date().toISOString();
+      }
+    }
 
-    const { error } = await supabaseAdmin.from('profiles').update(patch as any).eq('user_id', data.targetUserId);
-    if (error) throw error;
+    if (Object.keys(patch).length > 0) {
+      const { error } = await supabaseAdmin.from('profiles').update(patch as any).eq('user_id', data.targetUserId);
+      if (error) throw error;
+    }
 
     await writeAudit(supabaseAdmin, {
       actorId: userId, actorEmail: (claims as any)?.email ?? null,
