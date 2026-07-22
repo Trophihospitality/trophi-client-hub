@@ -4,7 +4,7 @@ import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 
 export type ClientPermission = 'admin_full' | 'leadership' | 'manager';
 export type ClientUserStatus = 'invited' | 'active' | 'inactive';
-export type InviteStatus = 'accepted' | 'invited' | 'expired' | 'never_sent' | 'revoked' | 'failed';
+export type InviteStatus = 'accepted' | 'invited' | 'expired' | 'never_sent' | 'revoked' | 'failed' | 'invite_required';
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
