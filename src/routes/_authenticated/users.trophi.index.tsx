@@ -4,7 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { toast } from 'sonner';
 import {
-  listUsersFn, createTrophiUserFn, updateTrophiUserFn, type AppRole, type AppUser,
+  listUsersFn, createTrophiUserFn, updateTrophiUserFn, resendTrophiInviteFn,
+  type AppRole, type AppUser,
 } from '@/lib/users.functions';
 
 import { useAuth } from '@/store/userStore';
@@ -12,7 +13,8 @@ import { formatPhone, formatPhoneInput } from '@/lib/phone';
 import { AvatarCircle } from '@/components/ui/avatar-circle';
 import { uploadAvatarBlob, validateAvatarFile, AVATAR_ACCEPT } from '@/lib/avatar';
 import { AvatarCropDialog } from '@/components/ui/avatar-crop-dialog';
-import { Plus, Search, Upload } from 'lucide-react';
+import { AlertTriangle, Mail, Plus, Search, Upload } from 'lucide-react';
+
 
 export const Route = createFileRoute('/_authenticated/users/trophi/')({
   component: TrophiUsersPage,
