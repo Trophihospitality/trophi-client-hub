@@ -95,7 +95,7 @@ export async function archiveCompletedContract(row: {
 export async function archiveAllCompletedForBusiness(businessId: string) {
   const { data: rows, error } = await supabaseAdmin
     .from('client_contracts')
-    .select('id, business_id, kind, pandadoc_document_id, signed_pdf_path, status')
+    .select('id, business_id, kind, pandadoc_document_id, signed_pdf_path, status, metadata, location_ids')
     .eq('business_id', businessId)
     .eq('status', 'document.completed');
   if (error) throw error;
