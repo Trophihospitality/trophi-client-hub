@@ -26,6 +26,7 @@ const NAV = [
 
 const ADMIN_NAV = [
   { to: '/users', label: 'User Management', icon: ShieldCheck },
+  { to: '/audit', label: 'Audit Log', icon: ScrollText },
   { to: '/settings/pandadoc-templates', label: 'PandaDoc Templates', icon: FileText },
 ] as const;
 
