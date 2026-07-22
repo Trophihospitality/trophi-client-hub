@@ -63,6 +63,12 @@ export default function CRM() {
   // ---- Forecast metrics: monthly value = budget-per-location × ACTIVE locations ----
   const clientMonthlyValue = (c: (typeof mine)[number]) =>
     (c.budget ?? 0) * c.locations.filter((l) => l.status === 'active').length;
+  // Signed value uses the locations-at-signing snapshot so historical figures are immutable.
+  const signedBrandMonthly = (c: (typeof mine)[number]) => {
+    const snap = (c as any).signedActiveLocations as number | null | undefined;
+    const locs = snap ?? c.locations.filter((l) => l.status === 'active').length;
+    return (c.budget ?? 0) * locs;
+  };
 
   const metrics = useMemo(() => {
     const active = mine.filter((c) => ACTIVE_STATUSES.includes(c.journeyStatus));
@@ -72,7 +78,7 @@ export default function CRM() {
       .reduce((s, c) => s + clientMonthlyValue(c), 0);
     const signedValue = mine
       .filter((c) => c.journeyStatus === 'Signed')
-      .reduce((s, c) => s + clientMonthlyValue(c), 0);
+      .reduce((s, c) => s + signedBrandMonthly(c), 0);
     const needsAttention = mine.filter((c) => isOverdue(c).overdue).length;
     return { activeCount: active.length, pipelineValue, approvedValue, signedValue, needsAttention };
   }, [mine]);

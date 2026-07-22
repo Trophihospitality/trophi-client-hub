@@ -438,6 +438,7 @@ export type Database = {
           package_type: string
           sales_person_id: string
           sent_to_onboarding: boolean
+          signed_active_locations: number | null
           signed_at: string | null
           updated_at: string
         }
@@ -463,6 +464,7 @@ export type Database = {
           package_type?: string
           sales_person_id: string
           sent_to_onboarding?: boolean
+          signed_active_locations?: number | null
           signed_at?: string | null
           updated_at?: string
         }
@@ -488,6 +490,7 @@ export type Database = {
           package_type?: string
           sales_person_id?: string
           sent_to_onboarding?: boolean
+          signed_active_locations?: number | null
           signed_at?: string | null
           updated_at?: string
         }

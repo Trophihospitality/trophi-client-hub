@@ -152,7 +152,7 @@ export const getLeaderboardDataFn = createServerFn({ method: 'GET' })
     const [profilesR, rolesR, clientsR, locsR, historyR, recordsR, progressR, defsR, awardsR] = await Promise.all([
       supabaseAdmin.from('profiles').select('user_id, name, email, team'),
       supabaseAdmin.from('user_roles').select('user_id, role'),
-      supabaseAdmin.from('clients').select('business_id, company, journey_status, sales_person_id, budget, created_at, approved_at, signed_at'),
+      supabaseAdmin.from('clients').select('business_id, company, journey_status, sales_person_id, budget, created_at, approved_at, signed_at, signed_active_locations'),
       supabaseAdmin.from('locations').select('business_id, status'),
       supabaseAdmin.from('client_status_history').select('*').order('changed_at'),
       supabaseAdmin.from('onboarding_records').select('business_id, started_at, status, specialist_id, account_manager_id, went_live_at'),
@@ -182,6 +182,8 @@ export const getLeaderboardDataFn = createServerFn({ method: 'GET' })
       businessId: c.business_id, company: c.company, journeyStatus: c.journey_status,
       salesPersonId: c.sales_person_id, budget: c.budget !== null ? Number(c.budget) : null,
       activeLocations: activeLocByBiz.get(c.business_id) ?? 0,
+      signedActiveLocations: c.signed_active_locations !== null && c.signed_active_locations !== undefined
+        ? Number(c.signed_active_locations) : null,
       createdAt: c.created_at, approvedAt: c.approved_at ?? null, signedAt: c.signed_at ?? null,
     }));
 

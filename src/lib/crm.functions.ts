@@ -89,6 +89,9 @@ function rowToClient(c: any, locs: any[], notes: any[], activity: any[], attachm
     updatedAt: c.updated_at,
     sentToOnboarding: !!c.sent_to_onboarding,
     onboardingSentAt: c.onboarding_sent_at ?? undefined,
+    approvedAt: c.approved_at ?? undefined,
+    signedAt: c.signed_at ?? undefined,
+    signedActiveLocations: c.signed_active_locations ?? null,
   };
 }
 

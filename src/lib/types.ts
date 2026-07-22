@@ -128,4 +128,7 @@ export interface Client {
   updatedAt: string;
   sentToOnboarding: boolean;       // set true automatically when status → Approved
   onboardingSentAt?: string;
+  approvedAt?: string;
+  signedAt?: string;
+  signedActiveLocations?: number | null; // snapshot of active locations at Signed transition
 }
