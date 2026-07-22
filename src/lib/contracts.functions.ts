@@ -481,3 +481,52 @@ export const voidAndRegenerateContractBundleFn = createServerFn({ method: 'POST'
     return { ok: true, voided, recreated };
   });
 
+// ============================================================
+// Prep-for-signing — silent-sends any draft/uploaded bundle docs
+// so they land in document.sent (signing-ready) without emailing
+// the client. Idempotent — skips docs already sent/completed.
+// ============================================================
+export const prepBundleForSigningFn = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ businessId: z.string() }).parse(d))
+  .handler(async ({ data, context }): Promise<{ ok: true; prepared: string[]; skipped: string[] }> => {
+    const { supabase, userId } = context;
+    await assertOwnerOrPrivileged(supabase, userId, data.businessId);
+
+    const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+    const { pandadoc } = await import('@/lib/pandadoc.server');
+
+    const { data: rows } = await supabaseAdmin
+      .from('client_contracts')
+      .select('kind, pandadoc_document_id, status')
+      .eq('business_id', data.businessId)
+      .in('kind', BUNDLE_KINDS);
+
+    const prepared: string[] = [];
+    const skipped: string[] = [];
+    for (const r of (rows ?? []) as any[]) {
+      const docId = r.pandadoc_document_id;
+      const s = String(r.status ?? '');
+      if (!docId) { skipped.push(`${r.kind}:no-doc`); continue; }
+      if (s !== 'document.draft' && s !== 'draft' && s !== 'document.uploaded' && s !== 'uploaded') {
+        skipped.push(`${r.kind}:${s}`);
+        continue;
+      }
+      try {
+        await pandadoc.waitForDraft(docId);
+        await pandadoc.sendDocument(docId, {
+          subject: 'Trophi Hospitality — in-portal signing',
+          message: 'Signing happens inside the Trophi client portal. You should not receive this email.',
+          silent: true,
+        });
+        await supabaseAdmin.from('client_contracts').update({
+          status: 'document.sent', updated_at: new Date().toISOString(),
+        }).eq('business_id', data.businessId).eq('kind', r.kind);
+        prepared.push(r.kind);
+      } catch (err: any) {
+        skipped.push(`${r.kind}:error:${err?.message ?? err}`);
+      }
+    }
+    return { ok: true, prepared, skipped };
+  });
+
