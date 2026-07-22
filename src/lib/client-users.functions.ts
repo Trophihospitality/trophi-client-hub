@@ -345,6 +345,7 @@ export const resendClientInviteFn = createServerFn({ method: 'POST' })
     try {
       inviteResp = await supabaseAdmin.auth.admin.inviteUserByEmail(row.email, {
         data: { name: `${row.first_name} ${row.last_name}`.trim(), client_user: true, business_id: row.business_id },
+        redirectTo: buildInviteRedirect(data.origin),
       });
     } catch (e: any) {
       const msg = e?.message || 'Failed to resend invite';
