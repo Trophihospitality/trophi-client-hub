@@ -42,7 +42,7 @@ export const listClientUsersFn = createServerFn({ method: 'GET' })
     const { supabase } = context;
     const { data, error } = await supabase
       .from('client_users')
-      .select('*, clients:business_id(business_name)')
+      .select('*, clients:business_id(company)')
       .order('created_at', { ascending: false });
     if (error) throw error;
     return (data ?? []).map((r: any) => ({
