@@ -40,6 +40,8 @@ export interface ClientUser {
   inviteSentTo: string | null;
   inviteExpiresAt: string | null;
   inviteStatus: InviteStatus;
+  inviteLastError: string | null;
+  inviteLastAttemptAt: string | null;
 }
 
 async function writeAudit(admin: any, params: {
