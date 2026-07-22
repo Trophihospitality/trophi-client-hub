@@ -32,11 +32,23 @@ export function DocumentsSection({
 }: { businessId: string; mode?: 'staff' | 'client' }) {
   const list = useServerFn(listClientDocumentsFn);
   const sign = useServerFn(getDocumentSignedUrlFn);
+  const sync = useServerFn(syncSignedPdfsFn);
+  const qc = useQueryClient();
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['client-documents', businessId],
     queryFn: () => list({ data: { businessId } }),
     enabled: !!businessId,
+  });
+
+  const syncM = useMutation({
+    mutationFn: () => sync({ data: { businessId } }),
+    onSuccess: (r: any) => {
+      qc.invalidateQueries({ queryKey: ['client-documents', businessId] });
+      const n = Array.isArray(r) ? r.filter((x) => !x.error).length : 0;
+      toast.success(`Synced ${n} document${n === 1 ? '' : 's'} from PandaDoc`);
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Sync failed'),
   });
 
   const open = async (bucket: 'contracts' | 'payment' | 'client-attachments', path: string) => {
