@@ -142,17 +142,20 @@ export const pandadoc = {
   // PandaDoc returns `document.uploaded` immediately after createFromTemplate
   // and transitions to `document.draft` once server-side processing finishes.
   // /send and /session both reject `document.uploaded`. Poll briefly.
-  async waitForDraft(id: string, timeoutMs = 15000): Promise<string> {
+  async waitForDraft(id: string, timeoutMs = 45000): Promise<string> {
     const started = Date.now();
     let last = '';
     while (Date.now() - started < timeoutMs) {
       const d = await this.getDocument(id);
       last = String(d.status ?? '');
       if (last !== 'document.uploaded' && last !== 'uploaded') return last;
-      await new Promise((r) => setTimeout(r, 1200));
+      // Slow poll interval — sandbox is 10 req/min, so aggressive polling
+      // burns the whole budget on one document.
+      await new Promise((r) => setTimeout(r, 3500));
     }
     return last;
   },
+
 
   // Draft docs are permanently removed. Sent/completed docs return 400; caller
   // should void those separately. We swallow 404 so a partial cleanup can retry.
