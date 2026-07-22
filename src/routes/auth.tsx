@@ -7,6 +7,7 @@ const trophiMark = trophiMarkAsset.url;
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PasswordInput } from '@/components/ui/password-input';
 import { toast } from 'sonner';
 
 export const Route = createFileRoute('/auth')({
@@ -19,29 +20,17 @@ export const Route = createFileRoute('/auth')({
 });
 
 function AuthPage() {
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      if (mode === 'signup') {
-        const { error } = await supabase.auth.signUp({
-          email, password,
-          options: { emailRedirectTo: window.location.origin + '/crm', data: { name } },
-        });
-        if (error) throw error;
-        toast.success('Account created. Signed in.');
-        window.location.href = '/crm';
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        window.location.href = '/crm';
-      }
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      window.location.href = '/crm';
     } catch (err: any) {
       toast.error(err.message ?? 'Authentication failed');
     } finally {
@@ -67,27 +56,19 @@ function AuthPage() {
           </div>
           <div className="gold-rule w-16 rounded" />
         </div>
-        <h1 className="text-center font-display text-lg font-semibold mb-1">
-          {mode === 'signin' ? 'Sign in to the portal' : 'Create your portal account'}
-        </h1>
-        <p className="text-center text-sm text-muted-foreground mb-6">Internal use — Trophi team</p>
+        <h1 className="text-center font-display text-lg font-semibold mb-1">Sign in to the portal</h1>
+        <p className="text-center text-sm text-muted-foreground mb-6">Invite only — contact your Trophi admin for access</p>
         <form onSubmit={onSubmit} className="space-y-4">
-          {mode === 'signup' && (
-            <div className="space-y-1.5">
-              <Label htmlFor="name">Full name</Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
-            </div>
-          )}
           <div className="space-y-1.5">
             <Label htmlFor="email">Email</Label>
             <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="password">Password</Label>
-            <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
+            <PasswordInput id="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
           </div>
           <Button type="submit" disabled={loading} className="w-full bg-[hsl(var(--trophi-ink))] hover:bg-[hsl(var(--trophi-ink))]/90">
-            {loading ? '…' : mode === 'signin' ? 'Sign in' : 'Create account'}
+            {loading ? '…' : 'Sign in'}
           </Button>
         </form>
         <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">
@@ -96,13 +77,6 @@ function AuthPage() {
         <Button type="button" variant="outline" onClick={onGoogle} className="w-full">
           Continue with Google
         </Button>
-        <button
-          type="button"
-          onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
-          className="mt-6 w-full text-center text-sm text-muted-foreground hover:text-foreground"
-        >
-          {mode === 'signin' ? "New here? Create an account" : 'Already have an account? Sign in'}
-        </button>
       </div>
     </div>
   );

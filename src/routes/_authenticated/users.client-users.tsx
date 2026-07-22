@@ -144,7 +144,7 @@ function ClientUserRow({ user }: { user: ClientUser }) {
     onError: (e: any) => toast.error(e?.message ?? 'Failed'),
   });
   const resendM = useMutation({
-    mutationFn: () => resend({ data: { id: user.id } }),
+    mutationFn: () => resend({ data: { id: user.id, origin: window.location.origin } }),
     onSuccess: (r: any) => { qc.invalidateQueries({ queryKey: ['client-users'] }); toast.success(`Invite sent to ${r?.sentTo ?? user.email}`); },
     onError: (e: any) => toast.error(e?.message ?? 'Failed'),
   });
@@ -226,7 +226,7 @@ function EditClientUserDialog({ user, onClose }: { user: ClientUser; onClose: ()
     onError: (e: any) => toast.error(e?.message ?? 'Failed'),
   });
   const resendM = useMutation({
-    mutationFn: () => resend({ data: { id: user.id } }),
+    mutationFn: () => resend({ data: { id: user.id, origin: window.location.origin } }),
     onSuccess: (r: any) => { qc.invalidateQueries({ queryKey: ['client-users'] }); toast.success(`Invite sent to ${r?.sentTo}`); onClose(); },
     onError: (e: any) => toast.error(e?.message ?? 'Failed'),
   });
@@ -293,6 +293,7 @@ function AddClientUserDialog({ onClose, onSaved }: { onClose: () => void; onSave
       email: form.email, phone: form.phone || null,
       permissionLevel: form.permissionLevel, locationIds: form.locationIds,
       sendInvite: form.sendInvite,
+      origin: window.location.origin,
     } as any }),
     onSuccess: () => { toast.success('Client user created'); onSaved(); onClose(); },
     onError: (e: any) => toast.error(e?.message ?? 'Failed'),
