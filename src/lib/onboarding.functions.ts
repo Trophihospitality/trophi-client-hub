@@ -55,6 +55,8 @@ export interface OnboardingListRow {
 }
 
 export interface OnboardingDetail extends OnboardingListRow {
+  paymentScope: 'brand' | 'per_location' | null;
+  paymentScopeRecordedAt: string | null;
   steps: (StepDefinition & StepProgress)[];
   activity: {
     id: string;
@@ -64,6 +66,7 @@ export interface OnboardingDetail extends OnboardingListRow {
     timestamp: string;
   }[];
 }
+
 
 async function loadProfileMap(supabase: any, ids: string[]) {
   const uniq = Array.from(new Set(ids.filter(Boolean)));
@@ -233,6 +236,8 @@ export const getOnboardingDetailFn = createServerFn({ method: 'GET' })
       status: rec.status as OnboardingStatus,
       waitingOn: actorWaitingOn((currentDef?.actor ?? 'system') as StepActor),
       incoming: false,
+      paymentScope: (rec.payment_scope ?? null) as 'brand' | 'per_location' | null,
+      paymentScopeRecordedAt: rec.payment_scope_recorded_at ?? null,
       steps,
       activity: (activity ?? []).map((a: any) => ({
         id: a.id, type: a.type, description: a.description, actor: a.actor, timestamp: a.timestamp,
@@ -339,6 +344,13 @@ export const completeStepFn = createServerFn({ method: 'POST' })
       throw new Error('Assign an onboarding specialist before completing step 6');
     if (data.stepNumber === 13 && !ctx.rec.account_manager_id)
       throw new Error('Assign an account manager before completing step 13');
+
+    // Step 2 requires the account owner to have recorded the payment scope
+    // (brand vs per_location). No document is created at Step 2; that decision
+    // drives Step 5's Stripe capture + Payment Authorization generation.
+    if (data.stepNumber === 2 && !ctx.rec.payment_scope)
+      throw new Error('Record the payment scope (brand or per-location) before completing step 2');
+
 
     // Load admin client for writes (blocked by RLS otherwise)
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
@@ -450,4 +462,57 @@ export const assignAccountManagerFn = createServerFn({ method: 'POST' })
       actor: (await supabaseAdmin.from('profiles').select('name').eq('user_id', caller).maybeSingle()).data?.name ?? 'User',
     });
     return { ok: true };
+  });
+
+// Records the payment scope on onboarding_records. Account owner /
+// manager / admin only. Allowed at any active step (defensive), but the
+// UI surfaces the control on Step 2. Changing scope after Step 5 has
+// generated a Payment Authorization is blocked here — regenerate via the
+// Payment Authorization panel instead.
+export const setPaymentScopeFn = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      businessId: z.string(),
+      paymentScope: z.enum(['brand', 'per_location']),
+    }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const ctx = await assertCanEditOnboarding(supabase, userId, data.businessId);
+    if (!ctx.isAdmin && !ctx.isManager && !ctx.isOwner)
+      throw new Error('Only the account owner, a manager, or an admin can set the payment scope');
+
+    const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+
+    // Block scope change once a Payment Authorization document exists in a
+    // non-void state. Regen must be explicit from the Payment Auth panel.
+    const { data: existing } = await supabaseAdmin
+      .from('client_contracts')
+      .select('id, status')
+      .eq('business_id', data.businessId)
+      .eq('kind', 'payment_authorization')
+      .not('status', 'eq', 'void')
+      .limit(1);
+    if ((existing ?? []).length > 0 && ctx.rec.payment_scope && ctx.rec.payment_scope !== data.paymentScope) {
+      throw new Error('A Payment Authorization already exists. Void it before changing scope.');
+    }
+
+    const now = new Date().toISOString();
+    const { error } = await supabaseAdmin.from('onboarding_records')
+      .update({
+        payment_scope: data.paymentScope,
+        payment_scope_recorded_at: now,
+        payment_scope_recorded_by: userId,
+      })
+      .eq('business_id', data.businessId);
+    if (error) throw new Error(error.message);
+
+    await supabaseAdmin.from('client_activity').insert({
+      business_id: data.businessId,
+      type: 'info_updated',
+      description: `Payment scope set to ${data.paymentScope === 'brand' ? 'Brand-wide (single method)' : 'Per-location (one method per active location)'}`,
+      actor: (await supabaseAdmin.from('profiles').select('name').eq('user_id', userId).maybeSingle()).data?.name ?? 'User',
+    });
+
+    return { ok: true, paymentScope: data.paymentScope, paymentScopeRecordedAt: now };
   });

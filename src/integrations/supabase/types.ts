@@ -686,6 +686,9 @@ export type Database = {
           business_id: string
           created_at: string
           current_step: number
+          payment_scope: string | null
+          payment_scope_recorded_at: string | null
+          payment_scope_recorded_by: string | null
           specialist_id: string | null
           started_at: string
           status: string
@@ -697,6 +700,9 @@ export type Database = {
           business_id: string
           created_at?: string
           current_step?: number
+          payment_scope?: string | null
+          payment_scope_recorded_at?: string | null
+          payment_scope_recorded_by?: string | null
           specialist_id?: string | null
           started_at?: string
           status?: string
@@ -708,6 +714,9 @@ export type Database = {
           business_id?: string
           created_at?: string
           current_step?: number
+          payment_scope?: string | null
+          payment_scope_recorded_at?: string | null
+          payment_scope_recorded_by?: string | null
           specialist_id?: string | null
           started_at?: string
           status?: string

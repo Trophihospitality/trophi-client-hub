@@ -120,11 +120,16 @@ export const createSetupIntentFn = createServerFn({ method: 'POST' })
     };
   });
 
+// Display-only listing (brand, last4, method type). Safe for both Trophi
+// staff and the client_admin of the same business — the projection deliberately
+// omits stripe_customer_id / stripe_payment_method_id.
 export const listPaymentMethodsFn = createServerFn({ method: 'GET' })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ businessId: z.string() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { data: rows, error } = await context.supabase
+    await assertClientAccess(context.supabase, context.userId, data.businessId);
+    const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+    const { data: rows, error } = await supabaseAdmin
       .from('payment_methods')
       .select('id, scope, location_id, method_type, brand, last4, is_default, created_at')
       .eq('business_id', data.businessId)
@@ -132,3 +137,88 @@ export const listPaymentMethodsFn = createServerFn({ method: 'GET' })
     if (error) throw new Error(error.message);
     return rows ?? [];
   });
+
+// Full Step 5 readiness snapshot: scope from onboarding_records +
+// list of "slots" that need a payment method, computed from active
+// locations. Used by the client portal (to render Add Payment
+// buttons) and by the Trophi onboarding page (status card).
+export const getPaymentSetupStatusFn = createServerFn({ method: 'GET' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ businessId: z.string() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await assertClientAccess(supabase, userId, data.businessId);
+
+    const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+
+    const [{ data: rec }, { data: locations }, { data: methods }] = await Promise.all([
+      supabaseAdmin.from('onboarding_records')
+        .select('payment_scope, payment_scope_recorded_at, current_step')
+        .eq('business_id', data.businessId).maybeSingle(),
+      supabaseAdmin.from('locations')
+        .select('location_id, name, status')
+        .eq('business_id', data.businessId).eq('status', 'active')
+        .order('location_id'),
+      supabaseAdmin.from('payment_methods')
+        .select('id, scope, location_id, method_type, brand, last4, is_default, created_at')
+        .eq('business_id', data.businessId),
+    ]);
+
+    const scope = (rec?.payment_scope ?? null) as 'brand' | 'per_location' | null;
+
+    // Build the "slots" that need a captured payment method
+    interface Slot {
+      key: string;
+      scope: 'brand' | 'location';
+      locationId: string | null;
+      locationName: string | null;
+      captured: {
+        methodType: string;
+        brand: string | null;
+        last4: string;
+        capturedAt: string;
+      } | null;
+    }
+
+    const slots: Slot[] = [];
+    if (scope === 'brand') {
+      const m = (methods ?? []).find((x: any) => x.scope === 'brand');
+      slots.push({
+        key: 'brand',
+        scope: 'brand',
+        locationId: null,
+        locationName: null,
+        captured: m ? {
+          methodType: m.method_type, brand: m.brand, last4: m.last4, capturedAt: m.created_at,
+        } : null,
+      });
+    } else if (scope === 'per_location') {
+      for (const loc of locations ?? []) {
+        const m = (methods ?? []).find((x: any) => x.scope === 'location' && x.location_id === loc.location_id);
+        slots.push({
+          key: `loc:${loc.location_id}`,
+          scope: 'location',
+          locationId: loc.location_id,
+          locationName: loc.name,
+          captured: m ? {
+            methodType: m.method_type, brand: m.brand, last4: m.last4, capturedAt: m.created_at,
+          } : null,
+        });
+      }
+    }
+
+    const filled = slots.filter((s) => s.captured).length;
+    const allCaptured = slots.length > 0 && filled === slots.length;
+
+    return {
+      businessId: data.businessId,
+      scope,
+      scopeRecordedAt: rec?.payment_scope_recorded_at ?? null,
+      currentStep: rec?.current_step ?? null,
+      slots,
+      filled,
+      total: slots.length,
+      allCaptured,
+    };
+  });
+

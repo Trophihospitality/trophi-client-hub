@@ -39,14 +39,20 @@ export async function archiveCompletedContract(row: {
     throw new Error(`Contract ${row.id} has no pandadoc_document_id`);
   }
   const docId = row.pandadoc_document_id;
-  const storagePath = `${row.business_id}/contracts/${row.kind}-${docId}.pdf`;
 
-  // If the file already exists in storage, keep the existing record consistent
-  // but do not re-download / re-upload.
+  // Route by kind:
+  //   payment_authorization → `payment` bucket, {bid}/payment/{docId}.pdf
+  //   everything else       → `contracts` bucket, {bid}/contracts/{kind}-{docId}.pdf
+  const isPayment = row.kind === 'payment_authorization';
+  const bucket = isPayment ? 'payment' : 'contracts';
+  const folder = isPayment ? 'payment' : 'contracts';
+  const fileName = isPayment ? `payment-authorization-${docId}.pdf` : `${row.kind}-${docId}.pdf`;
+  const storagePath = `${row.business_id}/${folder}/${fileName}`;
+
   const { data: existing } = await supabaseAdmin.storage
-    .from('contracts')
-    .list(`${row.business_id}/contracts`, { limit: 200 });
-  const found = existing?.find((f) => f.name === `${row.kind}-${docId}.pdf`);
+    .from(bucket)
+    .list(`${row.business_id}/${folder}`, { limit: 200 });
+  const found = existing?.find((f) => f.name === fileName);
   if (found && row.signed_pdf_path === storagePath) {
     return {
       storagePath,
@@ -58,7 +64,11 @@ export async function archiveCompletedContract(row: {
 
   const details = await pandadoc.getDocument(docId);
   const pdMeta = (details as any).metadata ?? {};
-  const fromPd: string[] = Array.isArray(pdMeta.location_ids) ? pdMeta.location_ids : [];
+  const fromPd: string[] = Array.isArray(pdMeta.location_ids)
+    ? pdMeta.location_ids
+    : typeof pdMeta.location_ids === 'string' && pdMeta.location_ids
+      ? String(pdMeta.location_ids).split(',').map((s) => s.trim()).filter(Boolean)
+      : [];
   const fromRow: string[] = Array.isArray(row.location_ids) ? row.location_ids
     : (Array.isArray(row.metadata?.location_ids) ? row.metadata.location_ids : []);
   const locationIds = fromPd.length ? fromPd : fromRow;
@@ -67,7 +77,7 @@ export async function archiveCompletedContract(row: {
   const { bytes, contentType } = await pandadoc.downloadDocumentPdf(docId);
 
   const { error: upErr } = await supabaseAdmin.storage
-    .from('contracts')
+    .from(bucket)
     .upload(storagePath, bytes, {
       contentType: contentType || 'application/pdf',
       upsert: true,
@@ -91,6 +101,7 @@ export async function archiveCompletedContract(row: {
 
   return { storagePath, size: bytes.byteLength, executedAt, reused: false };
 }
+
 
 export async function archiveAllCompletedForBusiness(businessId: string) {
   const { data: rows, error } = await supabaseAdmin
