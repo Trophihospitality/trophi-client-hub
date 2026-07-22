@@ -131,7 +131,7 @@ function ContractsCard({
   return (
     <div className="rounded-xl border border-border bg-card">
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <div className="flex items-center gap-2 text-sm font-semibold text-[hsl(var(--trophi-ink))]">
+        <div className="flex items-center gap-2 text-sm font-semibold text-trophi-ink">
           <FileText className="h-4 w-4 text-[hsl(var(--trophi-gold))]" /> Contracts
         </div>
         <div className="text-[11px] font-mono text-muted-foreground">{businessId}</div>
@@ -202,7 +202,7 @@ function FilesCard({
   return (
     <div className="rounded-xl border border-border bg-card">
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <div className="flex items-center gap-2 text-sm font-semibold text-[hsl(var(--trophi-ink))]">
+        <div className="flex items-center gap-2 text-sm font-semibold text-trophi-ink">
           {restricted
             ? <Lock className="h-4 w-4 text-muted-foreground" />
             : <FolderClosed className="h-4 w-4 text-muted-foreground" />}
