@@ -28,6 +28,7 @@ import { Route as AuthenticatedCrmIndexRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedUsersTrophiRouteImport } from './routes/_authenticated/users.trophi'
 import { Route as AuthenticatedUsersClientUsersRouteImport } from './routes/_authenticated/users.client-users'
 import { Route as AuthenticatedSettingsPandadocTemplatesRouteImport } from './routes/_authenticated/settings.pandadoc-templates'
+import { Route as AuthenticatedSettingsCutoverChecklistRouteImport } from './routes/_authenticated/settings.cutover-checklist'
 import { Route as AuthenticatedOnboardingBusinessIdRouteImport } from './routes/_authenticated/onboarding.$businessId'
 import { Route as AuthenticatedCrmBusinessIdRouteImport } from './routes/_authenticated/crm.$businessId'
 import { Route as AuthenticatedUsersTrophiIndexRouteImport } from './routes/_authenticated/users.trophi.index'
@@ -142,6 +143,12 @@ const AuthenticatedSettingsPandadocTemplatesRoute =
     path: '/settings/pandadoc-templates',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedSettingsCutoverChecklistRoute =
+  AuthenticatedSettingsCutoverChecklistRouteImport.update({
+    id: '/settings/cutover-checklist',
+    path: '/settings/cutover-checklist',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedOnboardingBusinessIdRoute =
   AuthenticatedOnboardingBusinessIdRouteImport.update({
     id: '/$businessId',
@@ -226,6 +233,7 @@ export interface FileRoutesByFullPath {
   '/users': typeof AuthenticatedUsersRouteWithChildren
   '/crm/$businessId': typeof AuthenticatedCrmBusinessIdRoute
   '/onboarding/$businessId': typeof AuthenticatedOnboardingBusinessIdRoute
+  '/settings/cutover-checklist': typeof AuthenticatedSettingsCutoverChecklistRoute
   '/settings/pandadoc-templates': typeof AuthenticatedSettingsPandadocTemplatesRoute
   '/users/client-users': typeof AuthenticatedUsersClientUsersRoute
   '/users/trophi': typeof AuthenticatedUsersTrophiRouteWithChildren
@@ -256,6 +264,7 @@ export interface FileRoutesByTo {
   '/support': typeof AuthenticatedSupportRoute
   '/crm/$businessId': typeof AuthenticatedCrmBusinessIdRoute
   '/onboarding/$businessId': typeof AuthenticatedOnboardingBusinessIdRoute
+  '/settings/cutover-checklist': typeof AuthenticatedSettingsCutoverChecklistRoute
   '/settings/pandadoc-templates': typeof AuthenticatedSettingsPandadocTemplatesRoute
   '/users/client-users': typeof AuthenticatedUsersClientUsersRoute
   '/crm': typeof AuthenticatedCrmIndexRoute
@@ -289,6 +298,7 @@ export interface FileRoutesById {
   '/_authenticated/users': typeof AuthenticatedUsersRouteWithChildren
   '/_authenticated/crm/$businessId': typeof AuthenticatedCrmBusinessIdRoute
   '/_authenticated/onboarding/$businessId': typeof AuthenticatedOnboardingBusinessIdRoute
+  '/_authenticated/settings/cutover-checklist': typeof AuthenticatedSettingsCutoverChecklistRoute
   '/_authenticated/settings/pandadoc-templates': typeof AuthenticatedSettingsPandadocTemplatesRoute
   '/_authenticated/users/client-users': typeof AuthenticatedUsersClientUsersRoute
   '/_authenticated/users/trophi': typeof AuthenticatedUsersTrophiRouteWithChildren
@@ -323,6 +333,7 @@ export interface FileRouteTypes {
     | '/users'
     | '/crm/$businessId'
     | '/onboarding/$businessId'
+    | '/settings/cutover-checklist'
     | '/settings/pandadoc-templates'
     | '/users/client-users'
     | '/users/trophi'
@@ -353,6 +364,7 @@ export interface FileRouteTypes {
     | '/support'
     | '/crm/$businessId'
     | '/onboarding/$businessId'
+    | '/settings/cutover-checklist'
     | '/settings/pandadoc-templates'
     | '/users/client-users'
     | '/crm'
@@ -385,6 +397,7 @@ export interface FileRouteTypes {
     | '/_authenticated/users'
     | '/_authenticated/crm/$businessId'
     | '/_authenticated/onboarding/$businessId'
+    | '/_authenticated/settings/cutover-checklist'
     | '/_authenticated/settings/pandadoc-templates'
     | '/_authenticated/users/client-users'
     | '/_authenticated/users/trophi'
@@ -553,6 +566,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsPandadocTemplatesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/settings/cutover-checklist': {
+      id: '/_authenticated/settings/cutover-checklist'
+      path: '/settings/cutover-checklist'
+      fullPath: '/settings/cutover-checklist'
+      preLoaderRoute: typeof AuthenticatedSettingsCutoverChecklistRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/onboarding/$businessId': {
       id: '/_authenticated/onboarding/$businessId'
       path: '/$businessId'
@@ -699,6 +719,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSupportRoute: typeof AuthenticatedSupportRoute
   AuthenticatedUsersRoute: typeof AuthenticatedUsersRouteWithChildren
   AuthenticatedCrmBusinessIdRoute: typeof AuthenticatedCrmBusinessIdRoute
+  AuthenticatedSettingsCutoverChecklistRoute: typeof AuthenticatedSettingsCutoverChecklistRoute
   AuthenticatedSettingsPandadocTemplatesRoute: typeof AuthenticatedSettingsPandadocTemplatesRoute
   AuthenticatedCrmIndexRoute: typeof AuthenticatedCrmIndexRoute
 }
@@ -714,6 +735,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSupportRoute: AuthenticatedSupportRoute,
   AuthenticatedUsersRoute: AuthenticatedUsersRouteWithChildren,
   AuthenticatedCrmBusinessIdRoute: AuthenticatedCrmBusinessIdRoute,
+  AuthenticatedSettingsCutoverChecklistRoute:
+    AuthenticatedSettingsCutoverChecklistRoute,
   AuthenticatedSettingsPandadocTemplatesRoute:
     AuthenticatedSettingsPandadocTemplatesRoute,
   AuthenticatedCrmIndexRoute: AuthenticatedCrmIndexRoute,
