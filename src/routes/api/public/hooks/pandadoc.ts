@@ -64,6 +64,21 @@ async function handleEvent(supabaseAdmin: any, ev: any) {
     actor: 'PandaDoc',
   });
 
+  // Archive the signed PDF into the contracts storage bucket, stamp
+  // executed_at / location_ids / signed_pdf_path on the row.
+  if (status === 'document.completed') {
+    try {
+      const { archiveCompletedContract } = await import('@/lib/contract-archive.server');
+      await archiveCompletedContract({
+        id: row.id, business_id: row.business_id, kind: row.kind,
+        pandadoc_document_id: docId, signed_pdf_path: null,
+      });
+    } catch (err) {
+      console.error(`[pandadoc webhook] archive failed for ${docId}:`, err);
+    }
+  }
+
+
   // If this event completed the doc AND all three bundle docs are complete,
   // auto-advance Step 4 (which flips CRM to Signed via existing logic).
   if (status === 'document.completed') {
