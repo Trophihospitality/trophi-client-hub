@@ -16,6 +16,7 @@ import { Route as AuthenticatedUsersRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedSupportRouteImport } from './routes/_authenticated/support'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
+import { Route as AuthenticatedLeaderboardsRouteImport } from './routes/_authenticated/leaderboards'
 import { Route as AuthenticatedClientPortalRouteImport } from './routes/_authenticated/client-portal'
 import { Route as AuthenticatedAccountsRouteImport } from './routes/_authenticated/accounts'
 import { Route as AuthenticatedOnboardingIndexRouteImport } from './routes/_authenticated/onboarding.index'
@@ -61,6 +62,12 @@ const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
   path: '/onboarding',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedLeaderboardsRoute =
+  AuthenticatedLeaderboardsRouteImport.update({
+    id: '/leaderboards',
+    path: '/leaderboards',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedClientPortalRoute =
   AuthenticatedClientPortalRouteImport.update({
     id: '/client-portal',
@@ -125,6 +132,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/accounts': typeof AuthenticatedAccountsRoute
   '/client-portal': typeof AuthenticatedClientPortalRoute
+  '/leaderboards': typeof AuthenticatedLeaderboardsRoute
   '/onboarding': typeof AuthenticatedOnboardingRouteWithChildren
   '/reports': typeof AuthenticatedReportsRoute
   '/support': typeof AuthenticatedSupportRoute
@@ -143,6 +151,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/accounts': typeof AuthenticatedAccountsRoute
   '/client-portal': typeof AuthenticatedClientPortalRoute
+  '/leaderboards': typeof AuthenticatedLeaderboardsRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/support': typeof AuthenticatedSupportRoute
   '/users': typeof AuthenticatedUsersRoute
@@ -162,6 +171,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/accounts': typeof AuthenticatedAccountsRoute
   '/_authenticated/client-portal': typeof AuthenticatedClientPortalRoute
+  '/_authenticated/leaderboards': typeof AuthenticatedLeaderboardsRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRouteWithChildren
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/support': typeof AuthenticatedSupportRoute
@@ -182,6 +192,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/accounts'
     | '/client-portal'
+    | '/leaderboards'
     | '/onboarding'
     | '/reports'
     | '/support'
@@ -200,6 +211,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/accounts'
     | '/client-portal'
+    | '/leaderboards'
     | '/reports'
     | '/support'
     | '/users'
@@ -218,6 +230,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/accounts'
     | '/_authenticated/client-portal'
+    | '/_authenticated/leaderboards'
     | '/_authenticated/onboarding'
     | '/_authenticated/reports'
     | '/_authenticated/support'
@@ -290,6 +303,13 @@ declare module '@tanstack/react-router' {
       path: '/onboarding'
       fullPath: '/onboarding'
       preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/leaderboards': {
+      id: '/_authenticated/leaderboards'
+      path: '/leaderboards'
+      fullPath: '/leaderboards'
+      preLoaderRoute: typeof AuthenticatedLeaderboardsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/client-portal': {
@@ -385,6 +405,7 @@ const AuthenticatedOnboardingRouteWithChildren =
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAccountsRoute: typeof AuthenticatedAccountsRoute
   AuthenticatedClientPortalRoute: typeof AuthenticatedClientPortalRoute
+  AuthenticatedLeaderboardsRoute: typeof AuthenticatedLeaderboardsRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRouteWithChildren
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedSupportRoute: typeof AuthenticatedSupportRoute
@@ -397,6 +418,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAccountsRoute: AuthenticatedAccountsRoute,
   AuthenticatedClientPortalRoute: AuthenticatedClientPortalRoute,
+  AuthenticatedLeaderboardsRoute: AuthenticatedLeaderboardsRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRouteWithChildren,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedSupportRoute: AuthenticatedSupportRoute,
