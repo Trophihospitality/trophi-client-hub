@@ -91,6 +91,7 @@ function TrophiUsersPage() {
           <thead className="bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
             <tr>
               <th className="px-4 py-3">Emp #</th>
+              <th className="px-4 py-3"></th>
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Email</th>
               <th className="px-4 py-3">Phone</th>
@@ -100,7 +101,7 @@ function TrophiUsersPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {isLoading && <tr><td className="px-4 py-6 text-muted-foreground" colSpan={7}>Loading…</td></tr>}
+            {isLoading && <tr><td className="px-4 py-6 text-muted-foreground" colSpan={8}>Loading…</td></tr>}
             {filtered.map((u) => (
               <tr
                 key={u.id}
@@ -109,6 +110,9 @@ function TrophiUsersPage() {
               >
                 <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
                   {u.employeeId !== null ? String(u.employeeId).padStart(2, '0') : '—'}
+                </td>
+                <td className="px-4 py-3">
+                  <AvatarCircle name={u.name} url={u.avatarUrl ?? null} size={32} />
                 </td>
                 <td className="px-4 py-3 font-medium">{u.name}</td>
                 <td className="px-4 py-3 text-muted-foreground">{u.email}</td>
@@ -125,7 +129,7 @@ function TrophiUsersPage() {
               </tr>
             ))}
             {!isLoading && filtered.length === 0 && (
-              <tr><td className="px-4 py-6 text-muted-foreground text-center" colSpan={7}>No users found</td></tr>
+              <tr><td className="px-4 py-6 text-muted-foreground text-center" colSpan={8}>No users found</td></tr>
             )}
           </tbody>
         </table>
