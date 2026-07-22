@@ -163,8 +163,9 @@ function SummaryTab({ user, mentor, users, editMode, onAvatarChanged }: {
     isActive: user.isActive,
     trainerId: spiroId ?? '',
   });
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [cropFile, setCropFile] = useState<File | null>(null);
 
   useEffect(() => {
     setForm({
@@ -180,18 +181,20 @@ function SummaryTab({ user, mentor, users, editMode, onAvatarChanged }: {
       isActive: user.isActive,
       trainerId: spiroId ?? '',
     });
-    setPhotoFile(null);
+    setPhotoBlob(null);
     setPhotoPreview(null);
+    setCropFile(null);
   }, [user, spiroId]);
 
   const roleChanged = !isSelfOnly && form.role !== user.role && form.role !== 'client_admin';
 
   function onPickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
+    e.target.value = '';
     if (!f) return;
-    if (f.size > 5 * 1024 * 1024) { toast.error('Image must be under 5 MB'); return; }
-    setPhotoFile(f);
-    setPhotoPreview(URL.createObjectURL(f));
+    const v = validateAvatarFile(f);
+    if (!v.ok) { toast.error(v.error); return; }
+    setCropFile(f);
   }
 
   const saveM = useMutation({
@@ -201,9 +204,8 @@ function SummaryTab({ user, mentor, users, editMode, onAvatarChanged }: {
       // Upload avatar first (if changed). Users may only upload to their own folder;
       // admin (Spiro) has global rights via storage policy.
       let newAvatarPath: string | null | undefined;
-      if (photoFile) {
-        const blob = await cropToSquareJpeg(photoFile);
-        newAvatarPath = await uploadAvatarBlob(user.id, blob);
+      if (photoBlob) {
+        newAvatarPath = await uploadAvatarBlob(user.id, photoBlob);
       }
 
       if (isSelfOnly) {
@@ -238,10 +240,10 @@ function SummaryTab({ user, mentor, users, editMode, onAvatarChanged }: {
     onSuccess: async () => {
       qc.invalidateQueries({ queryKey: ['users'] });
       qc.invalidateQueries({ queryKey: ['role-history', user.id] });
-      if (photoFile) await onAvatarChanged();
+      if (photoBlob) await onAvatarChanged();
       toast.success('Profile updated');
       setEditing(false);
-      setPhotoFile(null);
+      setPhotoBlob(null);
       setPhotoPreview(null);
     },
     onError: (e: any) => toast.error(e?.message ?? 'Failed to update'),
