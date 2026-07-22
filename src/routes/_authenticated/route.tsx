@@ -19,6 +19,7 @@ const NAV = [
   { to: '/crm', label: 'CRM', icon: Users },
   { to: '/onboarding', label: 'Onboarding', icon: ClipboardCheck },
   { to: '/accounts', label: 'Account Management', icon: BarChart3 },
+  { to: '/leaderboards', label: 'Leaderboards', icon: Trophy },
   { to: '/support', label: 'Tech / Support', icon: Wrench },
   { to: '/client-portal', label: 'Client Portal', icon: Globe },
 ] as const;
