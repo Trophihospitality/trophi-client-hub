@@ -90,7 +90,7 @@ export const listUsersFn = createServerFn({ method: 'GET' })
       arr.push({ role: r.role });
       byUser.set(r.user_id, arr);
     });
-    return (profiles ?? []).map((p: any) => ({
+    const withPaths = (profiles ?? []).map((p: any) => ({
       id: p.user_id,
       name: p.name,
       email: p.email,
@@ -105,7 +105,18 @@ export const listUsersFn = createServerFn({ method: 'GET' })
       mentorId: p.mentor_id ?? null,
       currentRoleStartedAt: p.current_role_started_at ?? null,
       isActive: p.is_active !== false,
+      avatarPath: p.avatar_path ?? null,
     }));
+
+    // Batch sign avatar URLs (1h). Failures leave avatarUrl null; the UI falls back to initials.
+    const signed = await Promise.all(
+      withPaths.map(async (u) => {
+        if (!u.avatarPath) return { ...u, avatarUrl: null as string | null };
+        const { data } = await supabase.storage.from('trophi-avatars').createSignedUrl(u.avatarPath, 3600);
+        return { ...u, avatarUrl: data?.signedUrl ?? null };
+      }),
+    );
+    return signed;
   });
 
 const AssignableRole = z.enum(['admin', 'manager', 'sales_rep', 'onboarding_specialist', 'account_manager']);
