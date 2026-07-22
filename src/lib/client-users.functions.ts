@@ -4,6 +4,21 @@ import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 
 export type ClientPermission = 'admin_full' | 'leadership' | 'manager';
 export type ClientUserStatus = 'invited' | 'active' | 'inactive';
+export type InviteStatus = 'accepted' | 'invited' | 'expired' | 'never_sent' | 'revoked';
+
+const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+export function deriveInviteStatus(row: {
+  status: ClientUserStatus;
+  user_id?: string | null;
+  invited_at?: string | null;
+}): InviteStatus {
+  if (row.user_id || row.status === 'active') return 'accepted';
+  if (row.status === 'inactive') return 'revoked';
+  if (!row.invited_at) return 'never_sent';
+  const ageMs = Date.now() - new Date(row.invited_at).getTime();
+  return ageMs > INVITE_TTL_MS ? 'expired' : 'invited';
+}
 
 export interface ClientUser {
   id: string;
@@ -20,6 +35,9 @@ export interface ClientUser {
   invitedAt: string | null;
   activatedAt: string | null;
   createdAt: string;
+  inviteSentTo: string | null;
+  inviteExpiresAt: string | null;
+  inviteStatus: InviteStatus;
 }
 
 async function writeAudit(admin: any, params: {
@@ -36,6 +54,45 @@ async function writeAudit(admin: any, params: {
   });
 }
 
+async function writeClientActivity(admin: any, params: {
+  businessId: string; type: string; description: string; actor: string; actorId: string | null;
+}) {
+  try {
+    await admin.from('client_activity').insert({
+      business_id: params.businessId,
+      type: params.type,
+      description: params.description,
+      actor: params.actor,
+      actor_id: params.actorId,
+    });
+  } catch { /* non-fatal */ }
+}
+
+function mapClientUser(r: any): ClientUser {
+  const inviteExpiresAt = r.invited_at
+    ? new Date(new Date(r.invited_at).getTime() + INVITE_TTL_MS).toISOString()
+    : null;
+  return {
+    id: r.id,
+    userId: r.user_id ?? null,
+    businessId: r.business_id,
+    businessName: r.clients?.company ?? null,
+    firstName: r.first_name,
+    lastName: r.last_name,
+    email: r.email,
+    phone: r.phone ?? null,
+    locationIds: r.location_ids ?? [],
+    permissionLevel: r.permission_level,
+    status: r.status,
+    invitedAt: r.invited_at ?? null,
+    activatedAt: r.activated_at ?? null,
+    createdAt: r.created_at,
+    inviteSentTo: r.invite_sent_to ?? null,
+    inviteExpiresAt,
+    inviteStatus: deriveInviteStatus(r),
+  };
+}
+
 export const listClientUsersFn = createServerFn({ method: 'GET' })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<ClientUser[]> => {
@@ -45,22 +102,21 @@ export const listClientUsersFn = createServerFn({ method: 'GET' })
       .select('*, clients:business_id(company)')
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return (data ?? []).map((r: any) => ({
-      id: r.id,
-      userId: r.user_id ?? null,
-      businessId: r.business_id,
-      businessName: r.clients?.company ?? null,
-      firstName: r.first_name,
-      lastName: r.last_name,
-      email: r.email,
-      phone: r.phone ?? null,
-      locationIds: r.location_ids ?? [],
-      permissionLevel: r.permission_level,
-      status: r.status,
-      invitedAt: r.invited_at ?? null,
-      activatedAt: r.activated_at ?? null,
-      createdAt: r.created_at,
-    }));
+    return (data ?? []).map(mapClientUser);
+  });
+
+export const listClientUsersForBusinessFn = createServerFn({ method: 'GET' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ businessId: z.string().min(1) }).parse(d))
+  .handler(async ({ data, context }): Promise<ClientUser[]> => {
+    const { supabase } = context;
+    const { data: rows, error } = await supabase
+      .from('client_users')
+      .select('*, clients:business_id(company)')
+      .eq('business_id', data.businessId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (rows ?? []).map(mapClientUser);
   });
 
 const PermSchema = z.enum(['admin_full', 'leadership', 'manager']);
