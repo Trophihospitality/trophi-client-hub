@@ -35,6 +35,8 @@ async function request<T = any>(path: string, init: RequestInit = {}, attempt = 
   }
   if (!res.ok) {
     const msg = body?.detail || body?.message || body?.error || res.statusText;
+    const raw = typeof text === 'string' ? text.slice(0, 600) : '';
+    console.error(`[pandadoc] ${init.method ?? 'GET'} ${path} → ${res.status}: ${msg} | body=${raw}`);
     throw new Error(`PandaDoc ${res.status}: ${msg}`);
   }
   return body as T;
