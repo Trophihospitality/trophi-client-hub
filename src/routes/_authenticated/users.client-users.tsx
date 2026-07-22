@@ -110,10 +110,16 @@ export function InviteStatusCell({ user }: { user: ClientUser }) {
     : s === 'expired' ? { label: 'Expired', cls: 'bg-orange-100 text-orange-700' }
     : s === 'failed' ? { label: 'Failed', cls: 'bg-red-100 text-red-700' }
     : s === 'revoked' ? { label: 'Revoked', cls: 'bg-muted text-muted-foreground' }
+    : s === 'invite_required' ? { label: 'Invite required', cls: 'bg-red-100 text-red-700' }
     : { label: 'Not sent', cls: 'bg-muted text-muted-foreground' };
   return (
     <div className="space-y-0.5">
       <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${cfg.cls}`}>{cfg.label}</span>
+      {s === 'invite_required' && (
+        <div className="flex items-center gap-1 text-[11px] text-red-700">
+          <AlertTriangle className="h-3 w-3" /> No active login — resend invite
+        </div>
+      )}
       {(s === 'invited' || s === 'expired') && user.invitedAt && (
         <div className="text-[11px] text-muted-foreground">
           Sent {fmtDate(user.invitedAt)} to {user.inviteSentTo ?? user.email}
@@ -135,8 +141,11 @@ export function InviteStatusCell({ user }: { user: ClientUser }) {
 
 function ClientUserRow({ user }: { user: ClientUser }) {
   const qc = useQueryClient();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
   const update = useServerFn(updateClientUserFn);
   const resend = useServerFn(resendClientInviteFn);
+  const adminReset = useServerFn(adminResetAndReinviteFn);
   const [editing, setEditing] = useState(false);
 
   const updateM = useMutation({
