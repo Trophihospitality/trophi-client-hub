@@ -35,12 +35,23 @@ const handler = createAuthEmailHandler({
     },
     invite: {
       subject: "You've been invited",
-      render: (data) =>
-        React.createElement(InviteEmail, {
+      render: (data) => {
+        // Scanner-proof: link directly to /accept-invite with the OTP token as
+        // a query param. The default `data.url` points at GoTrue's /verify
+        // endpoint, which consumes the one-time token on a plain GET —
+        // corporate email security scanners follow links and burn the token
+        // before the human can click. Our accept page only calls
+        // supabase.auth.verifyOtp on submit, so a scanner GET is harmless.
+        const acceptUrl = `https://trophi-client-hub.lovable.app/accept-invite`
+          + `?token=${encodeURIComponent(data.token ?? '')}`
+          + `&email=${encodeURIComponent(data.email)}`
+          + `&type=invite`;
+        return React.createElement(InviteEmail, {
           siteName: SITE_NAME,
           siteUrl: SITE_URL,
-          confirmationUrl: data.url,
-        }),
+          confirmationUrl: acceptUrl,
+        });
+      },
     },
     magiclink: {
       subject: 'Your login link',
