@@ -196,6 +196,5 @@ function Input({ value, onChange, type = 'text' }: { value: string; onChange: (v
     />
   );
 }
-// keep unused-suppressed exports to satisfy TS if referenced elsewhere
-export type { AppUser };
-export { setUserActiveFn };
+
+
