@@ -101,6 +101,11 @@ function ClientPortalPage() {
                     {d.description && (
                       <p className="mt-1 text-sm text-muted-foreground">{d.description}</p>
                     )}
+                    {isCurrent && d.step_number === 4 && (
+                      <div className="mt-3">
+                        <SignContractPanel businessId={client!.businessId} />
+                      </div>
+                    )}
                   </div>
                 </div>
               </li>
