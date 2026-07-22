@@ -9,7 +9,9 @@ import {
 
 import { useAuth } from '@/store/userStore';
 import { formatPhone, formatPhoneInput } from '@/lib/phone';
-import { Plus, Search } from 'lucide-react';
+import { AvatarCircle } from '@/components/ui/avatar-circle';
+import { uploadAvatarBlob, cropToSquareJpeg } from '@/lib/avatar';
+import { Plus, Search, Upload } from 'lucide-react';
 
 export const Route = createFileRoute('/_authenticated/users/trophi/')({
   component: TrophiUsersPage,
