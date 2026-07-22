@@ -83,7 +83,7 @@ function AcceptInvitePage() {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
       toast.success('Password set. Welcome!');
-      window.location.href = '/client-portal';
+      window.location.href = ctx?.company ? '/client-portal' : '/crm';
     } catch (err: any) {
       toast.error(err.message ?? 'Could not set password');
     } finally {
