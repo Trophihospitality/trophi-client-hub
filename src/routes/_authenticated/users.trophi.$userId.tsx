@@ -231,7 +231,7 @@ function SummaryTab({ user, mentor, users, canEdit }: { user: AppUser; mentor: A
               <Info label="Current role" value={user.role.replace(/_/g, ' ')} capitalize />
               <Info label="Role started" value={fmtDate(user.currentRoleStartedAt)} />
               <Info label="Team" value={user.team ?? '—'} />
-              <Info label="Mentor" value={mentor?.name ?? '—'} />
+              <Info label="Mentor" value={mentor?.name ?? 'Open'} />
               <Info label="Status" value={user.isActive ? 'Active' : 'Inactive'} />
             </dl>
           ) : (
