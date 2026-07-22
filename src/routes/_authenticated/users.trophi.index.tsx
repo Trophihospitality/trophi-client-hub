@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { toast } from 'sonner';
 import {
-  listUsersFn, createTrophiUserFn, type AppRole, type AppUser,
+  listUsersFn, createTrophiUserFn, updateTrophiUserFn, type AppRole, type AppUser,
 } from '@/lib/users.functions';
 
 import { useAuth } from '@/store/userStore';
