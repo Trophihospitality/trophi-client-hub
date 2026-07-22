@@ -159,8 +159,26 @@ function ClientUserRow({ user }: { user: ClientUser }) {
     onSuccess: (r: any) => { qc.invalidateQueries({ queryKey: ['client-users'] }); toast.success(`Invite sent to ${r?.sentTo ?? user.email}`); },
     onError: (e: any) => toast.error(e?.message ?? 'Failed'),
   });
+  const adminResetM = useMutation({
+    mutationFn: () => adminReset({ data: { id: user.id } }),
+    onSuccess: (r: any) => {
+      qc.invalidateQueries({ queryKey: ['client-users'] });
+      toast.success(`Reset & reinvited ${r?.sentTo ?? user.email}`);
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Failed'),
+  });
 
-  const canResend = user.inviteStatus === 'invited' || user.inviteStatus === 'expired' || user.inviteStatus === 'never_sent';
+  const canResend = user.inviteStatus === 'invited' || user.inviteStatus === 'expired'
+    || user.inviteStatus === 'never_sent' || user.inviteStatus === 'invite_required'
+    || user.inviteStatus === 'failed';
+
+  const handleAdminReset = () => {
+    if (!window.confirm(
+      `Reset & reinvite ${user.firstName} ${user.lastName} (${user.email})?\n\n`
+      + `This invalidates any existing portal access and login, deletes any current auth account for this email, and sends a fresh invite. Use this when the account is stuck, compromised, or the client wants to start over.`
+    )) return;
+    adminResetM.mutate();
+  };
 
   return (
     <>
@@ -190,10 +208,20 @@ function ClientUserRow({ user }: { user: ClientUser }) {
             {canResend && (
               <button
                 onClick={() => resendM.mutate()}
-                disabled={resendM.isPending}
+                disabled={resendM.isPending || adminResetM.isPending}
                 className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
               >
                 <RefreshCcw className="h-3.5 w-3.5" /> {user.inviteStatus === 'never_sent' ? 'Send invite' : 'Resend'}
+              </button>
+            )}
+            {isAdmin && (
+              <button
+                onClick={handleAdminReset}
+                disabled={adminResetM.isPending || resendM.isPending}
+                title="Invalidates existing access and sends a fresh invite"
+                className="inline-flex items-center gap-1 text-xs text-red-700 hover:text-red-900"
+              >
+                <AlertTriangle className="h-3.5 w-3.5" /> {adminResetM.isPending ? 'Resetting…' : 'Reset & reinvite'}
               </button>
             )}
             <button onClick={() => setEditing(true)} className="text-xs text-muted-foreground hover:text-foreground">Edit</button>
