@@ -570,3 +570,25 @@ export const resendTrophiInviteFn = createServerFn({ method: 'POST' })
     });
     return { ok: true, sentTo: profile.email };
   });
+
+// TEMP one-shot: admin-only, returns a fresh accept-invite link for a given email.
+export const getInviteLinkForEmailFn = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ email: z.string().email() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await assertSpiro(supabase, userId);
+    const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+    const { ACCEPT_INVITE_URL } = await import('./app-urls');
+    const { data: link, error } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'invite',
+      email: data.email,
+      options: { redirectTo: ACCEPT_INVITE_URL },
+    } as any);
+    if (error) throw error;
+    const props: any = (link as any)?.properties ?? {};
+    const token = props.hashed_token ?? props.email_otp ?? '';
+    const SITE_URL = 'https://trophi-client-hub.lovable.app';
+    const acceptUrl = `${SITE_URL}/accept-invite?token=${encodeURIComponent(token)}&email=${encodeURIComponent(data.email)}&type=invite`;
+    return { acceptUrl, rawActionLink: props.action_link ?? null };
+  });
