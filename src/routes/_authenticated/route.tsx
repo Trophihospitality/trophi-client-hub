@@ -30,6 +30,7 @@ const NAV = [
 const ADMIN_NAV = [
   { to: '/audit', label: 'Audit Log', icon: ScrollText },
   { to: '/settings/pandadoc-templates', label: 'PandaDoc Templates', icon: FileText },
+  { to: '/settings/cutover-checklist', label: 'Cutover Checklist', icon: ListChecks },
 ] as const;
 
 const USER_MGMT_CHILDREN = [
