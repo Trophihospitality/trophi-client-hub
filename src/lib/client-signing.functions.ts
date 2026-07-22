@@ -99,9 +99,19 @@ export const createSigningSessionFn = createServerFn({ method: 'POST' })
     if (!client?.contact_email) throw new Error('Client POC email not set');
 
     const { data: row } = await supabase.from('client_contracts')
-      .select('pandadoc_document_id, status')
+      .select('pandadoc_document_id, status, metadata')
       .eq('business_id', data.businessId).eq('kind', data.kind).maybeSingle();
     if (!row?.pandadoc_document_id) throw new Error('Document has not been generated yet');
+
+    // Blank-contract guard: never open a signing session for a document
+    // that failed the post-creation field verification.
+    const blank = Array.isArray((row as any).metadata?.blank_fields) ? (row as any).metadata.blank_fields : [];
+    if (row.status === 'error' || blank.length > 0) {
+      throw new Error(
+        `This document is not ready to sign — required fields are empty (${blank.join(', ') || 'see admin'}). ` +
+        `Contact your Trophi account manager to regenerate it.`,
+      );
+    }
 
     const { pandadoc } = await import('@/lib/pandadoc.server');
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
