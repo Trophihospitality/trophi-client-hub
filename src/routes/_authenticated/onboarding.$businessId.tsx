@@ -13,6 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Step1ContractBundle } from '@/components/onboarding/Step1ContractBundle';
+import { CountersignPanel } from '@/components/onboarding/CountersignPanel';
 import { formatPhone } from '@/lib/phone';
 import { listClientUsersForBusinessFn, resendClientInviteFn } from '@/lib/client-users.functions';
 import { InviteStatusCell } from '@/routes/_authenticated/users.client-users';
@@ -127,6 +128,9 @@ function OnboardingDetailPage() {
                   profile.id === data.salesPersonId)
               }
             />
+          )}
+          {data.currentStep >= 4 && data.status !== 'live' && (
+            <CountersignPanel businessId={data.businessId} />
           )}
           <div className="rounded-xl border bg-card">
             <div className="border-b border-border px-4 py-3 text-sm font-semibold">Step checklist</div>
