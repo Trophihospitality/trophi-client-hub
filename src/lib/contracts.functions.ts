@@ -4,8 +4,12 @@ import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 
 // ============================================================
 // Contract bundle (Step 1) — MSA + Order Form + Client Authorization
-// Merge fields come from the client record + active locations.
-// Documents are created as drafts in PandaDoc; sending happens in Step 4.
+// All PandaDoc document creation flows through buildAndCreateBundleDoc
+// so there is exactly ONE payload-construction path shared by initial
+// generation, void-and-regenerate, and future Payment Authorization
+// (Turn 5). After creation we read fields back from PandaDoc and mark
+// the row errored if any required merge field is empty — clients must
+// never be shown a blank contract to sign.
 // ============================================================
 
 export type BundleKind = 'msa' | 'order_form' | 'client_authorization';
@@ -18,20 +22,30 @@ const KIND_LABELS: Record<BundleKind, string> = {
   client_authorization: 'Client Authorization',
 };
 
+// Required merge fields per template — must exactly match the field
+// NAMES defined in the PandaDoc template (case-sensitive). If a template
+// changes, update this map.
+const REQUIRED_FIELDS_BY_KIND: Record<BundleKind, string[]> = {
+  msa: ['Company', 'Brands', 'ContactName', 'ContactRole', 'ContactEmail', 'BusinessId'],
+  order_form: ['Company', 'PackageType', 'MonthlyBudgetPerLocation', 'ActiveLocationsList', 'BusinessId'],
+  client_authorization: ['Company', 'ContactName', 'ContactRole', 'BusinessId'],
+};
+
 export interface ContractRow {
   kind: BundleKind;
   label: string;
-  status: string; // draft | sent | viewed | completed | error | not_created
+  status: string;
   pandadocDocumentId: string | null;
   updatedAt: string | null;
   errorMessage: string | null;
+  blankFields: string[]; // required merge fields that came back empty after creation
 }
 
 export interface ContractBundlePreview {
   ready: boolean;
-  readyReasons: string[]; // human-readable list of what's blocking generation
+  readyReasons: string[];
   missingTemplateIds: BundleKind[];
-  invalidTemplateIds: BundleKind[]; // template value present but not a valid PandaDoc UUID
+  invalidTemplateIds: BundleKind[];
   merge: {
     Company: string;
     Brands: string;
@@ -84,8 +98,6 @@ async function loadBundleContext(supabase: any, businessId: string) {
   return { client, locations: locations ?? [], templateMap, contracts: contracts ?? [], sales };
 }
 
-// A valid PandaDoc template UUID is an opaque 22-char base62 id; reject
-// obvious form/share URLs and anything with whitespace or slashes.
 function isValidTemplateId(v: string | null | undefined): boolean {
   if (!v) return false;
   const s = String(v).trim();
@@ -102,7 +114,6 @@ function formatLocationLine(l: any): string {
 
 function buildMerge(client: any, locations: any[]) {
   const brands = Array.isArray(client.brands) ? client.brands.join(', ') : '';
-  // Blank line between entries so PandaDoc renders them as separate paragraphs.
   const locList = locations.map(formatLocationLine).join('\n\n');
   return {
     Company: client.company ?? '',
@@ -144,13 +155,15 @@ export const getContractBundleFn = createServerFn({ method: 'GET' })
 
     const rows: ContractRow[] = BUNDLE_KINDS.map((kind) => {
       const c = contracts.find((r: any) => r.kind === kind);
+      const md = (c?.metadata ?? {}) as any;
       return {
         kind,
         label: KIND_LABELS[kind],
         status: c?.status ?? 'not_created',
         pandadocDocumentId: c?.pandadoc_document_id ?? null,
         updatedAt: c?.updated_at ?? null,
-        errorMessage: c?.metadata?.error ?? null,
+        errorMessage: md.error ?? null,
+        blankFields: Array.isArray(md.blank_fields) ? md.blank_fields : [],
       };
     });
 
@@ -198,72 +211,187 @@ async function assertOwnerOrPrivileged(supabase: any, userId: string, businessId
   if (!ok) throw new Error('Forbidden');
 }
 
+function assertBundleContextReady(client: any, locations: any[], sales: any, templateMap: Map<string, string | null>) {
+  const missing = BUNDLE_KINDS.filter((k) => !templateMap.get(k));
+  if (missing.length > 0) throw new Error(`Missing PandaDoc template IDs for: ${missing.join(', ')}`);
+  const invalid = BUNDLE_KINDS.filter((k) => !isValidTemplateId(templateMap.get(k)));
+  if (invalid.length > 0) {
+    throw new Error(
+      `PandaDoc template IDs for ${invalid.map((k) => KIND_LABELS[k]).join(', ')} look invalid. ` +
+        `Paste the template UUID (from Templates → your template → three-dot menu → Copy template ID), not a form/share URL.`,
+    );
+  }
+  if (!client.contact_email || !client.contact_name || !client.contact_role) {
+    throw new Error('Client point-of-contact name, role, and email are required');
+  }
+  if (!sales?.email) throw new Error('Account owner profile has no email — cannot set Trophi signer');
+  if (locations.length === 0) throw new Error('At least one active location is required');
+  if (!client.package_type || client.budget == null) {
+    throw new Error('Package type and monthly budget per location are required');
+  }
+}
+
+// ============================================================
+// SHARED BUILD PATH — all document creation flows through this.
+//   1. Build merge payload from client + locations
+//   2. Build recipients (client + trophi roles)
+//   3. Create from template with tokens+fields+metadata (business_id,
+//      kind, location_ids)
+//   4. Wait for draft, read back fields via API
+//   5. If any required merge field is empty → mark row errored with
+//      blank_fields list and DO NOT silent-send (blocks Sign now)
+//   6. Otherwise silent-send so doc lands in document.sent
+// Returns the persisted status.
+// ============================================================
+async function buildAndCreateBundleDoc(params: {
+  kind: BundleKind;
+  client: any;
+  locations: any[];
+  sales: any;
+  templateUuid: string;
+  userId: string;
+}): Promise<{ documentId: string; status: string; blankFields: string[]; error?: string }> {
+  const { kind, client, locations, sales, templateUuid } = params;
+  const { pandadoc } = await import('@/lib/pandadoc.server');
+
+  const merge = buildMerge(client, locations);
+  const mergeStrings: Record<string, string> = {};
+  Object.entries(merge).forEach(([k, v]) => { mergeStrings[k] = String(v); });
+
+  const clientNames = splitName(client.contact_name);
+  const salesNames = splitName(sales.name);
+  const recipients = [
+    { email: client.contact_email, first_name: clientNames.firstName, last_name: clientNames.lastName, role: 'client' },
+    { email: sales.email, first_name: salesNames.firstName, last_name: salesNames.lastName, role: 'trophi' },
+  ];
+
+  const locationIds = locations.map((l: any) => l.location_id).join(',');
+
+  const doc = await pandadoc.createFromTemplate({
+    name: `${KIND_LABELS[kind]} — ${client.company} (${client.business_id})`,
+    templateUuid,
+    recipients,
+    tokens: mergeStrings,
+    fields: mergeStrings,
+    metadata: {
+      business_id: client.business_id,
+      kind,
+      location_ids: locationIds,
+      signer_email_at_creation: client.contact_email,
+    },
+  });
+
+  // Wait for PandaDoc to finish server-side processing so we can read
+  // fields back reliably.
+  let status = String(doc.status || 'document.uploaded');
+  try {
+    status = await pandadoc.waitForDraft(doc.id);
+  } catch {
+    /* fall through to verification */
+  }
+
+  // Blank-contract guard: read fields back and verify every required
+  // merge field for this kind carries a non-empty value.
+  const details = await pandadoc.getDocument(doc.id);
+  const fieldMap = new Map<string, string>();
+  for (const f of (details as any).fields ?? []) {
+    const name = f.name ?? f.merge_field ?? f.field_id;
+    if (!name) continue;
+    const val = typeof f.value === 'string' ? f.value : '';
+    fieldMap.set(String(name), val);
+  }
+  const required = REQUIRED_FIELDS_BY_KIND[kind];
+  const blankFields = required.filter((k) => {
+    const v = fieldMap.get(k);
+    return v == null || v.trim() === '';
+  });
+
+  if (blankFields.length > 0) {
+    // Do NOT silent-send. Leave in draft/uploaded so staff can inspect
+    // and re-run; return error state to persist on the row.
+    return {
+      documentId: doc.id,
+      status: 'error',
+      blankFields,
+      error: `PandaDoc created the document but did not populate required merge fields: ${blankFields.join(', ')}. ` +
+        `Confirm the template's field NAMES match exactly (case-sensitive). Sign now is disabled until this is fixed.`,
+    };
+  }
+
+  // Silent-send so the doc is signing-ready without emailing the client.
+  try {
+    await pandadoc.sendDocument(doc.id, {
+      subject: 'Trophi Hospitality — in-portal signing',
+      message: 'Signing happens inside the Trophi client portal. You should not receive this email.',
+      silent: true,
+    });
+    status = 'document.sent';
+  } catch (err) {
+    // Non-fatal: keep whatever status we last saw. createSigningSessionFn
+    // will retry silent-send lazily on first Sign now click.
+    console.warn(`[bundle] silent send failed for ${kind} (${doc.id}):`, err);
+  }
+
+  return { documentId: doc.id, status, blankFields: [] };
+}
+
+async function persistBundleRow(params: {
+  supabaseAdmin: any;
+  businessId: string;
+  kind: BundleKind;
+  existingRowId: string | null;
+  documentId: string | null;
+  status: string;
+  templateId: string;
+  signerEmail: string;
+  locationIds: string[];
+  userId: string;
+  blankFields: string[];
+  error?: string;
+}) {
+  const { supabaseAdmin, existingRowId, kind, businessId } = params;
+  const metadata: Record<string, any> = {
+    template_id: params.templateId,
+    signer_email_at_creation: params.signerEmail,
+    location_ids: params.locationIds,
+  };
+  if (params.blankFields.length > 0) metadata.blank_fields = params.blankFields;
+  if (params.error) metadata.error = params.error;
+
+  const row = {
+    business_id: businessId,
+    kind,
+    pandadoc_document_id: params.documentId,
+    status: params.status,
+    metadata,
+    created_by: params.userId,
+    updated_at: new Date().toISOString(),
+  };
+  const res = existingRowId
+    ? await supabaseAdmin.from('client_contracts').update(row).eq('id', existingRowId)
+    : await supabaseAdmin.from('client_contracts').insert(row);
+  if (res.error) throw new Error(`DB persist failed: ${res.error.message}`);
+}
+
+// ============================================================
+// generateContractBundleFn — creates any missing/errored bundle
+// documents; skips those already successfully created.
+// ============================================================
 export const generateContractBundleFn = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ businessId: z.string() }).parse(d))
-  .handler(async ({ data, context }): Promise<{ ok: true; created: BundleKind[]; skipped: BundleKind[] }> => {
+  .handler(async ({ data, context }): Promise<{ ok: true; created: BundleKind[]; skipped: BundleKind[]; errored: BundleKind[] }> => {
     const { supabase, userId } = context;
     await assertOwnerOrPrivileged(supabase, userId, data.businessId);
 
-    const { client, locations, templateMap, contracts, sales } = await loadBundleContext(
-      supabase,
-      data.businessId,
-    );
-
-    const missing = BUNDLE_KINDS.filter((k) => !templateMap.get(k));
-    if (missing.length > 0) {
-      throw new Error(`Missing PandaDoc template IDs for: ${missing.join(', ')}`);
-    }
-    const invalid = BUNDLE_KINDS.filter((k) => !isValidTemplateId(templateMap.get(k)));
-    if (invalid.length > 0) {
-      throw new Error(
-        `PandaDoc template IDs for ${invalid.map((k) => KIND_LABELS[k]).join(', ')} look invalid. ` +
-          `Paste the template UUID (from Templates → your template → three-dot menu → Copy template ID), not a form/share URL.`,
-      );
-    }
-
-    if (!client.contact_email || !client.contact_name || !client.contact_role) {
-      throw new Error('Client point-of-contact name, role, and email are required');
-    }
-    if (!sales?.email) throw new Error('Account owner profile has no email — cannot set Trophi signer');
-    if (locations.length === 0) throw new Error('At least one active location is required');
-    if (!client.package_type || client.budget == null) {
-      throw new Error('Package type and monthly budget per location are required');
-    }
-
-    const merge = buildMerge(client, locations);
-    const clientNames = splitName(client.contact_name);
-    const salesNames = splitName(sales.name);
-
-    const recipients = [
-      { email: client.contact_email, first_name: clientNames.firstName, last_name: clientNames.lastName, role: 'client' },
-      { email: sales.email, first_name: salesNames.firstName, last_name: salesNames.lastName, role: 'trophi' },
-    ];
+    const { client, locations, templateMap, contracts, sales } = await loadBundleContext(supabase, data.businessId);
+    assertBundleContextReady(client, locations, sales, templateMap);
 
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
-    const { pandadoc } = await import('@/lib/pandadoc.server');
-
-    const mergeStrings: Record<string, string> = {};
-    Object.entries(merge).forEach(([k, v]) => { mergeStrings[k] = String(v); });
 
     const created: BundleKind[] = [];
     const skipped: BundleKind[] = [];
-
-    // Reconcile: find any PandaDoc documents already tagged with this business_id
-    // (e.g. from a previous run where the DB insert failed silently) so we link
-    // instead of creating duplicates.
-    let existingDocs: Array<{ id: string; name: string; status: string; metadata?: any }> = [];
-    try {
-      existingDocs = await pandadoc.listByMetadata({ business_id: client.business_id }) as any;
-    } catch {
-      existingDocs = [];
-    }
-    const findExistingRemote = (kind: BundleKind) => {
-      const byMeta = existingDocs.find((d: any) => d.metadata?.kind === kind);
-      if (byMeta) return byMeta;
-      // Fallback: match by document name prefix if metadata wasn't preserved.
-      return existingDocs.find((d) => d.name?.startsWith(KIND_LABELS[kind]));
-    };
+    const errored: BundleKind[] = [];
 
     for (const kind of BUNDLE_KINDS) {
       const existing = contracts.find((r: any) => r.kind === kind);
@@ -271,113 +399,72 @@ export const generateContractBundleFn = createServerFn({ method: 'POST' })
         skipped.push(kind);
         continue;
       }
-
       try {
-        let doc: { id: string; name: string; status: string };
-        const remote = findExistingRemote(kind);
-        if (remote) {
-          doc = remote;
-        } else {
-          const templateUuid = templateMap.get(kind)!;
-          const perKindRecipients =
-            kind === 'client_authorization' ? [recipients[0], recipients[1]] : recipients;
-          doc = await pandadoc.createFromTemplate({
-            name: `${KIND_LABELS[kind]} — ${client.company} (${client.business_id})`,
-            templateUuid,
-            recipients: perKindRecipients,
-            tokens: mergeStrings,
-            fields: mergeStrings,
-            metadata: { business_id: client.business_id, kind },
-          });
-        }
-
-        const row = {
-          business_id: client.business_id,
-          kind,
-          pandadoc_document_id: doc.id,
-          status: doc.status || 'document.draft',
-          metadata: { name: doc.name, template_id: templateMap.get(kind), reconciled: !!remote },
-          created_by: userId,
-          updated_at: new Date().toISOString(),
-        };
-        const res = existing
-          ? await supabaseAdmin.from('client_contracts').update(row).eq('id', existing.id)
-          : await supabaseAdmin.from('client_contracts').insert(row);
-        if (res.error) throw new Error(`DB persist failed: ${res.error.message}`);
-        created.push(kind);
-      } catch (err: any) {
-        const errRow = {
-          business_id: client.business_id,
-          kind,
-          pandadoc_document_id: existing?.pandadoc_document_id ?? null,
-          status: 'error',
-          metadata: { error: err?.message ?? String(err) },
-          created_by: userId,
-          updated_at: new Date().toISOString(),
-        };
-        if (existing) {
-          await supabaseAdmin.from('client_contracts').update(errRow).eq('id', existing.id);
-        } else {
-          await supabaseAdmin.from('client_contracts').insert(errRow);
-        }
-        throw new Error(`Failed to create ${KIND_LABELS[kind]}: ${err?.message ?? err}`);
-      }
-    }
-
-
-    // Auto-transition every new doc to document.sent (silent) so they are
-    // signing-ready. silent:true suppresses PandaDoc's own emails — all
-    // signing stays in-portal. Best-effort per doc; a failure here leaves
-    // the row as draft/uploaded and the lazy path in createSigningSessionFn
-    // will retry on first Sign now click.
-    for (const kind of created) {
-      const { data: r } = await supabaseAdmin.from('client_contracts')
-        .select('pandadoc_document_id').eq('business_id', client.business_id).eq('kind', kind).maybeSingle();
-      const docId = (r as any)?.pandadoc_document_id;
-      if (!docId) continue;
-      try {
-        await pandadoc.waitForDraft(docId);
-        await pandadoc.sendDocument(docId, {
-          subject: 'Trophi Hospitality — in-portal signing',
-          message: 'Signing happens inside the Trophi client portal. You should not receive this email.',
-          silent: true,
+        const result = await buildAndCreateBundleDoc({
+          kind, client, locations, sales,
+          templateUuid: templateMap.get(kind)!, userId,
         });
-        await supabaseAdmin.from('client_contracts').update({
-          status: 'document.sent', updated_at: new Date().toISOString(),
-        }).eq('business_id', client.business_id).eq('kind', kind);
-      } catch (err) {
-        console.warn(`[generate] silent send failed for ${kind} (${docId}):`, err);
+        await persistBundleRow({
+          supabaseAdmin,
+          businessId: client.business_id,
+          kind,
+          existingRowId: existing?.id ?? null,
+          documentId: result.documentId,
+          status: result.status,
+          templateId: templateMap.get(kind)!,
+          signerEmail: client.contact_email,
+          locationIds: locations.map((l: any) => l.location_id),
+          userId,
+          blankFields: result.blankFields,
+          error: result.error,
+        });
+        if (result.error) errored.push(kind);
+        else created.push(kind);
+      } catch (err: any) {
+        await persistBundleRow({
+          supabaseAdmin,
+          businessId: client.business_id,
+          kind,
+          existingRowId: existing?.id ?? null,
+          documentId: existing?.pandadoc_document_id ?? null,
+          status: 'error',
+          templateId: templateMap.get(kind)!,
+          signerEmail: client.contact_email,
+          locationIds: locations.map((l: any) => l.location_id),
+          userId,
+          blankFields: [],
+          error: err?.message ?? String(err),
+        });
+        errored.push(kind);
       }
     }
 
     await supabaseAdmin.from('client_activity').insert({
       business_id: client.business_id,
       type: 'info_updated',
-      description: `Contract bundle generated in PandaDoc (${created.length} new, ${skipped.length} existing)`,
+      description: `Contract bundle generated (${created.length} new, ${skipped.length} existing, ${errored.length} errored)`,
       actor: sales.name ?? 'User',
     });
 
-    return { ok: true, created, skipped };
+    return { ok: true, created, skipped, errored };
   });
 
 
 // ============================================================
-// Void + regenerate — always pulls the CURRENT POC email
-// (used when POC contact was changed after initial generation).
-// Deletes/voids each PandaDoc doc, clears client_contracts rows,
-// then re-runs generation from a clean slate.
+// voidAndRegenerateContractBundleFn — deletes all bundle docs
+// (whether draft or sent) and recreates from scratch through the
+// shared build path.
 // ============================================================
 export const voidAndRegenerateContractBundleFn = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ businessId: z.string() }).parse(d))
-  .handler(async ({ data, context }): Promise<{ ok: true; voided: number; recreated: BundleKind[] }> => {
+  .handler(async ({ data, context }): Promise<{ ok: true; voided: number; recreated: BundleKind[]; errored: BundleKind[] }> => {
     const { supabase, userId } = context;
     await assertOwnerOrPrivileged(supabase, userId, data.businessId);
 
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
     const { pandadoc } = await import('@/lib/pandadoc.server');
 
-    // 1. Void or delete every existing bundle doc in PandaDoc.
     const { data: existing } = await supabaseAdmin
       .from('client_contracts')
       .select('id, kind, pandadoc_document_id, status')
@@ -389,102 +476,79 @@ export const voidAndRegenerateContractBundleFn = createServerFn({ method: 'POST'
       const docId = (row as any).pandadoc_document_id;
       if (!docId) continue;
       try {
-        // Draft docs delete cleanly; sent docs need void via status endpoint.
-        // We attempt delete first; PandaDoc returns 400 for non-drafts.
         await pandadoc.deleteDocument(docId);
         voided++;
       } catch (err) {
-        // Best-effort: log and continue — we'll still clear DB rows and recreate.
-        console.warn(`[voidAndRegenerate] Failed to remove PandaDoc doc ${docId}:`, err);
+        // Sent/viewed docs cannot be deleted via public API — leave orphaned.
+        console.warn(`[voidAndRegenerate] Could not delete PandaDoc doc ${docId}:`, err);
       }
     }
 
-    // 2. Clear the DB rows.
     await supabaseAdmin
       .from('client_contracts')
       .delete()
       .eq('business_id', data.businessId)
       .in('kind', BUNDLE_KINDS);
 
-    // 3. Re-run generation. Re-read context so we pick up the current POC email.
     const { client, locations, templateMap, sales } = await loadBundleContext(supabase, data.businessId);
-
-    const missing = BUNDLE_KINDS.filter((k) => !templateMap.get(k));
-    if (missing.length > 0) throw new Error(`Missing PandaDoc template IDs for: ${missing.join(', ')}`);
-    const invalid = BUNDLE_KINDS.filter((k) => !isValidTemplateId(templateMap.get(k)));
-    if (invalid.length > 0) throw new Error(`Invalid PandaDoc template IDs for: ${invalid.join(', ')}`);
-    if (!client.contact_email || !client.contact_name || !client.contact_role)
-      throw new Error('Client POC name, role, and email are required');
-    if (!sales?.email) throw new Error('Account owner profile has no email');
-    if (locations.length === 0) throw new Error('At least one active location is required');
-    if (!client.package_type || client.budget == null)
-      throw new Error('Package type and monthly budget are required');
-
-    const merge = buildMerge(client, locations);
-    const clientNames = splitName(client.contact_name);
-    const salesNames = splitName(sales.name);
-    const recipients = [
-      { email: client.contact_email, first_name: clientNames.firstName, last_name: clientNames.lastName, role: 'client' },
-      { email: sales.email, first_name: salesNames.firstName, last_name: salesNames.lastName, role: 'trophi' },
-    ];
-    const mergeStrings: Record<string, string> = {};
-    Object.entries(merge).forEach(([k, v]) => { mergeStrings[k] = String(v); });
+    assertBundleContextReady(client, locations, sales, templateMap);
 
     const recreated: BundleKind[] = [];
+    const errored: BundleKind[] = [];
     for (const kind of BUNDLE_KINDS) {
-      const templateUuid = templateMap.get(kind)!;
-      const perKindRecipients = kind === 'client_authorization' ? [recipients[0], recipients[1]] : recipients;
-      const doc = await pandadoc.createFromTemplate({
-        name: `${KIND_LABELS[kind]} — ${client.company} (${client.business_id})`,
-        templateUuid,
-        recipients: perKindRecipients,
-        tokens: mergeStrings,
-        fields: mergeStrings,
-        metadata: { business_id: client.business_id, kind },
-      });
-      const res = await supabaseAdmin.from('client_contracts').insert({
-        business_id: client.business_id,
-        kind,
-        pandadoc_document_id: doc.id,
-        status: doc.status || 'document.draft',
-        metadata: { name: doc.name, template_id: templateUuid, signer_email_at_creation: client.contact_email },
-        created_by: userId,
-        updated_at: new Date().toISOString(),
-      });
-      if (res.error) throw new Error(`DB persist failed: ${res.error.message}`);
-      recreated.push(kind);
-
-      // Silent-send so the doc lands in document.sent (signing-ready) with
-      // no PandaDoc email sent to the client.
       try {
-        await pandadoc.waitForDraft(doc.id);
-        await pandadoc.sendDocument(doc.id, {
-          subject: 'Trophi Hospitality — in-portal signing',
-          message: 'Signing happens inside the Trophi client portal. You should not receive this email.',
-          silent: true,
+        const result = await buildAndCreateBundleDoc({
+          kind, client, locations, sales,
+          templateUuid: templateMap.get(kind)!, userId,
         });
-        await supabaseAdmin.from('client_contracts').update({
-          status: 'document.sent', updated_at: new Date().toISOString(),
-        }).eq('business_id', client.business_id).eq('kind', kind);
-      } catch (err) {
-        console.warn(`[voidAndRegenerate] silent send failed for ${kind} (${doc.id}):`, err);
+        await persistBundleRow({
+          supabaseAdmin,
+          businessId: client.business_id,
+          kind,
+          existingRowId: null,
+          documentId: result.documentId,
+          status: result.status,
+          templateId: templateMap.get(kind)!,
+          signerEmail: client.contact_email,
+          locationIds: locations.map((l: any) => l.location_id),
+          userId,
+          blankFields: result.blankFields,
+          error: result.error,
+        });
+        if (result.error) errored.push(kind);
+        else recreated.push(kind);
+      } catch (err: any) {
+        await persistBundleRow({
+          supabaseAdmin,
+          businessId: client.business_id,
+          kind,
+          existingRowId: null,
+          documentId: null,
+          status: 'error',
+          templateId: templateMap.get(kind)!,
+          signerEmail: client.contact_email,
+          locationIds: locations.map((l: any) => l.location_id),
+          userId,
+          blankFields: [],
+          error: err?.message ?? String(err),
+        });
+        errored.push(kind);
       }
     }
 
     await supabaseAdmin.from('client_activity').insert({
       business_id: client.business_id,
       type: 'info_updated',
-      description: `Contract bundle voided and regenerated (${voided} removed, ${recreated.length} recreated) — signer: ${client.contact_email}`,
+      description: `Contract bundle voided and regenerated (${voided} removed, ${recreated.length} recreated, ${errored.length} errored) — signer: ${client.contact_email}`,
       actor: sales.name ?? 'User',
     });
 
-    return { ok: true, voided, recreated };
+    return { ok: true, voided, recreated, errored };
   });
 
 // ============================================================
-// Prep-for-signing — silent-sends any draft/uploaded bundle docs
-// so they land in document.sent (signing-ready) without emailing
-// the client. Idempotent — skips docs already sent/completed.
+// prepBundleForSigningFn — silent-sends draft/uploaded docs.
+// Refuses to send docs marked errored (blank merge fields).
 // ============================================================
 export const prepBundleForSigningFn = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
@@ -498,7 +562,7 @@ export const prepBundleForSigningFn = createServerFn({ method: 'POST' })
 
     const { data: rows } = await supabaseAdmin
       .from('client_contracts')
-      .select('kind, pandadoc_document_id, status')
+      .select('kind, pandadoc_document_id, status, metadata')
       .eq('business_id', data.businessId)
       .in('kind', BUNDLE_KINDS);
 
@@ -507,10 +571,11 @@ export const prepBundleForSigningFn = createServerFn({ method: 'POST' })
     for (const r of (rows ?? []) as any[]) {
       const docId = r.pandadoc_document_id;
       const s = String(r.status ?? '');
+      const blank = Array.isArray(r.metadata?.blank_fields) && r.metadata.blank_fields.length > 0;
       if (!docId) { skipped.push(`${r.kind}:no-doc`); continue; }
+      if (blank) { skipped.push(`${r.kind}:blank-fields`); continue; }
       if (s !== 'document.draft' && s !== 'draft' && s !== 'document.uploaded' && s !== 'uploaded') {
-        skipped.push(`${r.kind}:${s}`);
-        continue;
+        skipped.push(`${r.kind}:${s}`); continue;
       }
       try {
         await pandadoc.waitForDraft(docId);
@@ -529,4 +594,3 @@ export const prepBundleForSigningFn = createServerFn({ method: 'POST' })
     }
     return { ok: true, prepared, skipped };
   });
-

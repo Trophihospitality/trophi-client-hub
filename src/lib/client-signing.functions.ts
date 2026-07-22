@@ -33,6 +33,9 @@ export interface ClientContractRow {
   status: string;
   pandadocDocumentId: string | null;
   completed: boolean;
+  errored: boolean;
+  errorMessage: string | null;
+  blankFields: string[];
 }
 
 export const getClientContractsFn = createServerFn({ method: 'GET' })
@@ -42,13 +45,14 @@ export const getClientContractsFn = createServerFn({ method: 'GET' })
     contracts: ClientContractRow[];
     signerEmail: string;
     allComplete: boolean;
+    anyErrored: boolean;
   }> => {
     const { supabase, userId } = context;
     await assertCanSignForClient(supabase, userId, data.businessId);
 
     const [{ data: client }, { data: contracts }] = await Promise.all([
       supabase.from('clients').select('contact_email').eq('business_id', data.businessId).maybeSingle(),
-      supabase.from('client_contracts').select('kind, status, pandadoc_document_id')
+      supabase.from('client_contracts').select('kind, status, pandadoc_document_id, metadata')
         .eq('business_id', data.businessId).in('kind', BUNDLE_KINDS),
     ]);
     if (!client?.contact_email) throw new Error('Client POC email not set');
@@ -56,12 +60,18 @@ export const getClientContractsFn = createServerFn({ method: 'GET' })
     const rows: ClientContractRow[] = BUNDLE_KINDS.map((kind) => {
       const r = (contracts ?? []).find((c: any) => c.kind === kind);
       const status = r?.status ?? 'not_created';
+      const md = (r?.metadata ?? {}) as any;
+      const blankFields = Array.isArray(md.blank_fields) ? md.blank_fields : [];
+      const errored = status === 'error' || blankFields.length > 0;
       return {
         kind,
         label: KIND_LABELS[kind],
         status,
         pandadocDocumentId: r?.pandadoc_document_id ?? null,
         completed: status === 'document.completed' || status === 'completed',
+        errored,
+        errorMessage: md.error ?? null,
+        blankFields,
       };
     });
 
@@ -69,6 +79,7 @@ export const getClientContractsFn = createServerFn({ method: 'GET' })
       contracts: rows,
       signerEmail: client.contact_email,
       allComplete: rows.length > 0 && rows.every((r) => r.completed),
+      anyErrored: rows.some((r) => r.errored),
     };
   });
 
@@ -88,9 +99,19 @@ export const createSigningSessionFn = createServerFn({ method: 'POST' })
     if (!client?.contact_email) throw new Error('Client POC email not set');
 
     const { data: row } = await supabase.from('client_contracts')
-      .select('pandadoc_document_id, status')
+      .select('pandadoc_document_id, status, metadata')
       .eq('business_id', data.businessId).eq('kind', data.kind).maybeSingle();
     if (!row?.pandadoc_document_id) throw new Error('Document has not been generated yet');
+
+    // Blank-contract guard: never open a signing session for a document
+    // that failed the post-creation field verification.
+    const blank = Array.isArray((row as any).metadata?.blank_fields) ? (row as any).metadata.blank_fields : [];
+    if (row.status === 'error' || blank.length > 0) {
+      throw new Error(
+        `This document is not ready to sign — required fields are empty (${blank.join(', ') || 'see admin'}). ` +
+        `Contact your Trophi account manager to regenerate it.`,
+      );
+    }
 
     const { pandadoc } = await import('@/lib/pandadoc.server');
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
