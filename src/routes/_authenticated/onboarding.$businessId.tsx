@@ -13,6 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Step1ContractBundle } from '@/components/onboarding/Step1ContractBundle';
+import { CountersignPanel } from '@/components/onboarding/CountersignPanel';
 import { formatPhone } from '@/lib/phone';
 import { listClientUsersForBusinessFn, resendClientInviteFn } from '@/lib/client-users.functions';
 import { InviteStatusCell } from '@/routes/_authenticated/users.client-users';
