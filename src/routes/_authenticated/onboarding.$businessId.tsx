@@ -141,7 +141,8 @@ function OnboardingDetailPage() {
                   }
                 />
               )}
-              {data.currentStep === 2 && data.status !== 'live' && (
+              {((data.currentStep === 2 && data.status !== 'live') ||
+                (data.currentStep >= 5 && data.status !== 'live' && !data.paymentScope)) && (
                 <Step2PaymentScopePanel
                   businessId={data.businessId}
                   activeLocations={data.activeLocations}
