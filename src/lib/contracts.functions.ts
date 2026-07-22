@@ -614,3 +614,108 @@ export const prepBundleForSigningFn = createServerFn({ method: 'POST' })
     }
     return { ok: true, prepared, skipped };
   });
+
+// ============================================================
+// reconcileContractBundleFn — re-reads each bundle document's true
+// state from PandaDoc and clears stale error/blank-fields metadata
+// when the doc is actually healthy. Fixes rows that were falsely
+// marked errored by transient throttling (429) or mid-processing
+// conflicts (409) on downstream calls after successful creation.
+// Also silent-sends docs that are still in draft/uploaded.
+// ============================================================
+export const reconcileContractBundleFn = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ businessId: z.string() }).parse(d))
+  .handler(async ({ data, context }): Promise<{
+    ok: true;
+    reconciled: Array<{ kind: BundleKind; status: string; cleared: boolean; sent: boolean; stillBlank: string[]; note?: string }>;
+  }> => {
+    const { supabase, userId } = context;
+    await assertOwnerOrPrivileged(supabase, userId, data.businessId);
+
+    const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+    const { pandadoc } = await import('@/lib/pandadoc.server');
+
+    const { data: rows } = await supabaseAdmin
+      .from('client_contracts')
+      .select('id, kind, pandadoc_document_id, status, metadata')
+      .eq('business_id', data.businessId)
+      .in('kind', BUNDLE_KINDS);
+
+    const results: Array<{ kind: BundleKind; status: string; cleared: boolean; sent: boolean; stillBlank: string[]; note?: string }> = [];
+
+    for (const r of (rows ?? []) as any[]) {
+      const kind = r.kind as BundleKind;
+      const docId: string | null = r.pandadoc_document_id;
+      if (!docId) {
+        results.push({ kind, status: r.status, cleared: false, sent: false, stillBlank: [], note: 'no PandaDoc doc' });
+        continue;
+      }
+
+      try {
+        // Wait for any lingering processing before reading fields.
+        await pandadoc.waitForDraft(docId);
+        const details = await pandadoc.getDocument(docId);
+        const trueStatus = String((details as any).status ?? r.status);
+
+        // Re-verify required merge fields.
+        const fieldMap = new Map<string, string>();
+        for (const f of (details as any).fields ?? []) {
+          const name = f.name ?? f.merge_field ?? f.field_id;
+          if (!name) continue;
+          const val = typeof f.value === 'string' ? f.value : '';
+          fieldMap.set(String(name), val);
+        }
+        const required = REQUIRED_FIELDS_BY_KIND[kind];
+        const stillBlank = required.filter((k) => {
+          const v = fieldMap.get(k);
+          return v == null || v.trim() === '';
+        });
+
+        const prevMd = (r.metadata ?? {}) as any;
+        const nextMd: Record<string, any> = { ...prevMd };
+        let cleared = false;
+
+        if (stillBlank.length === 0) {
+          if (nextMd.blank_fields) { delete nextMd.blank_fields; cleared = true; }
+          if (nextMd.error) { delete nextMd.error; cleared = true; }
+        } else {
+          nextMd.blank_fields = stillBlank;
+        }
+
+        let sent = false;
+        let effectiveStatus = trueStatus;
+        // Silent-send if still in draft and fields look good.
+        if (
+          stillBlank.length === 0 &&
+          (trueStatus === 'document.draft' || trueStatus === 'draft' ||
+           trueStatus === 'document.uploaded' || trueStatus === 'uploaded')
+        ) {
+          try {
+            await pandadoc.sendDocument(docId, {
+              subject: 'Trophi Hospitality — in-portal signing',
+              message: 'Signing happens inside the Trophi client portal. You should not receive this email.',
+              silent: true,
+            });
+            effectiveStatus = 'document.sent';
+            sent = true;
+          } catch (err) {
+            console.warn(`[reconcile] silent send failed for ${kind} (${docId}):`, err);
+          }
+        }
+
+        await supabaseAdmin.from('client_contracts').update({
+          status: stillBlank.length > 0 ? 'error' : effectiveStatus,
+          metadata: nextMd,
+          updated_at: new Date().toISOString(),
+        }).eq('id', r.id);
+
+        results.push({ kind, status: effectiveStatus, cleared, sent, stillBlank });
+      } catch (err: any) {
+        results.push({ kind, status: r.status, cleared: false, sent: false, stillBlank: [], note: err?.message ?? String(err) });
+      }
+    }
+
+    return { ok: true, reconciled: results };
+  });
+
