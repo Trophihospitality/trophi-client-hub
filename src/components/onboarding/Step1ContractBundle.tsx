@@ -82,6 +82,25 @@ export function Step1ContractBundle({ businessId, canEdit, onGenerated }: Props)
     onError: (e: any) => toast.error(e?.message ?? 'Could not void & regenerate'),
   });
 
+  const recon = useMutation({
+    mutationFn: () => reconcile({ data: { businessId } }),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ['contract-bundle', businessId] });
+      qc.invalidateQueries({ queryKey: ['client-contracts', businessId] });
+      const cleared = r.reconciled.filter((x) => x.cleared).length;
+      const sent = r.reconciled.filter((x) => x.sent).length;
+      const stillBlank = r.reconciled.filter((x) => x.stillBlank.length > 0).length;
+      if (stillBlank > 0) {
+        toast.error(`Refreshed ${r.reconciled.length} — ${stillBlank} still have blank fields.`);
+      } else {
+        toast.success(`Refreshed status for ${r.reconciled.length} docs (${cleared} cleared stale errors, ${sent} silent-sent).`);
+      }
+      onGenerated?.();
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Could not refresh status'),
+  });
+
+
   if (isLoading) {
     return (
       <div className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">
