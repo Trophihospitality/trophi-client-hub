@@ -488,9 +488,10 @@ export const resendTrophiInviteFn = createServerFn({ method: 'POST' })
       throw new Error('This user has already accepted their invite');
     }
 
-    // Try inviteUserByEmail first. If the auth user already exists (typical
-    // for a stalled invite), fall back to admin.generateLink('invite') which
-    // mints a fresh token and fires the same auth email hook.
+    // Try inviteUserByEmail first — this fires our auth email webhook end
+    // to end. If the auth user already exists (typical stalled invite),
+    // fall back to admin.generateLink('invite') + send our branded invite
+    // template directly, because generateLink alone does NOT dispatch email.
     let inviteErr: any = null;
     try {
       const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(profile.email, {
@@ -501,12 +502,52 @@ export const resendTrophiInviteFn = createServerFn({ method: 'POST' })
     } catch (e: any) { inviteErr = e; }
 
     if (inviteErr && /email.*exist|already.*regist|already been register/i.test(inviteErr.message || '')) {
-      const { error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
-        type: 'invite',
-        email: profile.email,
-        options: { redirectTo: ACCEPT_INVITE_URL, data: { name: profile.name } },
-      } as any);
-      if (linkErr) inviteErr = linkErr; else inviteErr = null;
+      try {
+        const { data: link, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
+          type: 'invite',
+          email: profile.email,
+          options: { redirectTo: ACCEPT_INVITE_URL, data: { name: profile.name } },
+        } as any);
+        if (linkErr) throw linkErr;
+
+        const props: any = (link as any)?.properties ?? {};
+        const token = props.hashed_token ?? props.email_otp ?? '';
+        const [{ default: React }, { render }, { sendLovableEmail }, { InviteEmail }] = await Promise.all([
+          import('react'),
+          import('@react-email/render'),
+          import('@lovable.dev/email-js'),
+          import('./email-templates/invite'),
+        ]);
+        const SITE_NAME = 'Trophi Client Hub';
+        const SENDER_DOMAIN = 'notify.trophihospitality.com';
+        const FROM_DOMAIN = 'trophihospitality.com';
+        const SITE_URL = 'https://trophi-client-hub.lovable.app';
+        const acceptUrl = `${SITE_URL}/accept-invite?token=${encodeURIComponent(token)}&email=${encodeURIComponent(profile.email)}&type=invite`;
+        const element = React.createElement(InviteEmail, {
+          siteName: SITE_NAME,
+          siteUrl: SITE_URL,
+          confirmationUrl: acceptUrl,
+        });
+        const html = await render(element);
+        const text = await render(element, { plainText: true });
+        await sendLovableEmail(
+          {
+            to: profile.email,
+            from: `${SITE_NAME} <noreply@${FROM_DOMAIN}>`,
+            sender_domain: SENDER_DOMAIN,
+            subject: "You've been invited",
+            html,
+            text,
+            purpose: 'transactional',
+            label: 'trophi_user.invite_resend',
+            idempotency_key: `trophi-reinvite-${data.targetUserId}-${Date.now()}`,
+          },
+          { apiKey: process.env.LOVABLE_API_KEY!, sendUrl: process.env.LOVABLE_SEND_URL },
+        );
+        inviteErr = null;
+      } catch (e: any) {
+        inviteErr = e;
+      }
     }
 
     if (inviteErr) {
@@ -514,6 +555,7 @@ export const resendTrophiInviteFn = createServerFn({ method: 'POST' })
       await recordFailure(msg);
       throw new Error(msg);
     }
+
 
     await supabaseAdmin.from('profiles').update({
       invited_at: nowIso,
