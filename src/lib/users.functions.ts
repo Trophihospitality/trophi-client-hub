@@ -191,11 +191,12 @@ export const createTrophiUserFn = createServerFn({ method: 'POST' })
       firstName: z.string().trim().min(1).max(80),
       lastName: z.string().trim().min(1).max(80),
       email: z.string().trim().email().max(255),
-      phone: z.string().trim().max(40).optional().nullable(),
+      phone: z.string().trim().min(1).max(40),
       role: AssignableRole,
-      team: z.string().trim().max(80).optional().nullable(),
-      hireDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
-      mentorId: z.string().uuid().optional().nullable(),
+      team: z.string().trim().min(1).max(80),
+      hireDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      mentorId: z.string().uuid().nullable(),
+      trainerId: z.string().uuid(),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
@@ -220,38 +221,38 @@ export const createTrophiUserFn = createServerFn({ method: 'POST' })
     const newUserId = invite.user?.id;
     if (!newUserId) throw new Error('Invite returned no user id');
 
-    // profile is created by handle_new_user trigger; update fields
     const today = new Date().toISOString().slice(0, 10);
     const { error: updErr } = await supabaseAdmin.from('profiles').update({
       name,
       first_name: data.firstName,
       last_name: data.lastName,
-      phone: data.phone || null,
-      team: data.team || null,
+      phone: data.phone,
+      team: data.team,
       hire_date: data.hireDate || today,
       hire_role: data.role,
-      mentor_id: data.mentorId || null,
+      mentor_id: data.mentorId,
+      mentor_status: 'assigned',
+      mentor_assigned_at: new Date().toISOString(),
       current_role_started_at: data.hireDate || today,
       is_active: true,
     } as any).eq('user_id', newUserId);
     if (updErr) throw updErr;
 
-    // Replace default sales_rep role with requested role
     await supabaseAdmin.from('user_roles').delete().eq('user_id', newUserId);
     await supabaseAdmin.from('user_roles').insert({ user_id: newUserId, role: data.role } as any);
 
-    // Seed role_history open row
     await supabaseAdmin.from('role_history').insert({
       user_id: newUserId,
       role: data.role,
       started_on: data.hireDate || today,
+      trainer_id: data.trainerId,
       changed_by: userId,
     } as any);
 
     await writeAudit(supabaseAdmin, {
       actorId: userId, actorEmail: (claims as any)?.email ?? null,
       action: 'trophi_user.create', entityType: 'profile', entityId: newUserId,
-      after: { email: data.email, role: data.role, name },
+      after: { email: data.email, role: data.role, name, trainerId: data.trainerId, mentorId: data.mentorId },
     });
 
     return { ok: true, userId: newUserId };
