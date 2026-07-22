@@ -1,5 +1,7 @@
 import { createFileRoute, Outlet, redirect, Link, useRouterState } from '@tanstack/react-router';
-import { Users, ClipboardCheck, BarChart3, Wrench, Globe, LogOut, ShieldCheck, FileText, LineChart, Trophy, ScrollText } from 'lucide-react';
+import { useState } from 'react';
+import { Users, ClipboardCheck, BarChart3, Wrench, Globe, LogOut, ShieldCheck, FileText, LineChart, Trophy, ScrollText, ChevronDown, ChevronRight } from 'lucide-react';
+
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/store/userStore';
 import trophiMarkAsset from '@/assets/trophi-mark.png.asset.json';
