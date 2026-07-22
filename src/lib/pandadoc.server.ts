@@ -45,10 +45,16 @@ async function request<T = any>(path: string, init: RequestInit = {}, attempt = 
     return request<T>(path, init, attempt + 1);
   }
   if (!res.ok) {
-    const msg = body?.detail || body?.message || body?.error || res.statusText;
+    const msg = body?.detail || body?.message || body?.error || body?.info_message || res.statusText;
     const raw = typeof text === 'string' ? text.slice(0, 600) : '';
     console.error(`[pandadoc] ${init.method ?? 'GET'} ${path} → ${res.status}: ${msg} | body=${raw}`);
-    throw new Error(`PandaDoc ${res.status}: ${msg}`);
+    const err = new Error(`PandaDoc ${res.status}: ${msg}`) as Error & { status?: number; terminal?: boolean };
+    err.status = res.status;
+    // 4xx (except 408/409/429) are terminal — no retry can fix an
+    // authorization / validation refusal. Callers should mark the
+    // contract errored and surface a clean message instead of retrying.
+    err.terminal = res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 409 && res.status !== 429;
+    throw err;
   }
   return body as T;
 }
