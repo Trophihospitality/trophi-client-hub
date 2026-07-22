@@ -197,6 +197,7 @@ export const createTrophiUserFn = createServerFn({ method: 'POST' })
       hireDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
       mentorId: z.string().uuid().nullable(),
       trainerId: z.string().uuid(),
+      origin: z.string().url().optional(),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
@@ -207,8 +208,11 @@ export const createTrophiUserFn = createServerFn({ method: 'POST' })
 
     const name = `${data.firstName} ${data.lastName}`.trim();
 
+    const inviteRedirect = data.origin && /^https?:\/\//.test(data.origin)
+      ? `${data.origin.replace(/\/$/, '')}/accept-invite` : undefined;
     const { data: invite, error: inviteErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
       data: { name, first_name: data.firstName, last_name: data.lastName },
+      redirectTo: inviteRedirect,
     });
     if (inviteErr) {
       await writeAudit(supabaseAdmin, {
