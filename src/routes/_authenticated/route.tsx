@@ -93,6 +93,7 @@ function UserMgmtGroup({ pathname }: { pathname: string }) {
 
 const CLIENT_NAV = [
   { to: '/client-portal', label: 'Client Portal', icon: Globe },
+  { to: '/client-documents', label: 'Documents', icon: FolderClosed },
   { to: '/support', label: 'Tech / Support', icon: Wrench },
 ] as const;
 
