@@ -266,7 +266,7 @@ function PortalAccessCard({ businessId }: { businessId: string }) {
           </li>
         )}
         {users.map((u) => {
-          const canResend = u.inviteStatus === 'invited' || u.inviteStatus === 'expired' || u.inviteStatus === 'never_sent';
+          const canResend = u.inviteStatus === 'invited' || u.inviteStatus === 'expired' || u.inviteStatus === 'never_sent' || u.inviteStatus === 'failed';
           return (
             <li key={u.id} className="px-4 py-3 text-sm">
               <div className="flex items-start justify-between gap-2">
