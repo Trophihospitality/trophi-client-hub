@@ -11,7 +11,8 @@ import { getLeaderboardDataFn } from '@/lib/awards.functions';
 import { useAuth } from '@/store/userStore';
 import { formatPhone, formatPhoneInput } from '@/lib/phone';
 import { AvatarCircle } from '@/components/ui/avatar-circle';
-import { cropToSquareJpeg, uploadAvatarBlob } from '@/lib/avatar';
+import { uploadAvatarBlob, validateAvatarFile, AVATAR_ACCEPT } from '@/lib/avatar';
+import { AvatarCropDialog } from '@/components/ui/avatar-crop-dialog';
 import { ArrowLeft, Pencil, X, Check, Trophy, Upload } from 'lucide-react';
 
 export const Route = createFileRoute('/_authenticated/users/trophi/$userId')({
@@ -162,8 +163,9 @@ function SummaryTab({ user, mentor, users, editMode, onAvatarChanged }: {
     isActive: user.isActive,
     trainerId: spiroId ?? '',
   });
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [cropFile, setCropFile] = useState<File | null>(null);
 
   useEffect(() => {
     setForm({
@@ -179,18 +181,20 @@ function SummaryTab({ user, mentor, users, editMode, onAvatarChanged }: {
       isActive: user.isActive,
       trainerId: spiroId ?? '',
     });
-    setPhotoFile(null);
+    setPhotoBlob(null);
     setPhotoPreview(null);
+    setCropFile(null);
   }, [user, spiroId]);
 
   const roleChanged = !isSelfOnly && form.role !== user.role && form.role !== 'client_admin';
 
   function onPickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
+    e.target.value = '';
     if (!f) return;
-    if (f.size > 5 * 1024 * 1024) { toast.error('Image must be under 5 MB'); return; }
-    setPhotoFile(f);
-    setPhotoPreview(URL.createObjectURL(f));
+    const v = validateAvatarFile(f);
+    if (!v.ok) { toast.error(v.error); return; }
+    setCropFile(f);
   }
 
   const saveM = useMutation({
@@ -200,9 +204,8 @@ function SummaryTab({ user, mentor, users, editMode, onAvatarChanged }: {
       // Upload avatar first (if changed). Users may only upload to their own folder;
       // admin (Spiro) has global rights via storage policy.
       let newAvatarPath: string | null | undefined;
-      if (photoFile) {
-        const blob = await cropToSquareJpeg(photoFile);
-        newAvatarPath = await uploadAvatarBlob(user.id, blob);
+      if (photoBlob) {
+        newAvatarPath = await uploadAvatarBlob(user.id, photoBlob);
       }
 
       if (isSelfOnly) {
@@ -237,10 +240,10 @@ function SummaryTab({ user, mentor, users, editMode, onAvatarChanged }: {
     onSuccess: async () => {
       qc.invalidateQueries({ queryKey: ['users'] });
       qc.invalidateQueries({ queryKey: ['role-history', user.id] });
-      if (photoFile) await onAvatarChanged();
+      if (photoBlob) await onAvatarChanged();
       toast.success('Profile updated');
       setEditing(false);
-      setPhotoFile(null);
+      setPhotoBlob(null);
       setPhotoPreview(null);
     },
     onError: (e: any) => toast.error(e?.message ?? 'Failed to update'),
@@ -261,7 +264,7 @@ function SummaryTab({ user, mentor, users, editMode, onAvatarChanged }: {
             )}
             {editing && (
               <div className="flex gap-2">
-                <button onClick={() => { setEditing(false); setPhotoFile(null); setPhotoPreview(null); }} className="inline-flex items-center gap-1 rounded-md border border-input px-3 py-1.5 text-sm">
+                <button onClick={() => { setEditing(false); setPhotoBlob(null); setPhotoPreview(null); setCropFile(null); }} className="inline-flex items-center gap-1 rounded-md border border-input px-3 py-1.5 text-sm">
                   <X className="h-3.5 w-3.5" /> Cancel
                 </button>
                 <button disabled={saveM.isPending} onClick={() => saveM.mutate()} className="inline-flex items-center gap-1 rounded-md bg-[hsl(var(--trophi-gold))] px-3 py-1.5 text-sm font-medium text-[hsl(var(--trophi-ink))] disabled:opacity-60">
@@ -281,16 +284,29 @@ function SummaryTab({ user, mentor, users, editMode, onAvatarChanged }: {
             <div className="mb-5 flex items-center gap-4">
               <AvatarCircle name={user.name} url={previewUrl} size={64} />
               <label className="inline-flex items-center gap-2 rounded-md border border-input px-3 py-1.5 text-sm cursor-pointer hover:bg-muted/40">
-                <Upload className="h-3.5 w-3.5" /> {photoFile ? 'Change photo' : 'Upload photo'}
-                <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={onPickPhoto} />
+                <Upload className="h-3.5 w-3.5" /> {photoBlob ? 'Change photo' : 'Upload photo'}
+                <input type="file" accept={AVATAR_ACCEPT} className="hidden" onChange={onPickPhoto} />
               </label>
-              {photoFile && (
-                <button onClick={() => { setPhotoFile(null); setPhotoPreview(null); }} className="text-xs text-muted-foreground hover:text-foreground">
+              {photoBlob && (
+                <button onClick={() => { setPhotoBlob(null); setPhotoPreview(null); }} className="text-xs text-muted-foreground hover:text-foreground">
                   Discard change
                 </button>
               )}
             </div>
           )}
+
+          {cropFile && (
+            <AvatarCropDialog
+              file={cropFile}
+              onCancel={() => setCropFile(null)}
+              onConfirm={(blob, url) => {
+                setPhotoBlob(blob);
+                setPhotoPreview(url);
+                setCropFile(null);
+              }}
+            />
+          )}
+
 
           {!editing ? (
             <dl className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">

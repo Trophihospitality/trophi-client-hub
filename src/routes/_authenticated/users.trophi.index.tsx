@@ -10,7 +10,8 @@ import {
 import { useAuth } from '@/store/userStore';
 import { formatPhone, formatPhoneInput } from '@/lib/phone';
 import { AvatarCircle } from '@/components/ui/avatar-circle';
-import { uploadAvatarBlob, cropToSquareJpeg } from '@/lib/avatar';
+import { uploadAvatarBlob, validateAvatarFile, AVATAR_ACCEPT } from '@/lib/avatar';
+import { AvatarCropDialog } from '@/components/ui/avatar-crop-dialog';
 import { Plus, Search, Upload } from 'lucide-react';
 
 export const Route = createFileRoute('/_authenticated/users/trophi/')({
@@ -156,8 +157,9 @@ function AddTrophiUserDialog({ users, onClose, onSaved }: { users: AppUser[]; on
     trainerId: spiroId ?? '',
     mentorChoice: 'open' as 'open' | string,
   });
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [cropFile, setCropFile] = useState<File | null>(null);
 
   const trainerOptions = useMemo(
     () => (spiroId ? [{ id: spiroId, label: 'Spiro Douvris' }] : []),
@@ -170,10 +172,11 @@ function AddTrophiUserDialog({ users, onClose, onSaved }: { users: AppUser[]; on
 
   function onPickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
+    e.target.value = '';
     if (!f) return;
-    if (f.size > 5 * 1024 * 1024) { toast.error('Image must be under 5 MB'); return; }
-    setPhotoFile(f);
-    setPhotoPreview(URL.createObjectURL(f));
+    const v = validateAvatarFile(f);
+    if (!v.ok) { toast.error(v.error); return; }
+    setCropFile(f);
   }
 
   const m = useMutation({
@@ -186,10 +189,9 @@ function AddTrophiUserDialog({ users, onClose, onSaved }: { users: AppUser[]; on
         mentorId: form.mentorChoice === 'open' ? null : form.mentorChoice,
       } as any });
       const newUserId = res?.userId;
-      if (photoFile && newUserId) {
+      if (photoBlob && newUserId) {
         try {
-          const blob = await cropToSquareJpeg(photoFile);
-          const path = await uploadAvatarBlob(newUserId, blob);
+          const path = await uploadAvatarBlob(newUserId, photoBlob);
           await updateUser({ data: { targetUserId: newUserId, avatarPath: path } as any });
         } catch (err: any) {
           toast.error(`User created but photo upload failed: ${err?.message ?? err}`);
@@ -216,11 +218,11 @@ function AddTrophiUserDialog({ users, onClose, onSaved }: { users: AppUser[]; on
             <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center text-muted-foreground text-xs">No photo</div>
           )}
           <label className="inline-flex items-center gap-2 rounded-md border border-input px-3 py-1.5 text-sm cursor-pointer hover:bg-muted/40">
-            <Upload className="h-3.5 w-3.5" /> {photoFile ? 'Change photo' : 'Upload photo'}
-            <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={onPickPhoto} />
+            <Upload className="h-3.5 w-3.5" /> {photoBlob ? 'Change photo' : 'Upload photo'}
+            <input type="file" accept={AVATAR_ACCEPT} className="hidden" onChange={onPickPhoto} />
           </label>
-          {photoFile && (
-            <button onClick={() => { setPhotoFile(null); setPhotoPreview(null); }} className="text-xs text-muted-foreground hover:text-foreground">
+          {photoBlob && (
+            <button onClick={() => { setPhotoBlob(null); setPhotoPreview(null); }} className="text-xs text-muted-foreground hover:text-foreground">
               Remove
             </button>
           )}
@@ -266,6 +268,18 @@ function AddTrophiUserDialog({ users, onClose, onSaved }: { users: AppUser[]; on
           </button>
         </div>
       </div>
+
+      {cropFile && (
+        <AvatarCropDialog
+          file={cropFile}
+          onCancel={() => setCropFile(null)}
+          onConfirm={(blob, url) => {
+            setPhotoBlob(blob);
+            setPhotoPreview(url);
+            setCropFile(null);
+          }}
+        />
+      )}
     </div>
   );
 }
