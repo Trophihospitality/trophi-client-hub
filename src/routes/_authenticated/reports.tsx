@@ -1,12 +1,22 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { Download, Info } from 'lucide-react';
+import { Download, Info, X } from 'lucide-react';
 import { getReportDataFn, type ReportData } from '@/lib/reports.functions';
+import { listAwardsFn, grantAwardFn } from '@/lib/awards.functions';
 import { useAuth } from '@/store/userStore';
 import { JOURNEY_STATUSES } from '@/lib/statusConfig';
 import { downloadCsv } from '@/lib/csv';
+import {
+  CrmLeaderboard,
+  OnboardingLeaderboard,
+  RecentAwardsStrip,
+  currentAndPreviousPeriods,
+  indexAwardsByRecipient,
+  type CrmLbRow,
+  type OnbLbRow,
+} from '@/components/leaderboards/Leaderboards';
 
 export const Route = createFileRoute('/_authenticated/reports')({
   component: ReportsPage,
