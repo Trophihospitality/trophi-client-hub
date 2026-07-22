@@ -325,6 +325,31 @@ export const generateContractBundleFn = createServerFn({ method: 'POST' })
     }
 
 
+    // Auto-transition every new doc to document.sent (silent) so they are
+    // signing-ready. silent:true suppresses PandaDoc's own emails — all
+    // signing stays in-portal. Best-effort per doc; a failure here leaves
+    // the row as draft/uploaded and the lazy path in createSigningSessionFn
+    // will retry on first Sign now click.
+    for (const kind of created) {
+      const { data: r } = await supabaseAdmin.from('client_contracts')
+        .select('pandadoc_document_id').eq('business_id', client.business_id).eq('kind', kind).maybeSingle();
+      const docId = (r as any)?.pandadoc_document_id;
+      if (!docId) continue;
+      try {
+        await pandadoc.waitForDraft(docId);
+        await pandadoc.sendDocument(docId, {
+          subject: 'Trophi Hospitality — in-portal signing',
+          message: 'Signing happens inside the Trophi client portal. You should not receive this email.',
+          silent: true,
+        });
+        await supabaseAdmin.from('client_contracts').update({
+          status: 'document.sent', updated_at: new Date().toISOString(),
+        }).eq('business_id', client.business_id).eq('kind', kind);
+      } catch (err) {
+        console.warn(`[generate] silent send failed for ${kind} (${docId}):`, err);
+      }
+    }
+
     await supabaseAdmin.from('client_activity').insert({
       business_id: client.business_id,
       type: 'info_updated',
