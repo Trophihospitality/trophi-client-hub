@@ -243,12 +243,12 @@ export const updateClientFn = createServerFn({ method: 'POST' })
     const { supabase, userId } = context;
     const name = await actorName(supabase, userId);
     const admin = await isAdminUser(supabase, userId);
-    if (!admin) {
-      const { data: cur } = await supabase.from('clients')
-        .select('journey_status').eq('business_id', data.businessId).maybeSingle();
-      if (cur?.journey_status === 'Signed') {
-        throw new Error('This client is Signed — record is locked. Notes and contact logs still work.');
-      }
+    // Load current client for Signed lock + POC sync baseline.
+    const { data: before } = await supabase.from('clients')
+      .select('journey_status, contact_name, contact_email, contact_phone')
+      .eq('business_id', data.businessId).maybeSingle();
+    if (!admin && before?.journey_status === 'Signed') {
+      throw new Error('This client is Signed — record is locked. Notes and contact logs still work.');
     }
     const patch: any = {};
     const u = data.updates;
@@ -268,6 +268,63 @@ export const updateClientFn = createServerFn({ method: 'POST' })
     // nextFollowUpDate is managed via follow_ups table below; the trigger keeps clients.next_follow_up_date in sync.
     const { error } = await supabase.from('clients').update(patch).eq('business_id', data.businessId);
     if (error) throw error;
+
+    // ---- POC identity sync (CRM → client_users while invite is unaccepted) ----
+    // While the linked portal user hasn't accepted, the CRM POC is source of truth
+    // for name/email/phone. After acceptance the user owns their profile; a
+    // separate query surfaces email divergence in the UI.
+    try {
+      const pocFieldsChanged =
+        u.contactName !== undefined || u.contactEmail !== undefined || u.contactPhone !== undefined;
+      if (pocFieldsChanged && before) {
+        const oldEmail = (before.contact_email ?? '').toLowerCase();
+        // Match linked portal user(s) by prior CRM email; ignore already-accepted rows.
+        const { data: linked } = await supabase.from('client_users')
+          .select('id, first_name, last_name, email, phone, status, user_id, invited_at, invite_sent_to')
+          .eq('business_id', data.businessId)
+          .is('user_id', null)
+          .neq('status', 'active');
+        const matches = (linked ?? []).filter((r: any) =>
+          (r.email ?? '').toLowerCase() === oldEmail,
+        );
+        if (matches.length > 0) {
+          const newName = (u.contactName ?? `${matches[0].first_name} ${matches[0].last_name}`.trim()).trim();
+          const [first, ...rest] = newName.split(/\s+/);
+          const cuPatch: any = { updated_at: new Date().toISOString() };
+          if (u.contactName !== undefined) {
+            cuPatch.first_name = first || matches[0].first_name;
+            cuPatch.last_name = rest.join(' ') || '';
+          }
+          if (u.contactPhone !== undefined) cuPatch.phone = u.contactPhone || null;
+          let emailChanged = false;
+          if (u.contactEmail !== undefined && u.contactEmail.toLowerCase() !== oldEmail) {
+            cuPatch.email = u.contactEmail;
+            // Invalidate outstanding invite links; UI shows "Send invite to new address".
+            cuPatch.invited_at = null;
+            cuPatch.invite_sent_to = null;
+            emailChanged = true;
+          }
+          const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+          for (const m of matches) {
+            await supabaseAdmin.from('client_users').update(cuPatch).eq('id', m.id);
+            await supabaseAdmin.from('audit_log').insert({
+              actor_id: userId, actor_email: null, actor_type: 'system',
+              action: 'client_user.sync_from_crm', entity_type: 'client_user', entity_id: m.id,
+              before: { first_name: m.first_name, last_name: m.last_name, email: m.email, phone: m.phone },
+              after: cuPatch,
+              metadata: { triggered_by: 'crm.client.update', business_id: data.businessId, email_invalidated: emailChanged },
+              success: true,
+            });
+          }
+          const desc = emailChanged
+            ? `Portal user synced from CRM edit; email changed to ${u.contactEmail} — prior invite invalidated`
+            : `Portal user synced from CRM edit`;
+          await logActivity(supabase, data.businessId, 'info_updated', desc, name, userId);
+        }
+      }
+    } catch { /* non-fatal */ }
+
+
 
     if (u.nextFollowUpDate !== undefined) {
       // Load current client + existing pending follow-up (if any).
