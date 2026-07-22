@@ -9,12 +9,19 @@ function apiKey(): string {
   return key;
 }
 
-function retryDelayMs(body: any, attempt: number): number {
+function retryDelayMs(body: any, attempt: number, retryAfterHeader?: string | null): number {
+  // Honor explicit Retry-After header first (seconds or HTTP-date; we assume seconds).
+  const headerSec = Number(retryAfterHeader);
+  if (Number.isFinite(headerSec) && headerSec > 0) return Math.min(headerSec * 1000 + 250, 30000);
   const detail = String(body?.detail ?? body?.message ?? '');
   const seconds = Number(detail.match(/available in (\d+) seconds/i)?.[1]);
-  if (Number.isFinite(seconds) && seconds > 0) return Math.min(seconds * 1000 + 250, 6000);
-  return 750 * (attempt + 1);
+  if (Number.isFinite(seconds) && seconds > 0) return Math.min(seconds * 1000 + 250, 30000);
+  // Exponential backoff with jitter.
+  const base = Math.min(1500 * Math.pow(2, attempt), 15000);
+  return base + Math.floor(Math.random() * 500);
 }
+
+const MAX_RETRIES = 6;
 
 async function request<T = any>(path: string, init: RequestInit = {}, attempt = 0): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
@@ -29,8 +36,12 @@ async function request<T = any>(path: string, init: RequestInit = {}, attempt = 
   const text = await res.text();
   let body: any = null;
   try { body = text ? JSON.parse(text) : null; } catch { body = { raw: text }; }
-  if (res.status === 429 && attempt < 3) {
-    await new Promise((r) => setTimeout(r, retryDelayMs(body, attempt)));
+  // Retry on 429 (throttled) and 409 (doc still processing / mid-transition).
+  // Both are transient — a transient failure must never permanently error a row.
+  if ((res.status === 429 || res.status === 409) && attempt < MAX_RETRIES) {
+    const delay = retryDelayMs(body, attempt, res.headers.get('Retry-After'));
+    console.warn(`[pandadoc] ${res.status} on ${init.method ?? 'GET'} ${path} — retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
+    await new Promise((r) => setTimeout(r, delay));
     return request<T>(path, init, attempt + 1);
   }
   if (!res.ok) {
@@ -41,6 +52,7 @@ async function request<T = any>(path: string, init: RequestInit = {}, attempt = 
   }
   return body as T;
 }
+
 
 export interface PandaDocRecipient {
   email: string;
@@ -130,17 +142,20 @@ export const pandadoc = {
   // PandaDoc returns `document.uploaded` immediately after createFromTemplate
   // and transitions to `document.draft` once server-side processing finishes.
   // /send and /session both reject `document.uploaded`. Poll briefly.
-  async waitForDraft(id: string, timeoutMs = 15000): Promise<string> {
+  async waitForDraft(id: string, timeoutMs = 45000): Promise<string> {
     const started = Date.now();
     let last = '';
     while (Date.now() - started < timeoutMs) {
       const d = await this.getDocument(id);
       last = String(d.status ?? '');
       if (last !== 'document.uploaded' && last !== 'uploaded') return last;
-      await new Promise((r) => setTimeout(r, 1200));
+      // Slow poll interval — sandbox is 10 req/min, so aggressive polling
+      // burns the whole budget on one document.
+      await new Promise((r) => setTimeout(r, 3500));
     }
     return last;
   },
+
 
   // Draft docs are permanently removed. Sent/completed docs return 400; caller
   // should void those separately. We swallow 404 so a partial cleanup can retry.
