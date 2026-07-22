@@ -139,6 +139,7 @@ export const createClientUserFn = createServerFn({ method: 'POST' })
     const { supabase, userId, claims } = context;
 
     // RLS on insert requires is_trophi_staff_for(business_id)
+    const nowIso = new Date().toISOString();
     const { data: inserted, error: insErr } = await supabase.from('client_users').insert({
       business_id: data.businessId,
       first_name: data.firstName,
@@ -149,12 +150,14 @@ export const createClientUserFn = createServerFn({ method: 'POST' })
       permission_level: data.permissionLevel,
       status: 'invited',
       invited_by: userId,
-      invited_at: new Date().toISOString(),
+      invited_at: data.sendInvite ? nowIso : null,
+      invite_sent_to: data.sendInvite ? data.email : null,
     } as any).select('*').single();
     if (insErr) throw insErr;
 
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
 
+    let inviteSent = false;
     if (data.sendInvite) {
       try {
         await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
@@ -164,15 +167,27 @@ export const createClientUserFn = createServerFn({ method: 'POST' })
             business_id: data.businessId,
           },
         });
+        inviteSent = true;
       } catch (e) {
-        // Non-fatal; row is still created
+        // Non-fatal; row is still created. Clear invite fields so UI shows never_sent.
+        await supabaseAdmin.from('client_users')
+          .update({ invited_at: null, invite_sent_to: null } as any)
+          .eq('id', inserted.id);
       }
+    }
+
+    if (inviteSent) {
+      await writeClientActivity(supabaseAdmin, {
+        businessId: data.businessId, type: 'info_updated',
+        description: `Portal invite sent to ${data.email} (${data.firstName} ${data.lastName})`,
+        actor: (claims as any)?.email ?? 'system', actorId: userId,
+      });
     }
 
     await writeAudit(supabaseAdmin, {
       actorId: userId, actorEmail: (claims as any)?.email ?? null,
       action: 'client_user.create', entityType: 'client_user', entityId: inserted.id,
-      after: { email: data.email, business_id: data.businessId, permission: data.permissionLevel },
+      after: { email: data.email, business_id: data.businessId, permission: data.permissionLevel, invite_sent: inviteSent },
     });
 
     return { ok: true, id: inserted.id };
@@ -183,6 +198,9 @@ export const updateClientUserFn = createServerFn({ method: 'POST' })
   .inputValidator((d: unknown) =>
     z.object({
       id: z.string().uuid(),
+      firstName: z.string().trim().min(1).max(80).optional(),
+      lastName: z.string().trim().min(1).max(80).optional(),
+      email: z.string().trim().email().max(255).optional(),
       permissionLevel: PermSchema.optional(),
       locationIds: z.array(z.string()).optional(),
       status: z.enum(['invited', 'active', 'inactive']).optional(),
@@ -191,6 +209,10 @@ export const updateClientUserFn = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId, claims } = context;
+
+    const { data: before } = await supabase.from('client_users').select('*').eq('id', data.id).maybeSingle();
+    if (!before) throw new Error('Client user not found');
+
     const patch: any = { updated_at: new Date().toISOString() };
     if (data.permissionLevel !== undefined) patch.permission_level = data.permissionLevel;
     if (data.locationIds !== undefined) patch.location_ids = data.locationIds;
@@ -200,8 +222,22 @@ export const updateClientUserFn = createServerFn({ method: 'POST' })
       if (data.status === 'active') patch.activated_at = new Date().toISOString();
     }
     if (data.phone !== undefined) patch.phone = data.phone || null;
+    if (data.firstName !== undefined) patch.first_name = data.firstName;
+    if (data.lastName !== undefined) patch.last_name = data.lastName;
 
-    const { data: before } = await supabase.from('client_users').select('*').eq('id', data.id).maybeSingle();
+    // Email change handling: if email changes on an unaccepted (invited/expired) user,
+    // invalidate any outstanding invite links by clearing invited_at + invite_sent_to.
+    let emailChangedWhileInvited = false;
+    if (data.email !== undefined && data.email.toLowerCase() !== (before.email ?? '').toLowerCase()) {
+      patch.email = data.email;
+      const accepted = !!before.user_id || before.status === 'active';
+      if (!accepted) {
+        patch.invited_at = null;
+        patch.invite_sent_to = null;
+        emailChangedWhileInvited = true;
+      }
+    }
+
     const { error } = await supabase.from('client_users').update(patch).eq('id', data.id);
     if (error) throw error;
 
@@ -209,11 +245,20 @@ export const updateClientUserFn = createServerFn({ method: 'POST' })
     await writeAudit(supabaseAdmin, {
       actorId: userId, actorEmail: (claims as any)?.email ?? null,
       action: 'client_user.update', entityType: 'client_user', entityId: data.id,
-      before: before ? { permission: before.permission_level, status: before.status, locations: before.location_ids } : null,
+      before: { email: before.email, permission: before.permission_level, status: before.status, locations: before.location_ids },
       after: patch,
+      metadata: emailChangedWhileInvited ? { email_changed_while_invited: true, previous_email: before.email } : null,
     });
 
-    return { ok: true };
+    if (emailChangedWhileInvited) {
+      await writeClientActivity(supabaseAdmin, {
+        businessId: before.business_id, type: 'info_updated',
+        description: `Client user email changed from ${before.email} to ${data.email}; prior invite links invalidated`,
+        actor: (claims as any)?.email ?? 'system', actorId: userId,
+      });
+    }
+
+    return { ok: true, emailChangedWhileInvited };
   });
 
 export const resendClientInviteFn = createServerFn({ method: 'POST' })
@@ -223,7 +268,23 @@ export const resendClientInviteFn = createServerFn({ method: 'POST' })
     const { supabase, userId, claims } = context;
     const { data: row, error } = await supabase.from('client_users').select('*').eq('id', data.id).single();
     if (error) throw error;
+    if (row.user_id || row.status === 'active') {
+      throw new Error('This user has already accepted their invite');
+    }
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+
+    // Best-effort: delete any prior unconfirmed auth user for the current email so
+    // the fresh invite issues a brand-new token (invalidating any old link).
+    try {
+      const { data: existing } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
+      const priorList = (existing?.users ?? []).filter(
+        (u: any) => u.email?.toLowerCase() === row.email.toLowerCase() && !u.email_confirmed_at && !u.last_sign_in_at,
+      );
+      for (const u of priorList) {
+        try { await supabaseAdmin.auth.admin.deleteUser(u.id); } catch { /* ignore */ }
+      }
+    } catch { /* ignore - not critical */ }
+
     try {
       await supabaseAdmin.auth.admin.inviteUserByEmail(row.email, {
         data: { name: `${row.first_name} ${row.last_name}`.trim(), client_user: true, business_id: row.business_id },
@@ -231,12 +292,21 @@ export const resendClientInviteFn = createServerFn({ method: 'POST' })
     } catch (e: any) {
       throw new Error(e?.message || 'Failed to resend invite');
     }
-    await supabase.from('client_users').update({ invited_at: new Date().toISOString() } as any).eq('id', data.id);
+    const nowIso = new Date().toISOString();
+    await supabase.from('client_users')
+      .update({ invited_at: nowIso, invite_sent_to: row.email, status: 'invited' } as any)
+      .eq('id', data.id);
     await writeAudit(supabaseAdmin, {
       actorId: userId, actorEmail: (claims as any)?.email ?? null,
       action: 'client_user.invite_resend', entityType: 'client_user', entityId: data.id,
+      after: { sent_to: row.email }, metadata: { previous_invite_invalidated: true },
     });
-    return { ok: true };
+    await writeClientActivity(supabaseAdmin, {
+      businessId: row.business_id, type: 'info_updated',
+      description: `Portal invite resent to ${row.email} (${row.first_name} ${row.last_name}); prior links invalidated`,
+      actor: (claims as any)?.email ?? 'system', actorId: userId,
+    });
+    return { ok: true, sentTo: row.email };
   });
 
 export interface AuditLogEntry {
