@@ -167,13 +167,16 @@ export const createClientUserFn = createServerFn({ method: 'POST' })
     let inviteError: string | null = null;
     if (data.sendInvite) {
       try {
-        await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
+        const inviteResp: any = await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
           data: {
             name: `${data.firstName} ${data.lastName}`.trim(),
             client_user: true,
             business_id: data.businessId,
           },
         });
+        if (inviteResp?.error) {
+          throw new Error(inviteResp.error.message || `Invite failed (${inviteResp.error.status ?? 'unknown'})`);
+        }
         inviteSent = true;
         await supabaseAdmin.from('client_users')
           .update({ invite_last_error: null, invite_last_attempt_at: new Date().toISOString() } as any)
