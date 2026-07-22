@@ -34,6 +34,7 @@ import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/l
 import { Route as LovableEmailAuthWebhookRouteImport } from './routes/lovable/email/auth/webhook'
 import { Route as LovableEmailAuthPreviewRouteImport } from './routes/lovable/email/auth/preview'
 import { Route as ApiPublicHooksTestOnboardingEmailRouteImport } from './routes/api/public/hooks/test-onboarding-email'
+import { Route as ApiPublicHooksPandadocRouteImport } from './routes/api/public/hooks/pandadoc'
 import { Route as ApiPublicHooksOnboardingRemindersRouteImport } from './routes/api/public/hooks/onboarding-reminders'
 import { Route as AuthenticatedUsersTrophiUserIdRouteImport } from './routes/_authenticated/users.trophi.$userId'
 
@@ -172,6 +173,11 @@ const ApiPublicHooksTestOnboardingEmailRoute =
     path: '/api/public/hooks/test-onboarding-email',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksPandadocRoute = ApiPublicHooksPandadocRouteImport.update({
+  id: '/api/public/hooks/pandadoc',
+  path: '/api/public/hooks/pandadoc',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHooksOnboardingRemindersRoute =
   ApiPublicHooksOnboardingRemindersRouteImport.update({
     id: '/api/public/hooks/onboarding-reminders',
@@ -207,6 +213,7 @@ export interface FileRoutesByFullPath {
   '/users/': typeof AuthenticatedUsersIndexRoute
   '/users/trophi/$userId': typeof AuthenticatedUsersTrophiUserIdRoute
   '/api/public/hooks/onboarding-reminders': typeof ApiPublicHooksOnboardingRemindersRoute
+  '/api/public/hooks/pandadoc': typeof ApiPublicHooksPandadocRoute
   '/api/public/hooks/test-onboarding-email': typeof ApiPublicHooksTestOnboardingEmailRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
   '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
@@ -232,6 +239,7 @@ export interface FileRoutesByTo {
   '/users': typeof AuthenticatedUsersIndexRoute
   '/users/trophi/$userId': typeof AuthenticatedUsersTrophiUserIdRoute
   '/api/public/hooks/onboarding-reminders': typeof ApiPublicHooksOnboardingRemindersRoute
+  '/api/public/hooks/pandadoc': typeof ApiPublicHooksPandadocRoute
   '/api/public/hooks/test-onboarding-email': typeof ApiPublicHooksTestOnboardingEmailRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
   '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
@@ -262,6 +270,7 @@ export interface FileRoutesById {
   '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
   '/_authenticated/users/trophi/$userId': typeof AuthenticatedUsersTrophiUserIdRoute
   '/api/public/hooks/onboarding-reminders': typeof ApiPublicHooksOnboardingRemindersRoute
+  '/api/public/hooks/pandadoc': typeof ApiPublicHooksPandadocRoute
   '/api/public/hooks/test-onboarding-email': typeof ApiPublicHooksTestOnboardingEmailRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
   '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
@@ -292,6 +301,7 @@ export interface FileRouteTypes {
     | '/users/'
     | '/users/trophi/$userId'
     | '/api/public/hooks/onboarding-reminders'
+    | '/api/public/hooks/pandadoc'
     | '/api/public/hooks/test-onboarding-email'
     | '/lovable/email/auth/preview'
     | '/lovable/email/auth/webhook'
@@ -317,6 +327,7 @@ export interface FileRouteTypes {
     | '/users'
     | '/users/trophi/$userId'
     | '/api/public/hooks/onboarding-reminders'
+    | '/api/public/hooks/pandadoc'
     | '/api/public/hooks/test-onboarding-email'
     | '/lovable/email/auth/preview'
     | '/lovable/email/auth/webhook'
@@ -346,6 +357,7 @@ export interface FileRouteTypes {
     | '/_authenticated/users/'
     | '/_authenticated/users/trophi/$userId'
     | '/api/public/hooks/onboarding-reminders'
+    | '/api/public/hooks/pandadoc'
     | '/api/public/hooks/test-onboarding-email'
     | '/lovable/email/auth/preview'
     | '/lovable/email/auth/webhook'
@@ -359,6 +371,7 @@ export interface RootRouteChildren {
   AcceptInviteRoute: typeof AcceptInviteRoute
   AuthRoute: typeof AuthRoute
   ApiPublicHooksOnboardingRemindersRoute: typeof ApiPublicHooksOnboardingRemindersRoute
+  ApiPublicHooksPandadocRoute: typeof ApiPublicHooksPandadocRoute
   ApiPublicHooksTestOnboardingEmailRoute: typeof ApiPublicHooksTestOnboardingEmailRoute
   LovableEmailAuthPreviewRoute: typeof LovableEmailAuthPreviewRoute
   LovableEmailAuthWebhookRoute: typeof LovableEmailAuthWebhookRoute
@@ -542,6 +555,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksTestOnboardingEmailRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/pandadoc': {
+      id: '/api/public/hooks/pandadoc'
+      path: '/api/public/hooks/pandadoc'
+      fullPath: '/api/public/hooks/pandadoc'
+      preLoaderRoute: typeof ApiPublicHooksPandadocRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/onboarding-reminders': {
       id: '/api/public/hooks/onboarding-reminders'
       path: '/api/public/hooks/onboarding-reminders'
@@ -646,6 +666,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   ApiPublicHooksOnboardingRemindersRoute:
     ApiPublicHooksOnboardingRemindersRoute,
+  ApiPublicHooksPandadocRoute: ApiPublicHooksPandadocRoute,
   ApiPublicHooksTestOnboardingEmailRoute:
     ApiPublicHooksTestOnboardingEmailRoute,
   LovableEmailAuthPreviewRoute: LovableEmailAuthPreviewRoute,

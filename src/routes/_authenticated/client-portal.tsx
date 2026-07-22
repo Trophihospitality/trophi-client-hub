@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, Clock, Lock, Circle } from 'lucide-react';
+import { SignContractPanel } from '@/components/client-portal/SignContractPanel';
 
 export const Route = createFileRoute('/_authenticated/client-portal')({
   ssr: false,
