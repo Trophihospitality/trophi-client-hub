@@ -669,9 +669,11 @@ export const adminResetTrophiInviteFn = createServerFn({ method: 'POST' })
     } as any;
 
     const { data: existingProfile } = await supabaseAdmin.from('profiles').select('user_id').eq('user_id', newUserId).maybeSingle();
-    const profileWrite = existingProfile
-      ? await supabaseAdmin.from('profiles').update(profilePatch).eq('user_id', newUserId)
-      : await supabaseAdmin.from('profiles').insert({ ...profilePatch, user_id: newUserId });
+    if (existingProfile) {
+      const { error: deleteAutoProfileErr } = await supabaseAdmin.from('profiles').delete().eq('user_id', newUserId);
+      if (deleteAutoProfileErr) throw deleteAutoProfileErr;
+    }
+    const profileWrite = await supabaseAdmin.from('profiles').insert({ ...profilePatch, user_id: newUserId });
     if (profileWrite.error) throw profileWrite.error;
 
     const roleRows = (roles ?? []).map((r: any) => ({ user_id: newUserId, role: r.role }));
