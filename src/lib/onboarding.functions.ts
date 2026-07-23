@@ -305,18 +305,32 @@ async function assertCanEditOnboarding(supabase: any, userId: string, businessId
   return { rec, client, roles, isAdmin, isManager, isOwner, isSpecialist, isAM };
 }
 
+// Actor-scoped completion permissions.
+//   admin  → override on everything (can force-complete client-actor steps).
+//   manager → all Trophi-actor steps; CLIENT-actor steps require admin override
+//     so a manager cannot skip a client's signing or payment steps.
+//   assigned specialist / AM → their own actor steps, PLUS Trophi-side
+//     account_owner and system steps on their assigned account (so a
+//     specialist working steps 10–12 can also mark a Trophi-side step done).
+//   sales owner → account_owner + system steps on their own accounts.
+//   Nobody but admin can force-complete a `client` actor step.
 function canActOnStep(
   actor: StepActor,
   ctx: { isAdmin: boolean; isManager: boolean; isOwner: boolean; isSpecialist: boolean; isAM: boolean },
 ) {
   if (ctx.isAdmin) return true;
+  if (actor === 'client') return false; // admin-only override
+  if (ctx.isManager) return true;
   switch (actor) {
-    case 'account_owner': return ctx.isOwner || ctx.isManager;
-    case 'system': return ctx.isOwner || ctx.isManager;
-    case 'client': return ctx.isOwner || ctx.isManager; // Trophi can mark on client's behalf
-    case 'specialist': return ctx.isSpecialist || ctx.isManager;
-    case 'account_manager': return ctx.isAM || ctx.isManager;
+    case 'account_owner':
+    case 'system':
+      return ctx.isOwner || ctx.isSpecialist || ctx.isAM;
+    case 'specialist':
+      return ctx.isSpecialist;
+    case 'account_manager':
+      return ctx.isAM;
   }
+  return false;
 }
 
 export const completeStepFn = createServerFn({ method: 'POST' })

@@ -89,12 +89,18 @@ function OnboardingDetailPage() {
   if (isLoading) return <div className="text-sm text-muted-foreground">Loading…</div>;
   if (!data) return <div className="text-sm text-muted-foreground">Onboarding record not found.</div>;
 
+  // Mirror of server-side canActOnStep. Client-actor steps require admin.
   const canCompleteStep = (actor: string) => {
     if (!profile) return false;
-    if (profile.role === 'admin' || profile.role === 'manager') return true;
-    if (actor === 'account_owner' || actor === 'system' || actor === 'client') return data.salesPersonId === profile.id;
-    if (actor === 'specialist') return data.specialistId === profile.id;
-    if (actor === 'account_manager') return data.accountManagerId === profile.id;
+    if (profile.role === 'admin') return true;
+    if (actor === 'client') return false;
+    if (profile.role === 'manager') return true;
+    const isOwner = data.salesPersonId === profile.id;
+    const isSpecialist = data.specialistId === profile.id;
+    const isAM = data.accountManagerId === profile.id;
+    if (actor === 'account_owner' || actor === 'system') return isOwner || isSpecialist || isAM;
+    if (actor === 'specialist') return isSpecialist;
+    if (actor === 'account_manager') return isAM;
     return false;
   };
 

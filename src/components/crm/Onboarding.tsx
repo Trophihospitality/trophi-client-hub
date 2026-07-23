@@ -2,8 +2,14 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { Send, Clock, AlertTriangle } from 'lucide-react';
+import { Send, Clock, AlertTriangle, LayoutGrid, List } from 'lucide-react';
 import { listOnboardingFn, type OnboardingListRow } from '@/lib/onboarding.functions';
+import { useAuth } from '@/store/userStore';
+import { Button } from '@/components/ui/button';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import { OnboardingPipeline } from '@/components/crm/OnboardingPipeline';
 
 function money(n: number | null): string {
   if (n == null) return '—';
@@ -22,7 +28,7 @@ function businessHoursSince(iso: string | null): number {
   let hours = 0;
   const cur = new Date(start);
   while (cur < end) {
-    const day = cur.getDay(); // 0=Sun, 6=Sat
+    const day = cur.getDay();
     if (day !== 0 && day !== 6) {
       const nextHour = new Date(cur.getTime() + 60 * 60 * 1000);
       const cap = nextHour > end ? end : nextHour;
@@ -64,32 +70,52 @@ function ElapsedBadge({ started, waitingOn }: { started: string | null; waitingO
   );
 }
 
-type Filter = 'all' | 'client' | 'trophi' | 'overdue' | 'incoming';
+type AssignmentFilter = 'all' | 'mine' | 'unassigned';
+type StatusFilter = 'all' | 'client' | 'trophi' | 'overdue';
+
+// "Assigned to me" resolves per-role: any slot the current user holds
+// (sales owner / specialist / AM). For admin/manager, any of the three.
+function matchesMine(r: OnboardingListRow, userId: string): boolean {
+  return (
+    r.salesPersonId === userId ||
+    r.specialistId === userId ||
+    r.accountManagerId === userId
+  );
+}
+
+// "Unassigned" = the record has an open assignment slot at its current phase.
+function isUnassigned(r: OnboardingListRow): boolean {
+  if (r.currentStep >= 6 && !r.specialistId) return true;
+  if (r.currentStep >= 13 && !r.accountManagerId) return true;
+  return false;
+}
 
 export default function Onboarding() {
   const navigate = useNavigate();
   const listFn = useServerFn(listOnboardingFn);
+  const { profile } = useAuth();
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ['onboarding-list'],
     queryFn: () => listFn(),
   });
-  const [filter, setFilter] = useState<Filter>('all');
+  const [view, setView] = useState<'table' | 'pipeline'>('table');
+  const [assignment, setAssignment] = useState<AssignmentFilter>('all');
+  const [status, setStatus] = useState<StatusFilter>('all');
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {
-      if (filter === 'client') return r.waitingOn === 'client';
-      if (filter === 'trophi') return r.waitingOn === 'trophi';
-      if (filter === 'incoming') return r.incoming;
-      if (filter === 'overdue') {
+      if (assignment === 'mine' && profile && !matchesMine(r, profile.id)) return false;
+      if (assignment === 'unassigned' && !isUnassigned(r)) return false;
+      if (status === 'client' && r.waitingOn !== 'client') return false;
+      if (status === 'trophi' && r.waitingOn !== 'trophi') return false;
+      if (status === 'overdue') {
         const hrs = businessHoursSince(r.currentStepStartedAt);
         const threshold = r.waitingOn === 'client' ? 48 : r.waitingOn === 'trophi' ? 24 : Infinity;
-        return hrs >= threshold;
+        if (hrs < threshold) return false;
       }
       return true;
     });
-  }, [rows, filter]);
-
-  const hasIncoming = rows.some((r) => r.incoming);
+  }, [rows, assignment, status, profile]);
 
   return (
     <div className="space-y-6">
@@ -101,26 +127,39 @@ export default function Onboarding() {
       </div>
       <div className="gold-rule w-24" />
 
-      <div className="flex flex-wrap gap-2">
-        {([
-          ['all', 'All'],
-          ['client', 'Waiting on client'],
-          ['trophi', 'Waiting on Trophi'],
-          ['overdue', 'Overdue'],
-          ...(hasIncoming ? [['incoming', 'Incoming (specialist preview)']] as const : []),
-        ] as const).map(([v, l]) => (
-          <button
-            key={v}
-            onClick={() => setFilter(v as Filter)}
-            className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-              filter === v
-                ? 'border-[hsl(var(--trophi-gold))] bg-[hsl(var(--trophi-gold))]/10 text-[hsl(var(--trophi-gold))]'
-                : 'border-border bg-card text-muted-foreground hover:text-foreground'
-            }`}
+      {/* Filters + view toggle */}
+      <div className="flex flex-wrap items-center gap-3">
+        <Select value={assignment} onValueChange={(v) => setAssignment(v as AssignmentFilter)}>
+          <SelectTrigger className="w-48 bg-card"><SelectValue placeholder="Assignment" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All assignments</SelectItem>
+            <SelectItem value="mine">Assigned to me</SelectItem>
+            <SelectItem value="unassigned">Unassigned</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={status} onValueChange={(v) => setStatus(v as StatusFilter)}>
+          <SelectTrigger className="w-48 bg-card"><SelectValue placeholder="Status" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            <SelectItem value="client">Waiting on client</SelectItem>
+            <SelectItem value="trophi">Waiting on Trophi</SelectItem>
+            <SelectItem value="overdue">Overdue</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="ml-auto flex rounded-lg border bg-card p-0.5">
+          <Button
+            variant={view === 'table' ? 'secondary' : 'ghost'} size="sm" className="gap-1.5 h-8"
+            onClick={() => setView('table')}
           >
-            {l}
-          </button>
-        ))}
+            <List className="h-4 w-4" /> Table
+          </Button>
+          <Button
+            variant={view === 'pipeline' ? 'secondary' : 'ghost'} size="sm" className="gap-1.5 h-8"
+            onClick={() => setView('pipeline')}
+          >
+            <LayoutGrid className="h-4 w-4" /> Pipeline
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -132,6 +171,8 @@ export default function Onboarding() {
             No onboardings match this filter. Set a client's journey status to Approved in the CRM to start onboarding.
           </p>
         </div>
+      ) : view === 'pipeline' ? (
+        <OnboardingPipeline rows={filtered} />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
           <table className="w-full text-sm">
