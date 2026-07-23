@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { toast } from 'sonner';
 import {
-  listUsersFn, createTrophiUserFn, updateTrophiUserFn, resendTrophiInviteFn,
+  listUsersFn, createTrophiUserFn, updateTrophiUserFn, resendTrophiInviteFn, adminResetTrophiInviteFn,
   type AppRole, type AppUser,
 } from '@/lib/users.functions';
 
@@ -132,6 +132,7 @@ function TrophiUsersPage() {
 function TrophiUserRow({ u, isSpiro, onNavigate }: { u: AppUser; isSpiro: boolean; onNavigate: () => void }) {
   const qc = useQueryClient();
   const resend = useServerFn(resendTrophiInviteFn);
+  const resetInvite = useServerFn(adminResetTrophiInviteFn);
   const resendM = useMutation({
     mutationFn: () => resend({ data: { targetUserId: u.id } }),
     onSuccess: (res: any) => {
@@ -140,11 +141,25 @@ function TrophiUserRow({ u, isSpiro, onNavigate }: { u: AppUser; isSpiro: boolea
     },
     onError: (e: any) => toast.error(e?.message ?? 'Failed to resend invite'),
   });
+  const resetM = useMutation({
+    mutationFn: () => resetInvite({ data: { targetUserId: u.id } }),
+    onSuccess: (res: any) => {
+      toast.success(`Reset invite for ${res?.sentTo ?? u.email}`);
+      qc.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Failed to reset invite'),
+  });
 
   const accepted = u.hasAcceptedInvite;
   const hasError = !!u.inviteLastError;
   const invitePending = !accepted && !hasError;
   const showResend = isSpiro && !accepted;
+  const showReset = isSpiro && u.email.toLowerCase() !== 'spiro@trophihospitality.com';
+
+  const onReset = () => {
+    if (!confirm(`Reset & reinvite ${u.name} (${u.email})?\n\nThis deletes stale auth access and issues a fresh invite.`)) return;
+    resetM.mutate();
+  };
 
   return (
     <tr className="hover:bg-muted/20 cursor-pointer" onClick={onNavigate}>
@@ -188,15 +203,26 @@ function TrophiUserRow({ u, isSpiro, onNavigate }: { u: AppUser; isSpiro: boolea
       </td>
       {isSpiro && (
         <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-end gap-2">
           {showResend && (
             <button
-              disabled={resendM.isPending}
+              disabled={resendM.isPending || resetM.isPending}
               onClick={() => resendM.mutate()}
               className="rounded-md border border-input px-2.5 py-1 text-xs hover:bg-muted/40 disabled:opacity-60"
             >
               {resendM.isPending ? 'Sending…' : 'Resend invite'}
             </button>
           )}
+          {showReset && (
+            <button
+              disabled={resendM.isPending || resetM.isPending}
+              onClick={onReset}
+              className="rounded-md border border-red-200 px-2.5 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-60"
+            >
+              {resetM.isPending ? 'Resetting…' : 'Reset & reinvite'}
+            </button>
+          )}
+          </div>
         </td>
       )}
     </tr>
