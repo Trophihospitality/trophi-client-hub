@@ -138,7 +138,7 @@ export const listOnboardingFn = createServerFn({ method: 'GET' })
       const c = clientMap.get(r.business_id) ?? {};
       const def = defMap.get(r.current_step) ?? { name: '', actor: 'system', client_visible: false };
       const prog = progMap.get(r.business_id);
-      const incoming = !!isSpecialistViewer && r.specialist_id !== userId && r.current_step >= 1 && r.current_step <= 5;
+      const incoming = !!isSpecialistViewer && !r.specialist_id && r.current_step >= 1 && r.current_step <= 6;
       return {
         businessId: r.business_id,
         company: c.company ?? '',
