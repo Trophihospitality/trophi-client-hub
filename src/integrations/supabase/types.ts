@@ -1108,6 +1108,10 @@ export type Database = {
       }
       business_hours_since: { Args: { _ts: string }; Returns: number }
       can_access_client: { Args: { _business_id: string }; Returns: boolean }
+      can_view_client_via_onboarding: {
+        Args: { _business_id: string }
+        Returns: boolean
+      }
       can_view_onboarding: { Args: { _business_id: string }; Returns: boolean }
       ensure_onboarding_for_client: {
         Args: { _business_id: string }
