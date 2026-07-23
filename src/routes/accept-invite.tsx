@@ -30,13 +30,14 @@ function AcceptInvitePage() {
       : new URLSearchParams();
     return {
       token: q.get('token') ?? '',
+      tokenHash: q.get('token_hash') ?? q.get('tokenHash') ?? '',
       email: q.get('email') ?? '',
       type: q.get('type') ?? 'invite',
       hashAccessToken: hash.get('access_token') ?? '',
     };
   }, []);
 
-  const missingToken = !params.token && !params.hashAccessToken;
+  const missingToken = !params.token && !params.tokenHash && !params.hashAccessToken;
 
   const [ctx, setCtx] = useState<Ctx>(null);
   const [password, setPassword] = useState('');
@@ -73,12 +74,11 @@ function AcceptInvitePage() {
     setSaving(true);
     try {
       // Consume the one-time token ONLY now, on user submit.
-      if (params.token && params.email) {
-        const { error: verifyErr } = await supabase.auth.verifyOtp({
-          email: params.email,
-          token: params.token,
-          type: 'invite',
-        });
+      if ((params.token || params.tokenHash) && params.email) {
+        const payload = params.tokenHash
+          ? { email: params.email, token_hash: params.tokenHash, type: 'invite' as const }
+          : { email: params.email, token: params.token, type: 'invite' as const };
+        const { error: verifyErr } = await supabase.auth.verifyOtp(payload as any);
         if (verifyErr) throw verifyErr;
       } else if (!params.hashAccessToken) {
         throw new Error('Missing invite token. Ask your Trophi contact to resend the invite.');
