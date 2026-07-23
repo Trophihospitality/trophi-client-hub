@@ -74,13 +74,41 @@ function AcceptInvitePage() {
     setSaving(true);
     try {
       // Consume the one-time token ONLY now, on user submit.
-      if ((params.token || params.tokenHash) && params.email) {
-        // token_hash flow: MUST only include token_hash + type (no email).
+      if (params.tokenHash) {
+        // Token-hash verification is strict: the auth endpoint accepts ONLY
+        // token_hash + type. supabase.auth.verifyOtp appends
+        // gotrue_meta_security automatically, so call /verify directly and
+        // then persist the returned session ourselves.
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+        const verifyRes = await fetch(`${supabaseUrl}/auth/v1/verify`, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            apikey: supabaseKey,
+          },
+          body: JSON.stringify({ token_hash: params.tokenHash, type: 'invite' }),
+        });
+        const verifyBody = await verifyRes.json().catch(() => null);
+        if (!verifyRes.ok) {
+          throw new Error(
+            verifyBody?.message ?? verifyBody?.error_description ?? verifyBody?.error ?? 'Invite verification failed',
+          );
+        }
+        if (verifyBody?.access_token && verifyBody?.refresh_token) {
+          const { error: sessionErr } = await supabase.auth.setSession({
+            access_token: verifyBody.access_token,
+            refresh_token: verifyBody.refresh_token,
+          });
+          if (sessionErr) throw sessionErr;
+        }
+      } else if (params.token && params.email) {
         // Legacy token flow: needs email + token + type.
-        const payload = params.tokenHash
-          ? { token_hash: params.tokenHash, type: 'invite' as const }
-          : { email: params.email, token: params.token, type: 'invite' as const };
-        const { error: verifyErr } = await supabase.auth.verifyOtp(payload as any);
+        const { error: verifyErr } = await supabase.auth.verifyOtp({
+          email: params.email,
+          token: params.token,
+          type: 'invite',
+        } as any);
         if (verifyErr) throw verifyErr;
       } else if (!params.hashAccessToken) {
         throw new Error('Missing invite token. Ask your Trophi contact to resend the invite.');
