@@ -75,8 +75,10 @@ function AcceptInvitePage() {
     try {
       // Consume the one-time token ONLY now, on user submit.
       if ((params.token || params.tokenHash) && params.email) {
+        // token_hash flow: MUST only include token_hash + type (no email).
+        // Legacy token flow: needs email + token + type.
         const payload = params.tokenHash
-          ? { email: params.email, token_hash: params.tokenHash, type: 'invite' as const }
+          ? { token_hash: params.tokenHash, type: 'invite' as const }
           : { email: params.email, token: params.token, type: 'invite' as const };
         const { error: verifyErr } = await supabase.auth.verifyOtp(payload as any);
         if (verifyErr) throw verifyErr;
